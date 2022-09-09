@@ -19,9 +19,6 @@ prev_harmonizer_note = -999
 chord_seq_retrig = true
 
 function init()
-  -- tab_list = {'Viz','Arranger','Chords','Arp'}
-  -- tabs = UI.Tabs.new(1,{'Arranger','Chords','Arp'})
-  -- UI.Tabs:set_index(1)
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
@@ -31,7 +28,8 @@ function init()
   view = 'Chord' 
   transport = 'play'
   arp_clock_div = 8 --8th notes, etc
-  arp_source = 'internal' -- internal, crow, midi
+  arp_source_list = {'Internal', 'Crow', 'MIDI'}
+  arp_source = 'Internal'
   chord_seq = {} --needs to have a sub table for each pattern!
   for i = 1,8 do
     chord_seq[i] = {x = 1} -- equivalent to chord_seq[i]["x"] = 1
@@ -114,14 +112,13 @@ function loop(rate) --using one clock to control all sequence events
         else  
           arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
         end
-        if arp_seq[arp_pattern][arp_seq_position] > 0 and arp_source == 'internal' then
+        if arp_seq[arp_pattern][arp_seq_position] > 0 and arp_source == 'Internal' then
           arp_note_num =  arp_seq[arp_pattern][arp_seq_position] 
           harmonizer()
         end
         grid_redraw() --move
       end
-    -- elseif arp_source == 'crow' then -- handled in crow_trigger()
-    
+
     --crow clock out
     if clock_step % 8 == 0 then
       crow.output[1].slew = 0
@@ -228,12 +225,26 @@ function key(n,z)
 end
 
 function enc(n,d)
-  if n == 1 then
-    -- tabs:set_index_delta(d, true)
-    
-  elseif n == 3 then
-    mode = util.clamp(mode + d, 1, 9)
-    scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
+  if view == 'Chord' then
+    if n == 1 then
+    elseif n == 2 then
+    elseif n == 3 then
+      mode = util.clamp(mode + d, 1, 9)
+      scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
+    end
+  elseif view == 'Arp' then
+    if n == 1 then
+    elseif n == 2 then
+    elseif n == 3 then  
+      if arp_source == 'Internal' then                             --This is so shitty yikes
+        arp_source = arp_source_list[util.clamp(1 + d, 1,3)]
+      elseif arp_source == 'Crow' then 
+        arp_source = arp_source_list[util.clamp(2 + d, 1,3)]
+      elseif arp_source == 'MIDI' then 
+        arp_source = arp_source_list[util.clamp(3 + d, 1,3)]
+      end
+    end
+    -- redraw()
   end
   redraw()
 end
@@ -246,11 +257,11 @@ function play_chord()
 end
 
 function crow_trigger(s)
-  if arp_source == 'crow' then -- this calls sample_crow via crow.input[1].query()
+  if arp_source == 'Crow' then -- this calls sample_crow via crow.input[1].query()
     state = s
     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
-  -- elseif arp_source == 'internal' then
+  -- elseif arp_source == 'Internal' then
   --   -- sample_crow() -- if we want to layer arp transposition
   end
 end
@@ -277,8 +288,6 @@ function harmonizer()
     crow.output[3].volts = 8
     crow.output[3].slew = 0.005
     crow.output[3].volts = 0
-  -- else
-  --   print(prev_harmonizer_note .. '  ' .. harmonizer_note.. " note blocked") --crow calibration issue or sequencer?
   end
   chord_seq_retrig = false
 end
@@ -290,21 +299,21 @@ function redraw()
   screen.line_rel(0,64)
   screen.stroke()
   screen.move(0,10)
+  screen.level(view == 'Arrange' and 15 or 5)
+  screen.text('Arrange')
+  screen.move(0,20)
+  screen.level(view == 'Chord' and 15 or 5)
+  screen.text('Chord')
+  screen.move(0,30)
+  screen.level(view == 'Arp' and 15 or 5)
+  screen.text('Arp')
+  screen.move(40,10)
+  screen.level(15)
   if view == 'Arrange' then
-    screen.text("Arrange")
-    screen.move(0,20)
-    -- screen.text(music.SCALES[mode].name)
-    screen.update()
   elseif view == 'Chord' then
-    screen.text("Chord")
-    screen.move(40,10)
     screen.text('Scale: ' .. music.SCALES[mode].name)
-    screen.update()
   elseif view == 'Arp' then
-    screen.text("Arp")
-    screen.move(0,20)
-    -- screen.text(music.SCALES[mode].name)
-    screen.update()
+    screen.text('Source: ' .. arp_source)
   end
-  -- screen.update()
+  screen.update()
 end
