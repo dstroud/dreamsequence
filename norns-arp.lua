@@ -24,12 +24,13 @@ function init()
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
   crow.input[2].change = crow_trigger
   grid_dirty = true
-  pages = {'Arrange','Chord','Arp'}
+  pages = {'Arrange','Chord','Arp','Crow'}
   page_index = 2
   view = 'Chord' 
   transport = 'play'
   arp_clock_div = 8 --8th notes, etc
   arp_source_list = {'Internal', 'Crow', 'MIDI'}
+  arp_source_index = 1
   arp_source = 'Internal'
   chord_seq = {} --needs to have a sub table for each pattern!
   for i = 1,8 do
@@ -106,7 +107,6 @@ function loop(rate) --using one clock to control all sequence events
     end
     
     -- arp clock
-    -- if arp_source == 'internal' then
       if clock_step % 4 == 0 then
         if arp_seq_position > arp_pattern_length[arp_pattern] then 
           arp_seq_position = 1
@@ -242,15 +242,9 @@ function enc(n,d)
   elseif view == 'Arp' then
     if n == 2 then
     elseif n == 3 then  
-      if arp_source == 'Internal' then                             --This is so shitty yikes
-        arp_source = arp_source_list[util.clamp(1 + d, 1,3)]
-      elseif arp_source == 'Crow' then 
-        arp_source = arp_source_list[util.clamp(2 + d, 1,3)]
-      elseif arp_source == 'MIDI' then 
-        arp_source = arp_source_list[util.clamp(3 + d, 1,3)]
-      end
+      arp_source_index = util.clamp(arp_source_index + d, 1, #arp_source_list)
+      arp_source = arp_source_list[arp_source_index]
     end
-    -- redraw()
   end
   redraw()
 end
@@ -304,15 +298,11 @@ function redraw()
   screen.move(36,0)
   screen.line_rel(0,64)
   screen.stroke()
-  screen.move(0,10)
-  screen.level(view == 'Arrange' and 15 or 4)
-  screen.text('Arrange')
-  screen.move(0,20)
-  screen.level(view == 'Chord' and 15 or 4)
-  screen.text('Chord')
-  screen.move(0,30)
-  screen.level(view == 'Arp' and 15 or 4)
-  screen.text('Arp')
+  for i = 1,#pages do
+    screen.move(0,i*10)
+    screen.level(view == pages[i] and 15 or 3)
+    screen.text(pages[i])
+  end
   screen.move(40,10)
   screen.level(15)
   if view == 'Arrange' then
