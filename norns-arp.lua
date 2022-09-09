@@ -10,6 +10,7 @@
 g = grid.connect()
 engine.name = "PolyPerc"
 music = require 'musicutil'
+UI = require "ui"
 transpose = 48
 mode = math.random(1,9)
 scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
@@ -18,12 +19,16 @@ prev_harmonizer_note = -999
 chord_seq_retrig = true
 
 function init()
+  -- tab_list = {'Viz','Arranger','Chords','Arp'}
+  -- tabs = UI.Tabs.new(1,{'Arranger','Chords','Arp'})
+  -- UI.Tabs:set_index(1)
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
   crow.input[2].change = crow_trigger
   grid_dirty = true
-  view = 'chord' -- chord, arrange, arp
+  pages = {'Arrange','Chord','Arp'}
+  view = 'Chord' 
   transport = 'play'
   arp_clock_div = 8 --8th notes, etc
   arp_source = 'internal' -- internal, crow, midi
@@ -140,8 +145,11 @@ end
 
 function grid_redraw()
   g:all(0)
-  if view == 'chord' then
-    -- g:all(0)
+  if view == 'Arrange' then
+    g:led(16,6,15)
+    --nothin yet!
+  elseif view == 'Chord' then
+    g:led(16,7,15)
     for i = 1,14 do                                           -- chord seq playhead
       g:led(i, chord_seq_position, 3)
     end
@@ -151,7 +159,8 @@ function grid_redraw()
         g:led(chord_seq[i].x, i, 15)                          --set LEDs for chord sequence
       end
     end
-  elseif view == 'arp' then
+  elseif view == 'Arp' then
+    g:led(16,8,15)
     for i = 1,14 do                                           -- chord seq playhead
       g:led(i, arp_seq_position, 3)
     end
@@ -161,15 +170,24 @@ function grid_redraw()
         g:led(arp_seq[arp_pattern][i], i, 15)                          --set LEDs for arp sequence
       end
     end
-  elseif view == 'arrange' then
+  elseif view == 'Arrange' then
     -- g:refresh()
   end
   g:refresh()
 end
 
 function g.key(x,y,z)
-  if view == 'chord' then
-    if z == 1 then
+  if z == 1 then
+    if x == 16 and y > 5 then --view switcher buttons
+      view = pages[y - 5]
+      -- redraw()
+      -- grid_redraw()
+    elseif view == 'Arrange' then
+      -- grid_redraw() --redundant?
+      -- redraw()
+      
+    --chord keys
+    elseif view == 'Chord' then
       if x < 15 then
         if x == chord_seq[y].x then
           chord_seq[y].x = 0 -- Only need to set one of these TBH
@@ -184,10 +202,10 @@ function g.key(x,y,z)
       elseif x == 15 then
         pattern_length[pattern] = y
       end
-      grid_redraw() --redundant?
-    end
-  elseif view == 'arp' then
-    if z == 1 then
+      -- grid_redraw() --redundant?
+      
+    -- arp keys
+    elseif view == 'Arp' then
       if x < 15 then
         if x == arp_seq[arp_pattern][y] then
           arp_seq[arp_pattern][y] = 0
@@ -198,8 +216,9 @@ function g.key(x,y,z)
       elseif x == 15 then
         arp_pattern_length[arp_pattern] = y
       end
-    grid_redraw() --redundant?
     end
+  redraw()
+  grid_redraw()
   end
 end
 
@@ -209,7 +228,10 @@ function key(n,z)
 end
 
 function enc(n,d)
-  if n == 3 then
+  if n == 1 then
+    -- tabs:set_index_delta(d, true)
+    
+  elseif n == 3 then
     mode = util.clamp(mode + d, 1, 9)
     scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
   end
@@ -264,7 +286,25 @@ end
 function redraw()
   screen.clear()
   screen.level(15)
-  screen.move(0,20)
-  screen.text(music.SCALES[mode].name)
-  screen.update()
+  screen.move(36,0)
+  screen.line_rel(0,64)
+  screen.stroke()
+  screen.move(0,10)
+  if view == 'Arrange' then
+    screen.text("Arrange")
+    screen.move(0,20)
+    -- screen.text(music.SCALES[mode].name)
+    screen.update()
+  elseif view == 'Chord' then
+    screen.text("Chord")
+    screen.move(40,10)
+    screen.text('Scale: ' .. music.SCALES[mode].name)
+    screen.update()
+  elseif view == 'Arp' then
+    screen.text("Arp")
+    screen.move(0,20)
+    -- screen.text(music.SCALES[mode].name)
+    screen.update()
+  end
+  -- screen.update()
 end
