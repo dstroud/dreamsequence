@@ -25,6 +25,7 @@ function init()
   crow.input[2].change = crow_trigger
   grid_dirty = true
   pages = {'Arrange','Chord','Arp'}
+  page_index = 2
   view = 'Chord' 
   transport = 'play'
   arp_clock_div = 8 --8th notes, etc
@@ -142,6 +143,9 @@ end
 
 function grid_redraw()
   g:all(0)
+  for i = 6,8 do
+    g:led(16,i,4)
+  end
   if view == 'Arrange' then
     g:led(16,6,15)
     --nothin yet!
@@ -176,7 +180,8 @@ end
 function g.key(x,y,z)
   if z == 1 then
     if x == 16 and y > 5 then --view switcher buttons
-      view = pages[y - 5]
+      page_index = y - 5
+      view = pages[page_index]
       -- redraw()
       -- grid_redraw()
     elseif view == 'Arrange' then
@@ -225,16 +230,17 @@ function key(n,z)
 end
 
 function enc(n,d)
-  if view == 'Chord' then
-    if n == 1 then
-    elseif n == 2 then
+  if n == 1 then
+    page_index = util.clamp(page_index + d, 1, #pages)
+    view = pages[page_index]
+  elseif view == 'Chord' then
+    if n == 2 then
     elseif n == 3 then
       mode = util.clamp(mode + d, 1, 9)
       scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
     end
   elseif view == 'Arp' then
-    if n == 1 then
-    elseif n == 2 then
+    if n == 2 then
     elseif n == 3 then  
       if arp_source == 'Internal' then                             --This is so shitty yikes
         arp_source = arp_source_list[util.clamp(1 + d, 1,3)]
@@ -294,18 +300,18 @@ end
   
 function redraw()
   screen.clear()
-  screen.level(15)
+  screen.level(7)
   screen.move(36,0)
   screen.line_rel(0,64)
   screen.stroke()
   screen.move(0,10)
-  screen.level(view == 'Arrange' and 15 or 5)
+  screen.level(view == 'Arrange' and 15 or 4)
   screen.text('Arrange')
   screen.move(0,20)
-  screen.level(view == 'Chord' and 15 or 5)
+  screen.level(view == 'Chord' and 15 or 4)
   screen.text('Chord')
   screen.move(0,30)
-  screen.level(view == 'Arp' and 15 or 5)
+  screen.level(view == 'Arp' and 15 or 4)
   screen.text('Arp')
   screen.move(40,10)
   screen.level(15)
