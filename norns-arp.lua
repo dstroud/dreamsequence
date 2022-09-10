@@ -1,4 +1,11 @@
 -- norns-arp
+--
+-- KEY 1: start/stop
+-- ENC 1: main menu
+--
+-- ENC 2: sub menu
+-- ENC 3: edit value 
+--
 -- Crow IN 1: voltage to sample
 -- Crow IN 2: trigger
 -- Crow OUT 1: clock
@@ -29,8 +36,18 @@ function init()
   grid_dirty = true
   pages = {'Arrange','Chord','Arp','Crow','MIDI','Global'}
   page_index = 2
-  view = 'Chord' 
-  transport = 'play'
+  view = 'Chord'
+  submenus = {
+              {"Follow"}, -- Arrange
+              {}, -- Chord
+              {}, -- Arp
+              {}, -- Crow
+              {}, -- MIDI
+              {"Tempo","Scale"} -- Global
+              }
+  -- submenu = 1
+  submenu_index = 1
+  transport_active = false
   -- do_follow = true -- whether pattern follows pattern seq
   arp_clock_div = 8 --8th notes, etc
   arp_source_list = {'Internal', 'Crow', 'MIDI'}
@@ -63,15 +80,25 @@ function init()
   arp_seq_note = 8
   engine.release(5)
   clock_step = 31 -- will turn over to step 0 on first loop
-  clock_id = clock.run(grid_redraw_clock)
-  seq_div = {}
-  -- seq_div[1] = clock.run(clock_out,1,1) -- seq number, rate divisor. Like 1 PPQN LOL
-  -- seq_div[2] = clock.run(chord_loop,2,.25)
-  seq_div[2] = clock.run(loop, 8) --fixed global clock at 32nd notes
+  clock.run(grid_redraw_clock)
+  -- seq_div[2] = clock.run(loop, 8) --fixed global clock at 32nd notes
+  -- clock.transport.start()
 end
 
+function clock.transport.start()
+  --TBD if we want to reset to beginning of sequence/arps
+  transport_active = true
+  clock_loop_id = clock.run(loop, 8) --fixed global clock at 32nd notes
+  print("Clock "..clock_loop_id.. " called")
+end
+
+function clock.transport.stop()
+  transport_active = false
+  clock.cancel(clock_loop_id)
+end
+  
 function loop(rate) --using one clock to control all sequence events
-  while transport == 'play' do
+  while transport_active do
     clock.sync(1/8)
     clock_step = util.wrap(clock_step + 1, 0, 31) -- 0-indexed counter for checking when to fire events
     
@@ -234,35 +261,40 @@ function g.key(x,y,z)
 end
 
 function key(n,z)
-  if z == 1 then
+  if n == 1 and z == 0 then -- Transport control operates on key up because of the K1 delay
+    if transport_active then
+      print("stop key")
+      clock.transport.stop()
+    else
+      print("start key")
+      clock.transport.start()
+    end
   end
 end
 
 function enc(n,d)
   if n == 1 then
+    submenu_index = 1
     page_index = util.clamp(page_index + d, 1, #pages)
     view = pages[page_index]
+    selected_menu = submenus[page_index][submenu_index]
+  elseif n == 2 then
+    submenu_index = util.clamp(submenu_index + d, 1, #submenus[page_index])
+    selected_menu = submenus[page_index][submenu_index]
   elseif view == 'Arrange' then
-    if n == 2 then
-    elseif n == 3 then
       params:set("do_follow", util.clamp(params:get("do_follow") + d, 1, 2))
-    end
   elseif view == 'Chord' then
-    if n == 2 then
-    elseif n == 3 then
       mode = util.clamp(mode + d, 1, 9)
       scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
-    end
   elseif view == 'Arp' then
-    if n == 2 then
-    elseif n == 3 then  
       arp_source_index = util.clamp(arp_source_index + d, 1, #arp_source_list)
       arp_source = arp_source_list[arp_source_index]
-    end
   elseif view == 'Global' then
-    if n == 2 then
-    elseif n == 3 then
-    params:set("clock_tempo", util.clamp(params:get("clock_tempo") + d, 1, 300))
+    if selected_menu == 'Tempo' then
+      params:set("clock_tempo", util.clamp(params:get("clock_tempo") + d, 1, 300))
+    elseif selected_menu == 'Scale' then
+      mode = util.clamp(mode + d, 1, 9)
+      scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
     end
   end
   redraw()
@@ -331,9 +363,10 @@ function redraw()
   elseif view == 'Arp' then
     screen.text('Source: ' .. arp_source)
   elseif view == 'Global' then
+    screen.level(submenu_index == 1 and 15 or 3)
     screen.text('Tempo: '..params:get("clock_tempo"))
-    -- screen.move_rel(0,10)
     screen.move(40,20)
+    screen.level(submenu_index == 2 and 15 or 3)
     screen.text('Scale: ' .. music.SCALES[mode].name)
   end
   screen.update()
