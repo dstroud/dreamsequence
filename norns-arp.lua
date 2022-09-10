@@ -11,6 +11,9 @@ g = grid.connect()
 engine.name = "PolyPerc"
 music = require 'musicutil'
 UI = require "ui"
+
+params:add_option("do_follow", "Follow", {"False","True"},True) -- Whether arranger is enabled
+
 transpose = 48
 mode = math.random(1,9)
 scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
@@ -24,11 +27,11 @@ function init()
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
   crow.input[2].change = crow_trigger
   grid_dirty = true
-  pages = {'Arrange','Chord','Arp','Crow'}
+  pages = {'Arrange','Chord','Arp','Crow','MIDI','Global'}
   page_index = 2
   view = 'Chord' 
   transport = 'play'
-  do_follow = true -- whether pattern follows pattern seq
+  -- do_follow = true -- whether pattern follows pattern seq
   arp_clock_div = 8 --8th notes, etc
   arp_source_list = {'Internal', 'Crow', 'MIDI'}
   arp_source_index = 1
@@ -41,9 +44,9 @@ function init()
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
     for i = 1,8 do
-      chord_seq[p][i] = {x = 1} -- equivalent to chord_seq[i]["x"] = 1
-      chord_seq[p][i]["c"] = 1 -- chord wrapped 1-7   
-      chord_seq[p][i]["o"] = 0 -- octave
+      chord_seq[p][i] = {x = 1} -- raw value
+      chord_seq[p][i]["c"] = 1  -- chord wrapped 1-7   
+      chord_seq[p][i]["o"] = 0  -- octave
     end
   end
   chord_seq_position = 0
@@ -60,7 +63,7 @@ function init()
   arp_seq_note = 8
   engine.release(5)
   clock_step = 31 -- will turn over to step 0 on first loop
-  clock.run(grid_redraw_clock)
+  clock_id = clock.run(grid_redraw_clock)
   seq_div = {}
   -- seq_div[1] = clock.run(clock_out,1,1) -- seq number, rate divisor. Like 1 PPQN LOL
   -- seq_div[2] = clock.run(chord_loop,2,.25)
@@ -75,7 +78,7 @@ function loop(rate) --using one clock to control all sequence events
     --chord clock
     if clock_step % 32 == 0 then
       chord_seq_retrig = true -- indicates when we're on a new chord seq step for arp filtering
-      if do_follow and chord_seq_position >= pattern_length[pattern] then
+      if params:get("do_follow") == 2 and chord_seq_position >= pattern_length[pattern] then
         pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
         pattern = pattern_seq[pattern_seq_position]
       end
@@ -239,6 +242,11 @@ function enc(n,d)
   if n == 1 then
     page_index = util.clamp(page_index + d, 1, #pages)
     view = pages[page_index]
+  elseif view == 'Arrange' then
+    if n == 2 then
+    elseif n == 3 then
+      params:set("do_follow", util.clamp(params:get("do_follow") + d, 1, 2))
+    end
   elseif view == 'Chord' then
     if n == 2 then
     elseif n == 3 then
@@ -250,6 +258,11 @@ function enc(n,d)
     elseif n == 3 then  
       arp_source_index = util.clamp(arp_source_index + d, 1, #arp_source_list)
       arp_source = arp_source_list[arp_source_index]
+    end
+  elseif view == 'Global' then
+    if n == 2 then
+    elseif n == 3 then
+    params:set("clock_tempo", util.clamp(params:get("clock_tempo") + d, 1, 300))
     end
   end
   redraw()
@@ -312,10 +325,16 @@ function redraw()
   screen.move(40,10)
   screen.level(15)
   if view == 'Arrange' then
+    screen.text('Follow: '..params:string("do_follow"))
   elseif view == 'Chord' then
     screen.text('Scale: ' .. music.SCALES[mode].name)
   elseif view == 'Arp' then
     screen.text('Source: ' .. arp_source)
+  elseif view == 'Global' then
+    screen.text('Tempo: '..params:get("clock_tempo"))
+    -- screen.move_rel(0,10)
+    screen.move(40,20)
+    screen.text('Scale: ' .. music.SCALES[mode].name)
   end
   screen.update()
 end
