@@ -34,9 +34,12 @@ function init()
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
   crow.input[2].change = crow_trigger
   grid_dirty = true
+  views = {'Arrange','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
+  view_index = 2
+  view_name = views[view_index]
   pages = {'Arrange','Chord','Arp','Crow','MIDI','Global'}
   page_index = 2
-  view = 'Chord'
+  page_name = pages[page_index]
   submenus = {
               {"Follow"}, -- Arrange
               {}, -- Chord
@@ -160,7 +163,7 @@ function grid_redraw()
   for i = 6,8 do
     g:led(16,i,4)
   end
-  if view == 'Arrange' then
+  if view_name == 'Arrange' then
     g:led(16,6,15)
     for x = 1,16 do
       for y = 1,4 do
@@ -171,7 +174,7 @@ function grid_redraw()
         end
       end
     end
-  elseif view == 'Chord' then
+  elseif view_name == 'Chord' then
   for i = 1,4 do
     g:led(16,i, i == pattern and 15 or 4)
   end
@@ -185,7 +188,7 @@ function grid_redraw()
         g:led(chord_seq[pattern][i].x, i, 15)                         -- set LEDs for chord sequence
       end
     end
-  elseif view == 'Arp' then
+  elseif view_name == 'Arp' then
     g:led(16,8,15)
     for i = 1,14 do                                                   -- chord seq playhead
       g:led(i, arp_seq_position, 3)
@@ -203,11 +206,11 @@ end
 function g.key(x,y,z)
   if z == 1 then
     if x == 16 and y > 5 then --view switcher buttons
-      page_index = y - 5
-      view = pages[page_index]
+      view_index = y - 5
+      view_name = views[view_index]
       
     --arrange keys
-    elseif view == 'Arrange' then
+    elseif view_name == 'Arrange' then
       if y < 5 then
         if y == pattern_seq[x] and x > 1 then 
           pattern_seq[x] = 0
@@ -224,7 +227,7 @@ function g.key(x,y,z)
     
     --chord keys
     -- print('checking for Chord keys')
-    elseif view == 'Chord' then
+    elseif view_name == 'Chord' then
       if x < 15 then
         if x == chord_seq[pattern][y].x then
           chord_seq[pattern][y].x = 0 -- Only need to set one of these TBH
@@ -243,7 +246,7 @@ function g.key(x,y,z)
       end
 
     -- arp keys
-    elseif view == 'Arp' then
+    elseif view_name == 'Arp' then
       if x < 15 then
         if x == arp_seq[arp_pattern][y] then
           arp_seq[arp_pattern][y] = 0
@@ -276,20 +279,20 @@ function enc(n,d)
   if n == 1 then
     submenu_index = 1
     page_index = util.clamp(page_index + d, 1, #pages)
-    view = pages[page_index]
+    page_name = pages[page_index]
     selected_menu = submenus[page_index][submenu_index]
   elseif n == 2 then
     submenu_index = util.clamp(submenu_index + d, 1, #submenus[page_index])
     selected_menu = submenus[page_index][submenu_index]
-  elseif view == 'Arrange' then
+  elseif page_name == 'Arrange' then
       params:set("do_follow", util.clamp(params:get("do_follow") + d, 1, 2))
-  elseif view == 'Chord' then
+  elseif page_name == 'Chord' then
       mode = util.clamp(mode + d, 1, 9)
       scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
-  elseif view == 'Arp' then
+  elseif page_name == 'Arp' then
       arp_source_index = util.clamp(arp_source_index + d, 1, #arp_source_list)
       arp_source = arp_source_list[arp_source_index]
-  elseif view == 'Global' then
+  elseif page_name == 'Global' then
     if selected_menu == 'Tempo' then
       params:set("clock_tempo", util.clamp(params:get("clock_tempo") + d, 1, 300))
     elseif selected_menu == 'Scale' then
@@ -351,18 +354,18 @@ function redraw()
   screen.stroke()
   for i = 1,#pages do
     screen.move(0,i*10)
-    screen.level(view == pages[i] and 15 or 3)
+    screen.level(page_name == pages[i] and 15 or 3)
     screen.text(pages[i])
   end
   screen.move(40,10)
   screen.level(15)
-  if view == 'Arrange' then
+  if page_name == 'Arrange' then
     screen.text('Follow: '..params:string("do_follow"))
-  elseif view == 'Chord' then
+  elseif page_name == 'Chord' then
     screen.text('Scale: ' .. music.SCALES[mode].name)
-  elseif view == 'Arp' then
+  elseif page_name == 'Arp' then
     screen.text('Source: ' .. arp_source)
-  elseif view == 'Global' then
+  elseif page_name == 'Global' then
     screen.level(submenu_index == 1 and 15 or 3)
     screen.text('Tempo: '..params:get("clock_tempo"))
     screen.move(40,20)
