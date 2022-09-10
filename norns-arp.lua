@@ -28,21 +28,27 @@ function init()
   page_index = 2
   view = 'Chord' 
   transport = 'play'
+  do_follow = true -- whether pattern follows pattern seq
   arp_clock_div = 8 --8th notes, etc
   arp_source_list = {'Internal', 'Crow', 'MIDI'}
   arp_source_index = 1
   arp_source = 'Internal'
-  chord_seq = {} --needs to have a sub table for each pattern!
-  for i = 1,8 do
-    chord_seq[i] = {x = 1} -- equivalent to chord_seq[i]["x"] = 1
-    chord_seq[i]["c"] = 1 -- chord wrapped 1-7   
-    chord_seq[i]["o"] = 0 -- octave
+  pattern_length = {4,8,8,8} -- loop length for each of the 4 patterns
+  pattern = 1
+  pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+  pattern_seq_position = 1
+  pattern_seq_length = 1
+  chord_seq = {{},{},{},{}} 
+  for p = 1,4 do
+    for i = 1,8 do
+      chord_seq[p][i] = {x = 1} -- equivalent to chord_seq[i]["x"] = 1
+      chord_seq[p][i]["c"] = 1 -- chord wrapped 1-7   
+      chord_seq[p][i]["o"] = 0 -- octave
+    end
   end
   chord_seq_position = 0
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
-  chord = {music.generate_chord_scale_degree(chord_seq[1].o * 12, mode, chord_seq[1].c, false)}
-  pattern_length = {4,8,8,8} -- loop length for each of the 4 patterns
-  pattern = 1
+  chord = {music.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, mode, chord_seq[pattern][1].c, false)}
   arp_seq = {{8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8},
@@ -61,32 +67,6 @@ function init()
   seq_div[2] = clock.run(loop, 8) --fixed global clock at 32nd notes
 end
 
--- function clock_out(index,rate) --investigate nondeterministic clock firing
---   while true do
---     clock.sync(1/rate)
---     crow.output[1].slew = 0
---     crow.output[1].volts = 8
---     crow.output[1].slew = 0.005
---     crow.output[1].volts = 0  
---   end
--- end
-
--- function chord_loop(index,rate)
---   while true do
---     clock.sync(1/rate)
---     chord_seq_retrig = true -- indicates when we're on a new chord seq step for harmonizer filtering
---     if chord_seq_position > pattern_length[pattern] then 
---       chord_seq_position = 1
---     else  
---       chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
---     end
---     if chord_seq[chord_seq_position].c > 0 then
---       play_chord()
---     end
---     grid_redraw()
---   end
--- end
-
 function loop(rate) --using one clock to control all sequence events
   while transport == 'play' do
     clock.sync(1/8)
@@ -94,13 +74,17 @@ function loop(rate) --using one clock to control all sequence events
     
     --chord clock
     if clock_step % 32 == 0 then
-      chord_seq_retrig = true -- indicates when we're on a new chord seq step for harmonizer filtering
+      chord_seq_retrig = true -- indicates when we're on a new chord seq step for arp filtering
+      if do_follow and chord_seq_position >= pattern_length[pattern] then
+        pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
+        pattern = pattern_seq[pattern_seq_position]
+      end
       if chord_seq_position > pattern_length[pattern] then 
         chord_seq_position = 1
       else  
         chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
       end
-      if chord_seq[chord_seq_position].c > 0 then
+      if chord_seq[pattern][chord_seq_position].c > 0 then
         play_chord()
       end
       grid_redraw() -- move
@@ -131,7 +115,7 @@ function loop(rate) --using one clock to control all sequence events
   end
 end
 
-function grid_redraw_clock() --IDK if this is even needed. Maybe for pulsing LEDs etc...
+function grid_redraw_clock() --Not necessary now. Maybe for pulsing LEDs etc...
   while true do
     if grid_dirty then
       grid_redraw()
@@ -148,31 +132,40 @@ function grid_redraw()
   end
   if view == 'Arrange' then
     g:led(16,6,15)
-    --nothin yet!
+    for x = 1,16 do
+      for y = 1,4 do
+        -- g:led(x, y, y == pattern_seq[x] and 15 or 4)
+        g:led(x,y, x == pattern_seq_position and 7 or 3)
+        if y == pattern_seq[x] then
+          g:led(x, y, 15)
+        end
+      end
+    end
   elseif view == 'Chord' then
+  for i = 1,4 do
+    g:led(16,i, i == pattern and 15 or 4)
+  end
     g:led(16,7,15)
-    for i = 1,14 do                                           -- chord seq playhead
+    for i = 1,14 do                                                   -- chord seq playhead
       g:led(i, chord_seq_position, 3)
     end
     for i = 1,8 do
-      g:led(15, i, pattern_length[pattern] < i and 4 or 15)   --set pattern_length LEDs
-      if chord_seq[i].x > 0 then                              -- muted steps
-        g:led(chord_seq[i].x, i, 15)                          --set LEDs for chord sequence
+      g:led(15, i, pattern_length[pattern] < i and 4 or 15)           --set pattern_length LEDs
+      if chord_seq[pattern][i].x > 0 then                             -- muted steps
+        g:led(chord_seq[pattern][i].x, i, 15)                         -- set LEDs for chord sequence
       end
     end
   elseif view == 'Arp' then
     g:led(16,8,15)
-    for i = 1,14 do                                           -- chord seq playhead
+    for i = 1,14 do                                                   -- chord seq playhead
       g:led(i, arp_seq_position, 3)
     end
     for i = 1,8 do
       g:led(15, i, arp_pattern_length[arp_pattern] < i and 4 or 15)   --set pattern_length LEDs
-      if arp_seq[arp_pattern][i] > 0 then                              -- muted steps
-        g:led(arp_seq[arp_pattern][i], i, 15)                          --set LEDs for arp sequence
+      if arp_seq[arp_pattern][i] > 0 then                             -- muted steps
+        g:led(arp_seq[arp_pattern][i], i, 15)                         --set LEDs for arp sequence
       end
     end
-  elseif view == 'Arrange' then
-    -- g:refresh()
   end
   g:refresh()
 end
@@ -182,30 +175,43 @@ function g.key(x,y,z)
     if x == 16 and y > 5 then --view switcher buttons
       page_index = y - 5
       view = pages[page_index]
-      -- redraw()
-      -- grid_redraw()
-    elseif view == 'Arrange' then
-      -- grid_redraw() --redundant?
-      -- redraw()
       
+    --arrange keys
+    elseif view == 'Arrange' then
+      if y < 5 then
+        if y == pattern_seq[x] and x > 1 then 
+          pattern_seq[x] = 0
+        else pattern_seq[x] = y  
+        end
+        for i = 1,16 do
+          if pattern_seq[i] == 0 then
+            pattern_seq_length = i - 1
+            print("pattern_seq_length "..pattern_seq_length)
+            break
+          end
+        end 
+      end
+    
     --chord keys
+    -- print('checking for Chord keys')
     elseif view == 'Chord' then
       if x < 15 then
-        if x == chord_seq[y].x then
-          chord_seq[y].x = 0 -- Only need to set one of these TBH
-          chord_seq[y].c = 0 -- Only need to set one of these TBH
-          chord_seq[y].o = 0 -- Only need to set one of these TBH
+        if x == chord_seq[pattern][y].x then
+          chord_seq[pattern][y].x = 0 -- Only need to set one of these TBH
+          chord_seq[pattern][y].c = 0 -- Only need to set one of these TBH
+          chord_seq[pattern][y].o = 0 -- Only need to set one of these TBH
         else
-          chord_seq[y].x = x --raw
-          chord_seq[y].c = util.wrap(x, 1, 7) --wrap so we can store octave in second index of chord_seq
-          chord_seq[y].o = math.floor(x / 8) --octave
+          chord_seq[pattern][y].x = x --raw
+          chord_seq[pattern][y].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+          chord_seq[pattern][y].o = math.floor(x / 8) --octave
           grid_dirty = true
         end
       elseif x == 15 then
         pattern_length[pattern] = y
+      elseif x == 16 and y <5 then
+        pattern = y
       end
-      -- grid_redraw() --redundant?
-      
+
     -- arp keys
     elseif view == 'Arp' then
       if x < 15 then
@@ -250,7 +256,7 @@ function enc(n,d)
 end
 
 function play_chord()
-  chord = {music.generate_chord_scale_degree(chord_seq[chord_seq_position].o * 12, mode, chord_seq[chord_seq_position].c, false)}
+  chord = {music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, mode, chord_seq[pattern][chord_seq_position].c, false)}
   for i=1,#chord[1] do -- only one chord is stored but it's in index 1 for some reason
     engine.hz(music.note_num_to_freq(chord[1][i] + transpose)) -- same as above
   end
