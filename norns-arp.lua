@@ -20,8 +20,8 @@ music = require 'musicutil'
 UI = require "ui"
 
 params:add_option("do_follow", "Follow", {"False","True"},True) -- Whether arranger is enabled
+params:add_number("transpose","Transpose",-24, 24, 0)
 
-transpose = 48
 mode = math.random(1,9)
 scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
 harmo_filter = 0 -- 1 filters out duplicate notes, 0 allows 
@@ -38,15 +38,15 @@ function init()
   view_index = 2
   view_name = views[view_index]
   pages = {'Arrange','Chord','Arp','Crow','MIDI','Global'}
-  page_index = 2
+  page_index = 6
   page_name = pages[page_index]
   submenus = {
-              {"Follow"}, -- Arrange
+              {'Follow'}, -- Arrange
               {}, -- Chord
               {}, -- Arp
               {}, -- Crow
               {}, -- MIDI
-              {"Tempo","Scale"} -- Global
+              {'Tempo','Scale','Transpose'} -- Global
               }
   -- submenu = 1
   submenu_index = 1
@@ -131,7 +131,7 @@ function loop(rate) --using one clock to control all sequence events
           arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
         end
         if arp_seq[arp_pattern][arp_seq_position] > 0 and arp_source == 'Internal' then
-          arp_note_num =  arp_seq[arp_pattern][arp_seq_position] 
+          arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
           harmonizer()
         end
         grid_redraw() --move
@@ -298,6 +298,8 @@ function enc(n,d)
     elseif selected_menu == 'Scale' then
       mode = util.clamp(mode + d, 1, 9)
       scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
+    elseif selected_menu == 'Transpose' then
+      params:set('transpose', util.clamp(params:get('transpose') + d, -24, 24))
     end
   end
   redraw()
@@ -306,7 +308,7 @@ end
 function play_chord()
   chord = {music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, mode, chord_seq[pattern][chord_seq_position].c, false)}
   for i=1,#chord[1] do -- only one chord is stored but it's in index 1 for some reason
-    engine.hz(music.note_num_to_freq(chord[1][i] + transpose)) -- same as above
+    engine.hz(music.note_num_to_freq(chord[1][i] + params:get('transpose')+ 48 )) -- same as above
   end
 end
 
@@ -322,7 +324,7 @@ end
 
 function sample_crow(v)
   volts = v
-  arp_note_num =  round(volts * 12,0) + 1 
+  arp_note_num =  round(volts * 12,0) + 1
   harmonizer()
 end
   
@@ -335,9 +337,9 @@ function harmonizer()
   prev_harmonizer_note = harmonizer_note
   harmonizer_note = chord[1][util.wrap(arp_note_num, 1, #chord[1])]
   harmonizer_octave = math.floor((arp_note_num - 1) / #chord[1],0)
-  -- print("volts: " .. volts.. "  "  .. arp_note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
+  -- print(arp_note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
   if chord_seq_retrig == true or harmo_filter == 0 or (harmo_filter == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
-    crow.output[4].volts = (harmonizer_note + (harmonizer_octave * 12)) / 12
+    crow.output[4].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
     crow.output[3].slew = 0
     crow.output[3].volts = 8
     crow.output[3].slew = 0.005
@@ -362,7 +364,7 @@ function redraw()
   if page_name == 'Arrange' then
     screen.text('Follow: '..params:string("do_follow"))
   elseif page_name == 'Chord' then
-    screen.text('Scale: ' .. music.SCALES[mode].name)
+    -- screen.text('Scale: ' .. music.SCALES[mode].name)
   elseif page_name == 'Arp' then
     screen.text('Source: ' .. arp_source)
   elseif page_name == 'Global' then
@@ -371,6 +373,9 @@ function redraw()
     screen.move(40,20)
     screen.level(submenu_index == 2 and 15 or 3)
     screen.text('Scale: ' .. music.SCALES[mode].name)
+    screen.move(40,30)
+    screen.level(submenu_index == 3 and 15 or 3)
+    screen.text('Transpose: ' .. params:get('transpose'))
   end
   screen.update()
 end
