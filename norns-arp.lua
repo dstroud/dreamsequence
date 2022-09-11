@@ -50,6 +50,7 @@ function init()
               }
   -- submenu = 1
   submenu_index = 1
+  selected_menu = submenus[page_index][submenu_index]
   transport_active = false
   -- do_follow = true -- whether pattern follows pattern seq
   arp_clock_div = 8 --8th notes, etc
@@ -61,6 +62,9 @@ function init()
   pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
   pattern_seq_position = 1
   pattern_seq_length = 1
+  global_clock_div = 8
+  chord_clock_div = 32
+  arp_clock_div = 4
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
     for i = 1,8 do
@@ -82,7 +86,7 @@ function init()
   arp_seq_position = 0
   arp_seq_note = 8
   engine.release(5)
-  clock_step = 31 -- will turn over to step 0 on first loop
+  clock_step = chord_clock_div - 1 -- will turn over to step 0 on first loop
   clock.run(grid_redraw_clock)
   -- seq_div[2] = clock.run(loop, 8) --fixed global clock at 32nd notes
   -- clock.transport.start()
@@ -91,7 +95,7 @@ end
 function clock.transport.start()
   --TBD if we want to reset to beginning of sequence/arps
   transport_active = true
-  clock_loop_id = clock.run(loop, 8) --fixed global clock at 32nd notes
+  clock_loop_id = clock.run(loop, global_clock_div) --8 == global clock at 32nd notes
   print("Clock "..clock_loop_id.. " called")
 end
 
@@ -102,11 +106,11 @@ end
   
 function loop(rate) --using one clock to control all sequence events
   while transport_active do
-    clock.sync(1/8)
-    clock_step = util.wrap(clock_step + 1, 0, 31) -- 0-indexed counter for checking when to fire events
+    clock.sync(1/rate)
+    clock_step = util.wrap(clock_step + 1, 0, chord_clock_div - 1) -- 0-indexed counter for checking when to fire events
     
     --chord clock
-    if clock_step % 32 == 0 then
+    if clock_step % chord_clock_div == 0 then
       chord_seq_retrig = true -- indicates when we're on a new chord seq step for arp filtering
       if params:get("do_follow") == 2 and chord_seq_position >= pattern_length[pattern] then
         pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
@@ -124,7 +128,7 @@ function loop(rate) --using one clock to control all sequence events
     end
     
     -- arp clock
-      if clock_step % 4 == 0 then
+      if clock_step % arp_clock_div == 0 then
         if arp_seq_position > arp_pattern_length[arp_pattern] then 
           arp_seq_position = 1
         else  
@@ -216,8 +220,8 @@ function g.key(x,y,z)
           pattern_seq[x] = 0
         else pattern_seq[x] = y  
         end
-        for i = 1,16 do
-          if pattern_seq[i] == 0 then
+        for i = 1,17 do
+          if pattern_seq[i] == 0  or i == 17 then
             pattern_seq_length = i - 1
             print("pattern_seq_length "..pattern_seq_length)
             break
@@ -363,6 +367,8 @@ function redraw()
   screen.level(15)
   if page_name == 'Arrange' then
     screen.text('Follow: '..params:string("do_follow"))
+    screen.move(40,20)
+    screen.text('Length: ' .. arrangement_time())
   elseif page_name == 'Chord' then
     -- screen.text('Scale: ' .. music.SCALES[mode].name)
   elseif page_name == 'Arp' then
@@ -379,3 +385,28 @@ function redraw()
   end
   screen.update()
 end
+
+function arrangement_time()
+  arrangement_steps = 0
+  for i = 1, pattern_seq_length do
+    arrangement_steps = arrangement_steps + pattern_length[pattern_seq[i]]
+  end
+  arrangement_time_s = arrangement_steps * 60 / params:get('clock_tempo') / global_clock_div * chord_clock_div
+  hours = string.format("%02.f", math.floor(arrangement_time_s/3600));
+  mins = string.format("%02.f", math.floor(arrangement_time_s/60 - (hours*60)));
+  secs = string.format("%02.f", math.floor(arrangement_time_s - hours*3600 - mins *60));
+  arrangement_time_clock = hours..":"..mins..":"..secs
+  return(arrangement_time_clock)
+end  
+  
+-- function seconds_to_clock(seconds)
+--   -- local seconds = tonumber(seconds)
+--   if seconds <= 0 then
+--     return "00:00:00";
+--   else
+--     hours = string.format("%02.f", math.floor(seconds/3600));
+--     mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
+--     secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
+--     return hours..":"..mins..":"..secs
+--   end
+-- end
