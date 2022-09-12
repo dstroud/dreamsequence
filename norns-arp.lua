@@ -115,9 +115,12 @@ function loop(rate) --using one clock to control all sequence events
       if params:get("do_follow") == 2 and chord_seq_position >= pattern_length[pattern] then
         pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
         pattern = pattern_seq[pattern_seq_position]
+        -- chord_seq_position = 1
+        pattern_seq_retrig = true
       end
-      if chord_seq_position > pattern_length[pattern] then 
+      if chord_seq_position > pattern_length[pattern] or pattern_seq_retrig then 
         chord_seq_position = 1
+        pattern_seq_retrig = false
       else  
         chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
       end
@@ -125,6 +128,7 @@ function loop(rate) --using one clock to control all sequence events
         play_chord()
       end
       grid_redraw() -- move
+      redraw() -- to update Arrange mini chart. Worth it?
     end
     
     -- arp clock
@@ -352,6 +356,19 @@ function harmonizer()
   chord_seq_retrig = false
 end
   
+function arrangement_time()
+  arrangement_steps = 0
+  for i = 1, pattern_seq_length do
+    arrangement_steps = arrangement_steps + pattern_length[pattern_seq[i]]
+  end
+  arrangement_time_s = arrangement_steps * 60 / params:get('clock_tempo') / global_clock_div * chord_clock_div
+  hours = string.format("%02.f", math.floor(arrangement_time_s/3600));
+  mins = string.format("%02.f", math.floor(arrangement_time_s/60 - (hours*60)));
+  secs = string.format("%02.f", math.floor(arrangement_time_s - hours*3600 - mins *60));
+  arrangement_time_clock = hours..":"..mins..":"..secs
+  return(arrangement_time_clock)
+end  
+
 function redraw()
   screen.clear()
   screen.level(7)
@@ -369,8 +386,36 @@ function redraw()
     screen.text('Follow: '..params:string("do_follow"))
     screen.move(40,20)
     screen.text('Length: ' .. arrangement_time())
+    
+    -- local rect_x = 39
+    -- for i = 1,pattern_seq_length do
+    --   screen.level(15)
+    --   rect_w = pattern_length[pattern_seq[i]]
+    --   rect_h = -pattern_seq[i]
+    --   screen.rect(rect_x + i, 64, rect_w, rect_h)
+    --   screen.fill()
+    --   rect_x = rect_x + rect_w
+    --   print(rect_x.. ' ' .. rect_h)
+    -- end
+    
+    
+    -- All this needs to be revisited after getting pattern switching figured out
+    local rect_x = 39
+    -- local rect_gap_adj = 0
+    for i = params:get('do_follow') == 2 and pattern_seq_position or 1, pattern_seq_length do
+      screen.level(15)
+      elapsed = params:get('do_follow') == 2 and (i == pattern_seq_position and chord_seq_position or 0) or 0 --recheck if this is needed when not following
+      rect_w = pattern_length[pattern_seq[i]] - elapsed
+      rect_h = pattern_seq[i]
+      rect_gap_adj = params:get('do_follow') == 2 and (pattern_seq_position - 1) or 0 --recheck if this is needed when not following
+      screen.rect(rect_x + i - rect_gap_adj, 60, rect_w, rect_h)
+      -- screen.rect(rect_x + i - pattern_seq_position - 1, 60, rect_w, rect_h)
+      screen.fill()
+      rect_x = rect_x + rect_w
+      -- print(rect_x.. ' ' .. rect_h)
+    end
+    
   elseif page_name == 'Chord' then
-    -- screen.text('Scale: ' .. music.SCALES[mode].name)
   elseif page_name == 'Arp' then
     screen.text('Source: ' .. arp_source)
   elseif page_name == 'Global' then
@@ -385,28 +430,3 @@ function redraw()
   end
   screen.update()
 end
-
-function arrangement_time()
-  arrangement_steps = 0
-  for i = 1, pattern_seq_length do
-    arrangement_steps = arrangement_steps + pattern_length[pattern_seq[i]]
-  end
-  arrangement_time_s = arrangement_steps * 60 / params:get('clock_tempo') / global_clock_div * chord_clock_div
-  hours = string.format("%02.f", math.floor(arrangement_time_s/3600));
-  mins = string.format("%02.f", math.floor(arrangement_time_s/60 - (hours*60)));
-  secs = string.format("%02.f", math.floor(arrangement_time_s - hours*3600 - mins *60));
-  arrangement_time_clock = hours..":"..mins..":"..secs
-  return(arrangement_time_clock)
-end  
-  
--- function seconds_to_clock(seconds)
---   -- local seconds = tonumber(seconds)
---   if seconds <= 0 then
---     return "00:00:00";
---   else
---     hours = string.format("%02.f", math.floor(seconds/3600));
---     mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
---     secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
---     return hours..":"..mins..":"..secs
---   end
--- end
