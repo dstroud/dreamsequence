@@ -34,18 +34,6 @@ params:add{
   -- action = function() grid_redraw() end
   }
 
--- params:add{
---   type = 'number',
---   id = 'booltest',
---   name = 'booltest',
---   min = 0,
---   max = 1,
---   default = 1,
---   formatter = function(param) return t_f_string(param:get()) end,
---   action = function() grid_redraw() end
---   }
-
-
 params:add_option("do_crow_auto_rest", "Crow Auto-rest", {"False","True"}, 1) -- Whether repeat notes are suppressed
 
 params:add_number("transpose","Transpose",-24, 24, 0)
@@ -69,14 +57,12 @@ scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
 prev_harmonizer_note = -999
 chord_seq_retrig = true
 
+in_midi = midi.connect(1)
+out_midi = midi.connect(1) -- Should set up params for several USB options or virtual?
+
 function init()
-  
-    -- prev_arrange_viz_steps = 0
-    -- prev_arrange_viz_x = 0
-    -- arrange_viz_steps = 0
-    -- arrange_viz_x = 0
-    
-  out_midi = midi.connect(1) -- Should set up params for several USB options
+  -- out_midi = midi.connect(1) -- Should set up params for several USB options or virtual?
+  -- m = midi.connect() -- if no argument is provided, we default to port 1
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
@@ -93,7 +79,7 @@ function init()
               {'Division', 'Destination'}, -- Chord
               {'Division', 'Destination'}, -- Arp
               {'Division', 'Destination', 'Auto-rest'}, -- Crow
-              {'Division', 'Destination'}, -- MIDI
+              {'Destination'}, -- MIDI
               {'Tempo','Scale','Transpose'} -- Global
               }
   -- submenu = 1
@@ -103,7 +89,7 @@ function init()
   pattern_length = {2,2,2,2} -- loop length for each of the 4 patterns
   pattern = 1
   pattern_queue = false
-  pattern_preview = false
+  -- pattern_preview = false
   pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
   pattern_seq_position = 1
   pattern_seq_length = 1
@@ -215,7 +201,7 @@ function loop(rate) --using one clock to control all sequence events
         end
         if arp_seq[arp_pattern][arp_seq_position] > 0 then
           arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
-          harmonizer(params:string('arp_dest'))
+          harmonizer(arp_note_num, params:string('arp_dest'))
         end
         grid_redraw() --move
       end
@@ -343,8 +329,8 @@ function g.key(x,y,z)
       elseif x == 15 then
         pattern_length[pattern] = y
       elseif x == 16 and y <5 then  --Pattern switcher
-        pattern_preview = y
-        print('previewing pattern '.. pattern_preview)
+        -- pattern_preview = y --not implemented yet
+        -- print('previewing pattern '.. pattern_preview)
       end
 
     -- arp keys
@@ -363,7 +349,7 @@ function g.key(x,y,z)
   redraw()
   grid_redraw()
   elseif view_name == 'Chord' and x == 16 and y <5 then --z == 0, pattern key released
-    pattern_preview = false
+    -- pattern_preview = false
     params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
     if y == pattern_queue then
       pattern = y
@@ -423,6 +409,10 @@ function enc(n,d)
     elseif selected_menu == 'Auto-rest' then
       params:set("do_crow_auto_rest", util.clamp(params:get("do_crow_auto_rest") + d, 1, 2))
     end
+  elseif page_name == 'MIDI' then
+    if selected_menu == 'Destination' then 
+      params:set('midi_dest', util.clamp(params:get('midi_dest') + d, 1, 2))
+    end
   elseif page_name == 'Global' then
     if selected_menu == 'Tempo' then
       params:set("clock_tempo", util.clamp(params:get("clock_tempo") + d, 1, 300))
@@ -440,12 +430,13 @@ function crow_trigger(s) --Trigger in used to sample voltage from Crow IN 1
     state = s
     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
+    print('crow trigger in')
 end
 
 function sample_crow(v)
   volts = v
-  arp_note_num =  round(volts * 12,0) + 1
-  harmonizer(params:string('crow_dest')) 
+  crow_note_num =  round(volts * 12,0) + 1
+  harmonizer(crow_note_num, params:string('crow_dest')) 
 end
   
 function round(num, numDecimalPlaces)
@@ -453,10 +444,21 @@ function round(num, numDecimalPlaces)
   return math.floor(num * mult + 0.5) / mult
 end
 
-function harmonizer(destination) 
+in_midi.event = function(data)
+  local d = midi.to_msg(data)
+  if d.type == "note_on" then
+    -- engine.amp(d.vel / 127)
+    -- engine.hz(music.note_num_to_freq(d.note))
+    harmonizer(d.note - 36, params:string('midi_dest'))
+    -- print('midi note in: ' ..d.note)
+  end
+end
+
+function harmonizer(note_num, destination) 
+  -- print(note_num .. " " ..destination)
   prev_harmonizer_note = harmonizer_note
-  harmonizer_note = chord[1][util.wrap(arp_note_num, 1, #chord[1])]
-  harmonizer_octave = math.floor((arp_note_num - 1) / #chord[1],0)
+  harmonizer_note = chord[1][util.wrap(note_num, 1, #chord[1])]
+  harmonizer_octave = math.floor((note_num - 1) / #chord[1],0)
   -- print(arp_note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
   -- if chord_seq_retrig == true or harmo_filter == 0 or (harmo_filter == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
   if chord_seq_retrig == true or params:string('do_crow_auto_rest') == 'False' or (params:string('do_crow_auto_rest') == 'True' and (prev_harmonizer_note ~= harmonizer_note)) then
@@ -540,6 +542,12 @@ function redraw()
     screen.move(40,30)
     screen.level(submenu_index == 3 and 15 or 3)
     screen.text('Auto-rest: '..params:string('do_crow_auto_rest'))
+  elseif page_name == 'MIDI' then
+    screen.level(submenu_index == 1 and 15 or 3)
+    screen.text('Destination: '..params:string('midi_dest'))
+    -- screen.move(40,20)
+    -- screen.level(submenu_index == 2 and 15 or 3)
+    -- screen.text('Auto-rest: '..params:string('do_midi_auto_rest'))
   elseif page_name == 'Global' then
     screen.level(submenu_index == 1 and 15 or 3)
     screen.text('Tempo: '..params:get("clock_tempo"))
