@@ -30,7 +30,8 @@ params:add{
   max = 1,
   default = 1,
   formatter = function(param) return t_f_string(param:get()) end,
-  action = function() grid_redraw() end
+  action = function() reset_arrangement() end, function() grid_redraw() end
+  -- action = function() grid_redraw() end
   }
 
 -- params:add{
@@ -129,7 +130,7 @@ function init()
   arp_seq_position = 0
   arp_seq_note = 8
   engine.release(5)
-  clock_step = params:get('chord_div') - 1 -- will turn over to step 0 on first loop
+  reset_clock() -- will turn over to step 0 on first loop
   -- clock.run(grid_redraw_clock) --Not used currently
   grid_redraw()
 end
@@ -143,7 +144,7 @@ function print_this(x)
 end
 
 function clock.transport.start()
-  --TBD if we want to reset to beginning of sequence/arps
+  --TBD if we want to reset to beginning of sequence/arps with reset_clock()
   transport_active = true
   clock_loop_id = clock.run(loop, global_clock_div) --8 == global clock at 32nd notes
   print("Clock "..clock_loop_id.. " called")
@@ -153,16 +154,25 @@ function clock.transport.stop()
   transport_active = false
   clock.cancel(clock_loop_id)
   stop_chord()
-  reset_arrangement()
+  if params:get('do_follow') == 1 then
+    reset_arrangement()
+  end
 end
    
 function reset_arrangement() -- check: how to send a reset out to Crow for external clocking
+  print('resetting arrangement')
+  pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
   pattern_seq_position = 1
   pattern = pattern_seq[1]
-  clock_step = params:get('chord_div') - 1
+  reset_clock()
   grid_redraw()
+  redraw()
+end
+
+function reset_clock()
+  clock_step = params:get('chord_div') - 1    
 end
 
 function loop(rate) --using one clock to control all sequence events
@@ -264,7 +274,7 @@ function grid_redraw()
       next_pattern_indicator = pattern_queue or pattern
     end
   for i = 1,4 do
-      g:led(16, i, i == next_pattern_indicator and 7 or 3)
+      g:led(16, i, i == next_pattern_indicator and 7 or 3) --Should add something to highlight when pattern_preview is ~= nil
     if i == pattern then
       g:led(16, i, 15)
     end
@@ -353,8 +363,16 @@ function g.key(x,y,z)
   redraw()
   grid_redraw()
   elseif view_name == 'Chord' and x == 16 and y <5 then --z == 0, pattern key released
+    pattern_preview = false
     params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
-    pattern_queue = y
+    if y == pattern_queue then
+      pattern = y
+      arp_seq_position = 0
+      chord_seq_position = 0
+      reset_clock()
+    else
+      pattern_queue = y
+    end
     redraw()
     grid_redraw()
   end
