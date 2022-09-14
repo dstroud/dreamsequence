@@ -17,11 +17,21 @@
 g = grid.connect()
 engine.name = "PolyPerc"
 music = require 'musicutil'
-UI = require "ui"
+-- UI = require "ui"
 
--- params:add_option("do_follow", "Follow", {"False","True"},True) -- Whether arranger is enabled
--- params:set_action("do_follow", print(params:string('do_follow')))
+mode = math.random(1,9)
+scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
+prev_harmonizer_note = -999
+chord_seq_retrig = true
 
+in_midi = midi.connect(1)
+out_midi = midi.connect(1) -- Should set up params for several USB options or virtual?
+
+function init()
+params:add_separator ('Global')
+params:add_number("transpose","Transpose",-24, 24, 0)
+
+params:add_separator ('Arrange')
 params:add{
   type = 'number',
   id = 'do_follow',
@@ -34,35 +44,40 @@ params:add{
   -- action = function() grid_redraw() end
   }
 
-params:add_option("do_crow_auto_rest", "Crow Auto-rest", {"False","True"}, 1) -- Whether repeat notes are suppressed
-
-params:add_number("transpose","Transpose",-24, 24, 0)
-params:add_number('arp_div', 'Arp Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
+params:add_separator ('Chord')
 params:add_number('chord_div', 'Chord Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,65,96,128,192,256
+params:add_option("chord_dest", "Chord dest.", {'None',"Engine", 'MIDI'},2)
+params:set_action("chord_dest",function() submenu_update() end)
+params:add{
+  type = 'number',
+  id = 'chord_pp_amp',
+  name = 'Chord amp',
+  min = 0,
+  max = 100,
+  default = 100,
+  formatter = function(param) return percent(param:get()) end,
+  }
+params:add_control("chord_pp_cutoff","Chord cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
+params:add_number("chord_pp_gain","Chord gain",0, 400, 200) --hiding this one in system menu
+params:add_number("chord_pp_pw","Chord pulse width",1, 99, 50)
+params:add_number("chord_pp_release","Chord release",1, 10, 5)
+params:add_number('chord_midi_velocity','MIDI Velocity',0, 127, 127)
+params:add_number("chord_midi_cc1","MIDI Mod",0, 127, 0)
+
+params:add_separator ('Arp')
+params:add_number('arp_div', 'Arp Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
+params:add_option("arp_dest", "Arp dest.", {'None',"Engine","Crow", 'MIDI'},2)
+params:add_number("arp_pp_release","Arp release",1, 10, 5)
+
+params:add_separator ('Crow')
 params:add_number('crow_div', 'Crow Division', 1, 32, 8) --most useful TBD
+params:add_option("crow_dest", "Crow dest.", {'None',"Engine","Crow",'MIDI'},2)
+params:add_option("do_crow_auto_rest", "Crow Auto-rest", {"False","True"}, 1) 
 
-params:add_option("chord_dest", "Chord dest.", {"Engine", 'MIDI'},1)
-params:add_option("arp_dest", "Arp dest.", {"Engine","Crow", 'MIDI'},1)
-params:add_option("crow_dest", "Crow dest.", {"Engine","Crow",'MIDI'},1)
-params:add_option("midi_dest", "Midi dest.", {"Engine","Crow", 'MIDI'},1)
-
--- params:add_number('midi_out_a', 'MIDI Out A', 1, 16, 1)
--- params:add_number('midi_out_b', 'MIDI Out B', 1, 16, 2)
--- params:add_number('midi_out_c', 'MIDI Out C', 1, 16, 3)
-
-
-mode = math.random(1,9)
-scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
--- harmo_filter = 0 -- 1 filters out duplicate notes, 0 allows 
-prev_harmonizer_note = -999
-chord_seq_retrig = true
-
-in_midi = midi.connect(1)
-out_midi = midi.connect(1) -- Should set up params for several USB options or virtual?
-
-function init()
-  -- out_midi = midi.connect(1) -- Should set up params for several USB options or virtual?
-  -- m = midi.connect() -- if no argument is provided, we default to port 1
+params:add_separator ('MIDI')
+params:add_option("midi_dest", "Midi dest.", {'None',"Engine","Crow", 'MIDI'},2)
+-- params:bang()
+  
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
@@ -76,29 +91,30 @@ function init()
   page_name = pages[page_index]
   submenus = {
               {'Follow'}, -- Arrange
-              {'Division', 'Destination'}, -- Chord
+              {'Division', 'Destination', 'Amp', 'Cutoff', 'Pulse width', 'Release'}, -- Chord
               {'Division', 'Destination'}, -- Arp
               {'Division', 'Destination', 'Auto-rest'}, -- Crow
               {'Destination'}, -- MIDI
               {'Tempo','Scale','Transpose'} -- Global
               }
+  
   -- submenu = 1
   submenu_index = 1
   selected_menu = submenus[page_index][submenu_index]
   transport_active = false
-  pattern_length = {2,2,2,2} -- loop length for each of the 4 patterns
+  pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
   pattern = 1
   pattern_queue = false
   -- pattern_preview = false
   pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
   pattern_seq_position = 1
-  pattern_seq_length = 1
+  pattern_seq_length = 1 
   global_clock_div = 8
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
     for i = 1,8 do
-      chord_seq[p][i] = {x = 1} -- raw value
-      chord_seq[p][i]["c"] = 1  -- chord wrapped 1-7   
+      chord_seq[p][i] = {x = 0} -- raw value
+      chord_seq[p][i]["c"] = 0  -- chord wrapped 1-7   
       chord_seq[p][i]["o"] = 0  -- octave
     end
   end
@@ -106,7 +122,7 @@ function init()
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
   chord = {music.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, mode, chord_seq[pattern][1].c, false)}
   chord_hanging_notes = {}
-  arp_seq = {{8,8,8,8,8,8,8,8},
+  arp_seq = {{0,0,0,0,0,0,0,0},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8}
@@ -115,14 +131,42 @@ function init()
   arp_pattern = 1
   arp_seq_position = 0
   arp_seq_note = 8
-  engine.release(5)
+  -- engine.release(5)
   reset_clock() -- will turn over to step 0 on first loop
   -- clock.run(grid_redraw_clock) --Not used currently
   grid_redraw()
 end
 
+
+function submenu_update()
+  if params:string('chord_dest') == 'None' then -- Dynamic chord submenus
+    submenus[2] = {'Division', 'Destination'}
+  elseif params:string('chord_dest') == 'Engine' then
+    submenus[2] = {'Division', 'Destination', 'Amp', 'Cutoff', 'Pulse width', 'Release'}
+  elseif params:string('chord_dest') == 'MIDI' then
+    submenus[2] = {'Division', 'Destination', 'Velocity'}
+  end
+end
+
+function round(num, numDecimalPlaces)
+  local mult = 10^(numDecimalPlaces or 0)
+  return math.floor(num * mult + 0.5) / mult
+end
+
 function t_f_string(x)
   return(x == 1 and 'True' or 'False')
+end
+
+function div_10(x)
+  return(x / 10)
+end
+
+function mult_100_percent(x)
+  return(math.floor(x * 100) .. '%')
+end
+
+function percent(x)
+  return(math.floor(x) .. '%')
 end
 
 function print_this(x)
@@ -139,10 +183,10 @@ end
 function clock.transport.stop()
   transport_active = false
   clock.cancel(clock_loop_id)
-  stop_chord()
   if params:get('do_follow') == 1 then
     reset_arrangement()
   end
+  stop_chord()
 end
    
 function reset_arrangement() -- check: how to send a reset out to Crow for external clocking
@@ -222,11 +266,16 @@ function play_chord(destination)
   chord = {music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, mode, chord_seq[pattern][chord_seq_position].c, false)}
   if destination == 'Engine' then
     for i=1,#chord[1] do -- only one chord is stored but it's in index 1. Kinda weird IDK.
+      engine.amp(params:get('chord_pp_amp') / 100)
+      engine.cutoff(params:get('chord_pp_cutoff'))
+      engine.release(params:get('chord_pp_release'))
+      -- engine.gain(params:get('chord_pp_gain') / 100)
+      engine.pw(params:get('chord_pp_pw') / 100)
       engine.hz(music.note_num_to_freq(chord[1][i] + params:get('transpose')+ 48 )) -- same as above
     end
   elseif destination == 'MIDI' then
     for i=1,#chord[1] do -- only one chord is stored but it's in index 1. Kinda weird IDK.
-      out_midi:note_on((chord[1][i] + params:get('transpose')+ 48 ),127) 
+      out_midi:note_on((chord[1][i] + params:get('transpose')+ 48 ),params:get('chord_midi_velocity')) 
       chord_hanging_notes[i] = chord[1][i] + params:get('transpose')+ 48
     end
   end
@@ -306,7 +355,7 @@ function g.key(x,y,z)
         for i = 1,17 do
           if pattern_seq[i] == 0  or i == 17 then
             pattern_seq_length = i - 1
-            print("pattern_seq_length "..pattern_seq_length)
+            -- print("pattern_seq_length "..pattern_seq_length)
             break
           end
         end 
@@ -392,30 +441,40 @@ function enc(n,d)
   elseif page_name == 'Chord' then
     if selected_menu == 'Division' then
       params:set("chord_div", util.clamp(params:get("chord_div") + d, 4, 128))
-      elseif selected_menu == 'Destination' then 
-      params:set("chord_dest", util.clamp(params:get("chord_dest") + d, 1, 2)) -- only 2 destinations
+    elseif selected_menu == 'Destination' then 
+      params:set("chord_dest", util.clamp(params:get("chord_dest") + d, 1, 3)) -- only 2 destinations
+    elseif selected_menu == 'Amp' then
+      params:set("chord_pp_amp", util.clamp(params:get("chord_pp_amp") + d, 0, 100))
+    elseif selected_menu == 'Cutoff' then
+      params:delta("chord_pp_cutoff",d)
+    elseif selected_menu == 'Pulse width' then
+      params:delta("chord_pp_pw",d)
+    elseif selected_menu == 'Release' then
+      params:delta("chord_pp_release",d)
+    elseif selected_menu == 'Velocity' then
+      params:delta("chord_midi_velocity",d)
     end
   elseif page_name == 'Arp' then
     if selected_menu == 'Division' then
       params:set("arp_div", util.clamp(params:get("arp_div") + d, 1, 32))
     elseif selected_menu == 'Destination' then 
-      params:set("arp_dest", util.clamp(params:get("arp_dest") + d, 1, 2))
+      params:set("arp_dest", util.clamp(params:get("arp_dest") + d, 1, 3))
     end
   elseif page_name == 'Crow' then
     if selected_menu == 'Division' then
       params:set("crow_div", util.clamp(params:get("crow_div") + d, 1, 32))
     elseif selected_menu == 'Destination' then 
-      params:set("crow_dest", util.clamp(params:get("crow_dest") + d, 1, 2))
+      params:set("crow_dest", util.clamp(params:get("crow_dest") + d, 1, 3))
     elseif selected_menu == 'Auto-rest' then
       params:set("do_crow_auto_rest", util.clamp(params:get("do_crow_auto_rest") + d, 1, 2))
     end
   elseif page_name == 'MIDI' then
     if selected_menu == 'Destination' then 
-      params:set('midi_dest', util.clamp(params:get('midi_dest') + d, 1, 2))
+      params:set('midi_dest', util.clamp(params:get('midi_dest') + d, 1, 3))
     end
   elseif page_name == 'Global' then
     if selected_menu == 'Tempo' then
-      params:set("clock_tempo", util.clamp(params:get("clock_tempo") + d, 1, 300))
+      params:set("clock_tempo", util.clamp(params:get("clock_tempo") + d, 1, 240))
     elseif selected_menu == 'Scale' then
       mode = util.clamp(mode + d, 1, 9)
       scale = music.generate_scale_of_length(60,music.SCALES[mode].name,8)
@@ -437,11 +496,7 @@ function sample_crow(v)
   volts = v
   crow_note_num =  round(volts * 12,0) + 1
   harmonizer(crow_note_num, params:string('crow_dest')) 
-end
-  
-function round(num, numDecimalPlaces)
-  local mult = 10^(numDecimalPlaces or 0)
-  return math.floor(num * mult + 0.5) / mult
+  chord_seq_retrig = false -- Check this to make sure it's working correct
 end
 
 in_midi.event = function(data)
@@ -464,6 +519,7 @@ function harmonizer(note_num, destination)
   if chord_seq_retrig == true or params:string('do_crow_auto_rest') == 'False' or (params:string('do_crow_auto_rest') == 'True' and (prev_harmonizer_note ~= harmonizer_note)) then
   -- params:add_option("do_crow_auto_rest", "Crow Auto-rest", {"False","True"}, 1) -- Whether repeat notes are suppressed
     if destination == 'Engine' then
+      engine.release(params:get('arp_pp_release')) -- Fix: test only. Needs to be passed from calling function
       engine.hz(music.note_num_to_freq(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48))
     elseif destination == 'Crow' then
       crow.output[4].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
@@ -473,7 +529,7 @@ function harmonizer(note_num, destination)
       crow.output[3].volts = 0
     end
   end
-  chord_seq_retrig = false
+  -- chord_seq_retrig = false -- Fix: Needs to be fired by calling function depending on where enabled
 end
   
 function arrangement_time()
@@ -488,6 +544,26 @@ function arrangement_time()
   arrangement_time_clock = hours..":"..mins..":"..secs
   return(arrangement_time_clock)
 end  
+
+-- function arrangement_time()
+--   steps_remaining_in_pattern = math.min(pattern_length[pattern_seq_position], pattern_length[pattern_seq_position] - chord_seq_position + 1)
+--   -- print(steps_remaining_in_pattern)
+--   arrangement_steps = 0
+--   if pattern_seq_length - pattern_seq_position > 0 then
+--     for i = math.min(pattern_seq_position + 1, pattern_seq_length), pattern_seq_length do  --steps after the current pattern
+--       arrangement_steps = arrangement_steps + pattern_length[pattern_seq[i]]
+--     end
+--   end
+--   arrangement_steps = arrangement_steps + steps_remaining_in_pattern
+--   -- print(arrangement_steps)
+--   -- print('chord_seq_length[pattern_seq_position]')
+--   arrangement_time_s = arrangement_steps * 60 / params:get('clock_tempo') / global_clock_div * params:get('chord_div')
+--   hours = string.format("%02.f", math.floor(arrangement_time_s/3600));
+--   mins = string.format("%02.f", math.floor(arrangement_time_s/60 - (hours*60)));
+--   secs = string.format("%02.f", math.floor(arrangement_time_s - hours*3600 - mins *60));
+--   arrangement_time_clock = hours..":"..mins..":"..secs
+--   return(arrangement_time_clock)
+-- end  
 
 function redraw()
   screen.clear()
@@ -504,8 +580,8 @@ function redraw()
   screen.level(15)
   if page_name == 'Arrange' then
     screen.text('Follow: '..params:string("do_follow"))
-    screen.move(40,20)
-    screen.text('Length: ' .. arrangement_time())
+    screen.move(40,50)
+    screen.text('Time: ' .. arrangement_time())
     -- All the following needs to be revisited after getting pattern switching figured out
     local rect_x = 39
     -- local rect_gap_adj = 0
@@ -527,6 +603,28 @@ function redraw()
     screen.move(40,20)
     screen.level(submenu_index == 2 and 15 or 3)
     screen.text('Destination: '..params:string('chord_dest'))
+    screen.move(40,30)
+    if params:string('chord_dest') == 'Engine' then
+      screen.level(submenu_index == 3 and 15 or 3)
+      screen.text('Amp: '..params:string('chord_pp_amp'))
+      screen.move(40,40)
+      screen.level(submenu_index == 4 and 15 or 3)
+      screen.text('Cutoff: '..params:string('chord_pp_cutoff'))
+      --engine.gain should go in here once we have menu scrolling
+      screen.move(40,50)
+      screen.level(submenu_index == 5 and 15 or 3)
+      screen.text('Pulse width: '..params:string('chord_pp_pw'))
+      screen.move(40,60)
+      screen.level(submenu_index == 6 and 15 or 3)
+      screen.text('Release: '..params:string('chord_pp_release'))
+    elseif params:string('chord_dest') == 'MIDI' then
+      screen.level(submenu_index == 3 and 15 or 3)
+      screen.text('Velocity: '..params:string('chord_midi_velocity'))
+      -- screen.move(40,40)
+      -- screen.level(submenu_index == 4 and 15 or 3)
+      -- screen.text('Mod: '..params:string('chord_midi_cc1'))
+    end
+    
   elseif page_name == 'Arp' then
     screen.level(submenu_index == 1 and 15 or 3)
     screen.text('Division: '..params:get('arp_div'))
