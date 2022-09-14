@@ -333,7 +333,7 @@ function harmonizer(destination, note_num, channel, velocity)
       harmonizer_hanging_notes[channel] = {(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48)}
     end
   end
-  -- chord_seq_retrig = false -- Fix: Needs to be fired by calling function depending on where enabled
+  chord_seq_retrig = false -- Fix: Needs to be fired by calling function depending on where enabled
 end
 
 function stop_harmonizer(channel) --midi
