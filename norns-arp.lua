@@ -86,6 +86,15 @@ params:add_separator ('MIDI')
 params:add_option("midi_dest", "Midi dest.", {'None',"Engine","Crow", 'MIDI'},2)
 params:add_number('midi_midi_ch','MIDI Channel',1, 16, 2)
 params:add_number('midi_midi_vel','MIDI Velocity',0, 127, 127)
+params:add{
+  type = 'number',
+  id = 'do_midi_vel_passthru',
+  name = 'Velocity Passthru',
+  min = 0,
+  max = 1,
+  default = 0,
+  formatter = function(param) return t_f_string(param:get()) end,
+  }
 
 -- params:bang()
   
@@ -549,9 +558,12 @@ end
 in_midi.event = function(data)
   local d = midi.to_msg(data)
   if d.type == "note_on" then
-    -- engine.amp(d.vel / 127)
-    -- engine.hz(music.note_num_to_freq(d.note))
-    harmonizer(params:string('midi_dest'), d.note - 36, params:get('midi_midi_ch'), params:get('midi_midi_vel')) --Fix: pass thru midi vel?
+    if params:get('do_midi_vel_passthru') == 1 then                                               -- Fix: velocity to engine.amp
+      harmonizer(params:string('midi_dest'), d.note - 36, params:get('midi_midi_ch'), d.vel)
+      -- print(d.vel)
+    else
+      harmonizer(params:string('midi_dest'), d.note - 36, params:get('midi_midi_ch'), params:get('midi_midi_vel'))
+    end
   end
 end
   
