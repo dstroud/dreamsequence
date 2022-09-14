@@ -25,7 +25,8 @@ prev_harmonizer_note = -999
 chord_seq_retrig = true
 
 in_midi = midi.connect(1)
-out_midi = midi.connect(1) -- Should set up params for several USB options or virtual?
+chord_out_midi = midi.connect(1)
+harmonizer_out_midi = midi.connect(1)
 
 function init()
 params:add_separator ('Global')
@@ -62,20 +63,30 @@ params:add_number("chord_pp_gain","Chord gain",0, 400, 200) --hiding this one in
 params:add_number("chord_pp_pw","Chord pulse width",1, 99, 50)
 params:add_number("chord_pp_release","Chord release",1, 10, 5)
 params:add_number('chord_midi_velocity','MIDI Velocity',0, 127, 127)
-params:add_number("chord_midi_cc1","MIDI Mod",0, 127, 0)
+params:add_number('chord_midi_ch','MIDI Channel',1, 16, 1)
+
+-- params:add_number("chord_midi_cc1","MIDI Mod",0, 127, 0)
 
 params:add_separator ('Arp')
 params:add_number('arp_div', 'Arp Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
 params:add_option("arp_dest", "Arp dest.", {'None',"Engine","Crow", 'MIDI'},2)
 params:add_number("arp_pp_release","Arp release",1, 10, 5)
+params:add_number('arp_midi_ch','MIDI Channel',1, 16, 2)
+params:add_number('arp_midi_vel','MIDI Velocity',0, 127, 127)
 
 params:add_separator ('Crow')
 params:add_number('crow_div', 'Crow Division', 1, 32, 8) --most useful TBD
 params:add_option("crow_dest", "Crow dest.", {'None',"Engine","Crow",'MIDI'},2)
 params:add_option("do_crow_auto_rest", "Crow Auto-rest", {"False","True"}, 1) 
+params:add_number('crow_midi_ch','MIDI Channel',1, 16, 2)
+params:add_number('crow_midi_vel','MIDI Velocity',0, 127, 127)
+
 
 params:add_separator ('MIDI')
 params:add_option("midi_dest", "Midi dest.", {'None',"Engine","Crow", 'MIDI'},2)
+params:add_number('midi_midi_ch','MIDI Channel',1, 16, 2)
+params:add_number('midi_midi_vel','MIDI Velocity',0, 127, 127)
+
 -- params:bang()
   
   crow.input[1].stream = sample_crow
@@ -121,7 +132,8 @@ params:add_option("midi_dest", "Midi dest.", {'None',"Engine","Crow", 'MIDI'},2)
   chord_seq_position = 0
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
   chord = {music.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, mode, chord_seq[pattern][1].c, false)}
-  chord_hanging_notes = {}
+  chord_hanging_notes = {}  
+  harmonizer_hanging_notes = {{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}}
   arp_seq = {{0,0,0,0,0,0,0,0},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8},
@@ -186,6 +198,9 @@ function clock.transport.stop()
   if params:get('do_follow') == 1 then
     reset_arrangement()
   end
+  for i = 1,16 do
+    stop_harmonizer(i)
+  end
   stop_chord()
 end
    
@@ -245,7 +260,7 @@ function loop(rate) --using one clock to control all sequence events
         end
         if arp_seq[arp_pattern][arp_seq_position] > 0 then
           arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
-          harmonizer(arp_note_num, params:string('arp_dest'))
+          harmonizer(params:string('arp_dest'), arp_note_num, params:get('arp_midi_ch'), params:get('arp_midi_vel'))
         end
         grid_redraw() --move
       end
@@ -275,15 +290,47 @@ function play_chord(destination)
     end
   elseif destination == 'MIDI' then
     for i=1,#chord[1] do -- only one chord is stored but it's in index 1. Kinda weird IDK.
-      out_midi:note_on((chord[1][i] + params:get('transpose')+ 48 ),params:get('chord_midi_velocity')) 
-      chord_hanging_notes[i] = chord[1][i] + params:get('transpose')+ 48
+      chord_out_midi:note_on((chord[1][i] + params:get('transpose')+ 48 ),params:get('chord_midi_velocity')) 
+      chord_hanging_notes[i] = {chord[1][i] + params:get('transpose')+ 48, params:get('chord_midi_ch')} --note index, note, channel (simplified)
     end
   end
 end
 
 function stop_chord()
   for i = 1, #chord_hanging_notes do          --Turn off any hanging chord notes
-    out_midi:note_off(chord_hanging_notes[i])
+    chord_out_midi:note_off(chord_hanging_notes[i][1], 0, chord_hanging_notes[i][2])
+  end
+end
+
+function harmonizer(destination, note_num, channel, velocity)
+  -- print('Harmonizer: ' ..destination .. ' '.. note_num .. ' ' .. channel .. ' ' .. velocity)
+  prev_harmonizer_note = harmonizer_note
+  harmonizer_note = chord[1][util.wrap(note_num, 1, #chord[1])]
+  harmonizer_octave = math.floor((note_num - 1) / #chord[1],0)
+  -- print(arp_note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
+  if chord_seq_retrig == true or params:string('do_crow_auto_rest') == 'False' or (params:string('do_crow_auto_rest') == 'True' and (prev_harmonizer_note ~= harmonizer_note)) then
+    if destination == 'Engine' then
+      engine.release(params:get('arp_pp_release')) -- Fix: test only. Needs to be passed from calling function
+      engine.hz(music.note_num_to_freq(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48))
+    elseif destination == 'Crow' then
+      crow.output[4].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
+      crow.output[3].slew = 0
+      crow.output[3].volts = 8
+      crow.output[3].slew = 0.005
+      crow.output[3].volts = 0
+    elseif destination == 'MIDI' then
+      stop_harmonizer(channel)
+      harmonizer_out_midi:note_on((harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48), velocity, channel)
+      harmonizer_hanging_notes[channel] = {(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48)}
+    end
+  end
+  -- chord_seq_retrig = false -- Fix: Needs to be fired by calling function depending on where enabled
+end
+
+function stop_harmonizer(channel) --midi
+  -- for i = #harmonizer_hanging_notes[channel], #harmonizer_hanging_notes[channel] do 
+  if #harmonizer_hanging_notes[channel] then
+    harmonizer_out_midi:note_off(harmonizer_hanging_notes[channel][1], 0, channel) -- note, vel, ch. Not sure if there is a reason we need [i] index
   end
 end
 
@@ -458,19 +505,19 @@ function enc(n,d)
     if selected_menu == 'Division' then
       params:set("arp_div", util.clamp(params:get("arp_div") + d, 1, 32))
     elseif selected_menu == 'Destination' then 
-      params:set("arp_dest", util.clamp(params:get("arp_dest") + d, 1, 3))
+      params:delta("arp_dest",d)
     end
   elseif page_name == 'Crow' then
     if selected_menu == 'Division' then
       params:set("crow_div", util.clamp(params:get("crow_div") + d, 1, 32))
     elseif selected_menu == 'Destination' then 
-      params:set("crow_dest", util.clamp(params:get("crow_dest") + d, 1, 3))
+      params:delta("crow_dest",d)
     elseif selected_menu == 'Auto-rest' then
       params:set("do_crow_auto_rest", util.clamp(params:get("do_crow_auto_rest") + d, 1, 2))
     end
   elseif page_name == 'MIDI' then
     if selected_menu == 'Destination' then 
-      params:set('midi_dest', util.clamp(params:get('midi_dest') + d, 1, 3))
+      params:delta("midi_dest",d)
     end
   elseif page_name == 'Global' then
     if selected_menu == 'Tempo' then
@@ -489,13 +536,13 @@ function crow_trigger(s) --Trigger in used to sample voltage from Crow IN 1
     state = s
     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
-    print('crow trigger in')
+    -- print('crow trigger in')
 end
 
 function sample_crow(v)
   volts = v
   crow_note_num =  round(volts * 12,0) + 1
-  harmonizer(crow_note_num, params:string('crow_dest')) 
+  harmonizer(params:string('crow_dest'), crow_note_num, params:get('crow_midi_ch'), params:get('crow_midi_vel'))
   chord_seq_retrig = false -- Check this to make sure it's working correct
 end
 
@@ -504,32 +551,8 @@ in_midi.event = function(data)
   if d.type == "note_on" then
     -- engine.amp(d.vel / 127)
     -- engine.hz(music.note_num_to_freq(d.note))
-    harmonizer(d.note - 36, params:string('midi_dest'))
-    -- print('midi note in: ' ..d.note)
+    harmonizer(params:string('midi_dest'), d.note - 36, params:get('midi_midi_ch'), params:get('midi_midi_vel')) --Fix: pass thru midi vel?
   end
-end
-
-function harmonizer(note_num, destination) 
-  -- print(note_num .. " " ..destination)
-  prev_harmonizer_note = harmonizer_note
-  harmonizer_note = chord[1][util.wrap(note_num, 1, #chord[1])]
-  harmonizer_octave = math.floor((note_num - 1) / #chord[1],0)
-  -- print(arp_note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
-  -- if chord_seq_retrig == true or harmo_filter == 0 or (harmo_filter == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
-  if chord_seq_retrig == true or params:string('do_crow_auto_rest') == 'False' or (params:string('do_crow_auto_rest') == 'True' and (prev_harmonizer_note ~= harmonizer_note)) then
-  -- params:add_option("do_crow_auto_rest", "Crow Auto-rest", {"False","True"}, 1) -- Whether repeat notes are suppressed
-    if destination == 'Engine' then
-      engine.release(params:get('arp_pp_release')) -- Fix: test only. Needs to be passed from calling function
-      engine.hz(music.note_num_to_freq(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48))
-    elseif destination == 'Crow' then
-      crow.output[4].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
-      crow.output[3].slew = 0
-      crow.output[3].volts = 8
-      crow.output[3].slew = 0.005
-      crow.output[3].volts = 0
-    end
-  end
-  -- chord_seq_retrig = false -- Fix: Needs to be fired by calling function depending on where enabled
 end
   
 function arrangement_time()
