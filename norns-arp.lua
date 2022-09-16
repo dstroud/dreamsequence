@@ -187,6 +187,7 @@ chord_seq_retrig = true
   reset_clock() -- will turn over to step 0 on first loop
   -- clock.run(grid_redraw_clock) --Not used currently
   grid_redraw()
+
 end
 
 -- Dynamic chord submenus
@@ -600,6 +601,13 @@ end
 --   return(arrangement_time_clock)
 -- end  
 
+function scroll_offset(index, total, in_view ,height) --index of list, count of items in list, #viewable, line height
+  if total > in_view then
+    return((index - 1) * (total - in_view) * height / total) --math.ceil might be necessary if some options are cut off
+  else return(0)
+  end
+end
+
 function redraw()
   screen.clear()
   screen.level(7)
@@ -611,13 +619,18 @@ function redraw()
     screen.level(page_name == pages[i] and 15 or 3)
     screen.text(pages[i])
   end
+  --menu and scroll stuff
+  
+  local menu_offset = scroll_offset(submenu_index,#submenus[page_index], 6, 10)
+  
   line = 1
   for i = 1,#submenus[page_index] do
-    screen.move(40, line*10)
+    screen.move(40, line*10 - menu_offset)
     screen.level(submenu_index == i and 15 or 3)
     screen.text(first_to_upper(param_id_to_name(submenus[page_index][i])) .. ': ' .. params:string(submenus[page_index][i]))
     line = line + 1
   end
+
   -- Draw the sequence and add timer for Arrange
   if page_name == 'Arrange' then
     screen.move(40,50)
