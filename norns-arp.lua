@@ -36,7 +36,7 @@ params:add_separator ('Arrange')
 params:add{
   type = 'number',
   id = 'do_follow',
-  name = 'do_follow',
+  name = 'Follow',
   min = 0,
   max = 1,
   default = 1,
@@ -46,38 +46,38 @@ params:add{
 
 --Chord params
 params:add_separator ('Chord')
-params:add_number('chord_div', 'Chord Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,65,96,128,192,256
-params:add_option("chord_dest", "Chord dest.", {'None',"Engine", 'MIDI'},2)
+params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,65,96,128,192,256
+params:add_option("chord_dest", "Destination", {'None',"Engine", 'MIDI'},2)
   params:set_action("chord_dest",function() submenu_update() end)
 params:add{
   type = 'number',
   id = 'chord_pp_amp',
-  name = 'Chord amp',
+  name = 'Amp.',
   min = 0,
   max = 100,
   default = 80,
   formatter = function(param) return percent(param:get()) end,
   }
-  params:add_control("chord_pp_cutoff","Chord cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-params:add_number("chord_pp_gain","Chord gain",0, 400, 200) --hiding this one in system menu
-params:add_number("chord_pp_pw","Chord pulse width",1, 99, 50)
-params:add_number("chord_pp_release","Chord release",1, 10, 5)
-params:add_number('chord_midi_velocity','MIDI Velocity',0, 127, 127)
-params:add_number('chord_midi_ch','MIDI Channel',1, 16, 1)
+  params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
+params:add_number("chord_pp_gain","Gain",0, 400, 200) --hiding this one in system menu
+params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
+params:add_number("chord_pp_release","Release",1, 10, 5)
+params:add_number('chord_midi_velocity','Velocity',0, 127, 127)
+params:add_number('chord_midi_ch','Channel',1, 16, 1)
 -- params:add_number("chord_midi_cc1","MIDI Mod",0, 127, 0)
 
 --Arp params
 params:add_separator ('Arp')
-params:add_number('arp_div', 'Arp Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
-params:add_option("arp_dest", "Arp dest.", {'None',"Engine","Crow", 'MIDI'},2)
-params:add_number("arp_pp_release","Arp release",1, 10, 5)
-params:add_number('arp_midi_ch','MIDI Channel',1, 16, 2)
-params:add_number('arp_midi_vel','MIDI Velocity',0, 127, 127)
+params:add_number('arp_div', 'Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
+params:add_option("arp_dest", "Destination", {'None',"Engine","Crow", 'MIDI'},2)
+params:add_number("arp_pp_release","Release",1, 10, 5)
+params:add_number('arp_midi_ch','Channel',1, 16, 2)
+params:add_number('arp_midi_vel','Velocity',0, 127, 127)
 
 --Crow params
 params:add_separator ('Crow')
-params:add_number('crow_div', 'Crow Division', 1, 32, 8) --most useful TBD
-params:add_option("crow_dest", "Crow dest.", {'None',"Engine","Crow",'MIDI'},2)
+params:add_number('crow_div', 'Clock out div.', 1, 32, 8) --most useful TBD
+params:add_option("crow_dest", "Destination", {'None',"Engine","Crow",'MIDI'},2)
 params:add{
   type = 'number',
   id = 'do_crow_auto_rest',
@@ -87,14 +87,14 @@ params:add{
   default = 0,
   formatter = function(param) return t_f_string(param:get()) end,
   }
-params:add_number('crow_midi_ch','MIDI Channel',1, 16, 2)
-params:add_number('crow_midi_vel','MIDI Velocity',0, 127, 127)
+params:add_number('crow_midi_ch','Channel',1, 16, 2)
+params:add_number('crow_midi_vel','Velocity',0, 127, 127)
 
 --MIDI params
 params:add_separator ('MIDI')
-params:add_option("midi_dest", "Midi dest.", {'None',"Engine","Crow", 'MIDI'},2)
-params:add_number('midi_midi_ch','MIDI Channel',1, 16, 2)
-params:add_number('midi_midi_vel','MIDI Velocity',0, 127, 127)
+params:add_option("midi_dest", "Destination", {'None',"Engine","Crow", 'MIDI'},2)
+params:add_number('midi_midi_ch','Channel',1, 16, 2)
+params:add_number('midi_midi_vel','Velocity',0, 127, 127)
 params:add{
   type = 'number',
   id = 'do_midi_vel_passthru',
@@ -136,7 +136,7 @@ chord_seq_retrig = true
               {'do_follow'}, -- Arrange
               {'chord_div', 'chord_dest', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_pw', 'chord_pp_release'}, -- Chord
               {'arp_div', 'arp_dest'}, -- Arp
-              {'chor_div', 'crow_dest', 'do_crow_auto_rest'}, -- Crow
+              {'crow_div', 'crow_dest', 'do_crow_auto_rest'}, -- Crow
               {'midi_dest'}, -- MIDI
               {'clock_tempo','mode','transpose'} -- Global
               }
@@ -191,7 +191,10 @@ function submenu_update()
   end
 end
               
-              
+function param_id_to_name(id)
+  return(params.params[params.lookup[id]].name)
+end
+
 function round(num, numDecimalPlaces)
   local mult = 10^(numDecimalPlaces or 0)
   return math.floor(num * mult + 0.5) / mult
@@ -592,7 +595,7 @@ function redraw()
   screen.move(40,10)
   screen.level(15)
   if page_name == 'Arrange' then
-    screen.text('Follow: '..params:string("do_follow"))
+    screen.text(param_id_to_name('do_follow').. ': '..params:string("do_follow"))
     screen.move(40,50)
     screen.text('Time: ' .. arrangement_time())
     -- All the following needs to be revisited after getting pattern switching figured out
@@ -612,27 +615,27 @@ function redraw()
     end
   elseif page_name == 'Chord' then
     screen.level(submenu_index == 1 and 15 or 3)
-    screen.text('Division: '..params:get('chord_div'))
+    screen.text(param_id_to_name('chord_div').. ': '..params:get('chord_div'))
     screen.move(40,20)
     screen.level(submenu_index == 2 and 15 or 3)
-    screen.text('Destination: '..params:string('chord_dest'))
+    screen.text(param_id_to_name('chord_dest') .. ': '..params:string('chord_dest'))
     screen.move(40,30)
     if params:string('chord_dest') == 'Engine' then
       screen.level(submenu_index == 3 and 15 or 3)
-      screen.text('Amp: '..params:string('chord_pp_amp'))
+      screen.text(param_id_to_name('chord_pp_amp') .. ': '..params:string('chord_pp_amp'))
       screen.move(40,40)
       screen.level(submenu_index == 4 and 15 or 3)
-      screen.text('Cutoff: '..params:string('chord_pp_cutoff'))
+      screen.text(param_id_to_name('chord_pp_cutoff') .. ': '..params:string('chord_pp_cutoff'))
       --engine.gain should go in here once we have menu scrolling
       screen.move(40,50)
       screen.level(submenu_index == 5 and 15 or 3)
-      screen.text('Pulse width: '..params:string('chord_pp_pw'))
+      screen.text(param_id_to_name('chord_pp_pw') .. ': '..params:string('chord_pp_pw'))
       screen.move(40,60)
       screen.level(submenu_index == 6 and 15 or 3)
-      screen.text('Release: '..params:string('chord_pp_release'))
+      screen.text(param_id_to_name('chord_pp_release') .. ': '..params:string('chord_pp_release'))
     elseif params:string('chord_dest') == 'MIDI' then
       screen.level(submenu_index == 3 and 15 or 3)
-      screen.text('Velocity: '..params:string('chord_midi_velocity'))
+      screen.text(param_id_to_name('chord_midi_velocity') .. ': '..params:string('chord_midi_velocity'))
       -- screen.move(40,40)
       -- screen.level(submenu_index == 4 and 15 or 3)
       -- screen.text('Mod: '..params:string('chord_midi_cc1'))
@@ -640,34 +643,40 @@ function redraw()
     
   elseif page_name == 'Arp' then
     screen.level(submenu_index == 1 and 15 or 3)
-    screen.text('Division: '..params:get('arp_div'))
+    screen.text(param_id_to_name('arp_div') .. ': '..params:get('arp_div'))
     screen.move(40,20)
     screen.level(submenu_index == 2 and 15 or 3)
-    screen.text('Destination: '..params:string('arp_dest'))
+    screen.text(param_id_to_name('arp_dest') .. ': '..params:string('arp_dest'))
   elseif page_name == 'Crow' then
     screen.level(submenu_index == 1 and 15 or 3)
-    screen.text('Division: '..params:get('crow_div'))
+    screen.text(param_id_to_name('crow_div') .. ': '..params:get('crow_div'))
     screen.move(40,20)
     screen.level(submenu_index == 2 and 15 or 3)
-    screen.text('Destination: '..params:string('crow_dest'))
+    screen.text(param_id_to_name('crow_dest') .. ': '..params:string('crow_dest'))
     screen.move(40,30)
     screen.level(submenu_index == 3 and 15 or 3)
-    screen.text('Auto-rest: '..params:string('do_crow_auto_rest'))
+    screen.text(param_id_to_name('do_crow_auto_rest') .. ': '..params:string('do_crow_auto_rest'))
   elseif page_name == 'MIDI' then
     screen.level(submenu_index == 1 and 15 or 3)
-    screen.text('Destination: '..params:string('midi_dest'))
+    screen.text(param_id_to_name('midi_dest') .. ': '..params:string('midi_dest'))
     -- screen.move(40,20)
     -- screen.level(submenu_index == 2 and 15 or 3)
     -- screen.text('Auto-rest: '..params:string('do_midi_auto_rest'))
   elseif page_name == 'Global' then
     screen.level(submenu_index == 1 and 15 or 3)
-    screen.text('Tempo: '..params:get("clock_tempo"))
+    screen.text(param_id_to_name('clock_tempo') .. ': '..params:get("clock_tempo"))
     screen.move(40,20)
     screen.level(submenu_index == 2 and 15 or 3)
-    screen.text('Mode: ' .. music.SCALES[params:get('mode')].name)
+    screen.text(param_id_to_name('mode') .. ': ' .. music.SCALES[params:get('mode')].name)
     screen.move(40,30)
     screen.level(submenu_index == 3 and 15 or 3)
-    screen.text('Transpose: ' .. params:get('transpose'))
+    screen.text(param_id_to_name('transpose') .. ': ' .. params:get('transpose'))
   end
   screen.update()
 end
+
+
+
+
+
+
