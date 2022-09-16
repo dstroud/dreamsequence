@@ -1,17 +1,19 @@
 -- Bento
 --
--- KEY 1: start/stop
--- ENC 1: main menu
+-- KEY 1: intructions (WIP)
+-- KEY 2: start/stop
+-- KEY 3: follow on
 --
--- ENC 2: sub menu
+-- ENC 1: select page
+-- ENC 2: select menu
 -- ENC 3: edit value 
 --
--- Crow IN 1: voltage to sample
--- Crow IN 2: trigger
--- Crow OUT 1: clock
--- Crow OUT 2: assignable
--- Crow OUT 3: trigger out
--- Crow OUT 4: v/oct out
+-- Crow IN 1: cv in
+-- Crow IN 2: trigger in
+-- Crow OUT 1: v/oct out
+-- Crow OUT 2: trigger out
+-- Crow OUT 3: clock out
+-- Crow OUT 4: assignable
 
 
 g = grid.connect()
@@ -50,7 +52,8 @@ params:add{
   max = 1,
   default = 1,
   formatter = function(param) return t_f_string(param:get()) end,
-  action = function() reset_arrangement() end, function() grid_redraw() end
+  -- action = function() reset_arrangement() end, function() grid_redraw() end
+    action = function() grid_redraw() end,
   }
   params:add{
   type = 'number',
@@ -70,7 +73,7 @@ params:add_option("chord_dest", "Destination", {'None',"Engine", 'MIDI'},2)
 params:add{
   type = 'number',
   id = 'chord_pp_amp',
-  name = 'Amp.',
+  name = 'Amp',
   min = 0,
   max = 100,
   default = 80,
@@ -91,7 +94,7 @@ params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},
 params:add{
   type = 'number',
   id = 'arp_pp_amp',
-  name = 'Amp.',
+  name = 'Amp',
   min = 0,
   max = 100,
   default = 80,
@@ -110,7 +113,7 @@ params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'}
 params:add{
   type = 'number',
   id = 'midi_pp_amp',
-  name = 'Amp.',
+  name = 'Amp',
   min = 0,
   max = 100,
   default = 80,
@@ -138,7 +141,7 @@ params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'}
 params:add{
   type = 'number',
   id = 'crow_pp_amp',
-  name = 'Amp.',
+  name = 'Amp',
   min = 0,
   max = 100,
   default = 80,
@@ -217,47 +220,28 @@ chord_seq_retrig = true
   grid_redraw()
 end
 
--- function menu_update()
---   menus = {
---           {'do_follow','playback'}, -- Arrange
---           {}, -- Chord filled in below
---           {'arp_div', 'arp_dest'}, -- Arp
---           {'crow_div', 'crow_dest', 'do_crow_auto_rest'}, -- Crow
---           {'midi_dest'}, -- MIDI
---           {'clock_tempo','mode','transpose'} -- Global
---           }
---   --dynamic chord menu generation       
---   if params:string('chord_dest') == 'None' then
---     menus[2] = {'chord_div', 'chord_dest'}
---   elseif params:string('chord_dest') == 'Engine' then
---     menus[2] = {'chord_div', 'chord_dest', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw', 'chord_pp_release'}
---   elseif params:string('chord_dest') == 'MIDI' then
---     menus[2] = {'chord_div', 'chord_dest', 'chord_midi_ch', 'chord_midi_velocity'}
---   end
--- end
-
 function menu_update()
   -- Arrange menu
   menus[1] = {'do_follow','playback'}
   
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_div', 'chord_dest'}
+    menus[2] = {'chord_dest', 'chord_div'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_div', 'chord_dest', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw', 'chord_pp_release'}
+    menus[2] = {'chord_dest', 'chord_div', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw', 'chord_pp_release'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_div', 'chord_dest', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_div', 'chord_midi_ch', 'chord_midi_velocity'}
   end
   
   --arp menus
   if params:string('arp_dest') == 'None' then
-    menus[3] = {'arp_div', 'arp_dest'}
+    menus[3] = {'arp_dest', 'arp_div'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_div', 'arp_dest', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw', 'arp_pp_release'}
+    menus[3] = {'arp_dest', 'arp_div', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw', 'arp_pp_release'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_div', 'arp_dest', 'arp_midi_ch', 'arp_midi_velocity'}
+    menus[3] = {'arp_dest', 'arp_div', 'arp_midi_ch', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
-    menus[3] = {'arp_div', 'arp_dest'}
+    menus[3] = {'arp_dest', 'arp_div'}
   end
   
     --MIDI menus
@@ -273,13 +257,13 @@ function menu_update()
   
     --Crow menus
   if params:string('crow_dest') == 'None' then
-    menus[5] = {'crow_div', 'crow_dest', 'do_crow_auto_rest'}
+    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[5] = {'crow_div', 'crow_dest', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw', 'crow_pp_release'}
+    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw', 'crow_pp_release'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_div', 'crow_dest', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
+    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
-    menus[5] = {'crow_div', 'crow_dest', 'do_crow_auto_rest'}
+    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest'}
   end  
   
   --Global menu
@@ -331,7 +315,7 @@ end
 function clock.transport.start()
   transport_active = true
   clock_loop_id = clock.run(loop, global_clock_div) --8 == global clock at 32nd notes
-  print("Clock "..clock_loop_id.. " called")
+  print("Clock "..clock_loop_id.. " started")
 end
 
 function clock.transport.stop()
@@ -441,10 +425,10 @@ function loop(rate)
 
     --crow clock out
     if clock_step % params:get('crow_div') == 0 then
-      crow.output[1].slew = 0
-      crow.output[1].volts = 8
-      crow.output[1].slew = 0.005 --WAG here
-      crow.output[1].volts = 0  
+      crow.output[3].slew = 0
+      crow.output[3].volts = 8
+      crow.output[3].slew = 0.005 --WAG here
+      crow.output[3].volts = 0  
     end
     -- end
   end
@@ -491,11 +475,11 @@ function harmonizer(destination, note_num, channel, velocity, amp, cutoff, gain,
       engine.pw(pw / 100)
       engine.hz(music.note_num_to_freq(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48))
     elseif destination == 'Crow' then
-      crow.output[4].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
-      crow.output[3].slew = 0
-      crow.output[3].volts = 8
-      crow.output[3].slew = 0.005
-      crow.output[3].volts = 0
+      crow.output[1].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
+      crow.output[2].slew = 0
+      crow.output[2].volts = 8
+      crow.output[2].slew = 0.005
+      crow.output[2].volts = 0
     elseif destination == 'MIDI' then
       stop_harmonizer(channel)
       harmonizer_out_midi:note_on((harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48), velocity, channel)
@@ -639,16 +623,42 @@ function g.key(x,y,z)
 end
 
 function key(n,z)
-  if n == 1 and z == 0 then -- Transport control operates on key up because of the K1 delay
-    if transport_active then
-      print("stop key")
-      clock.transport.stop()
-    else
-      print("start key")
-      clock.transport.start()
+  if z == 1 then
+    if n == 2 then
+      if transport_active then
+        print('Stop')
+        clock.transport.stop()
+      else
+        print('Start')
+        clock.transport.start()
+      end
+    elseif n == 3 then
+      -- params:delta('do_follow', 1)
+      params:set('do_follow', 0)
+      redraw()
     end
   end
 end
+
+--   if n == 1 then
+--     if z == 0 then -- Transport control operates on key up because of the K1 delay
+--       if transport_active then
+--         print("stop key")
+--         clock.transport.stop()
+--       else
+--         print("start key")
+--         clock.transport.start()
+--       end
+--     end
+--   elseif z == 1 then
+--     if n == 2 then 
+--       params:delta(selected_menu, -1)
+--     else 
+--       params:delta(selected_menu, 1)
+--     end
+--   redraw()
+--   end
+-- end
 
 function enc(n,d)
   if n == 1 then
@@ -749,15 +759,22 @@ end
 --   return(arrangement_time_clock)
 -- end  
 
+--This needs some work and will get off if the menu is too long
 function scroll_offset(index, total, in_view ,height) --index of list, count of items in list, #viewable, line height
   if total > in_view then
-    return((index - 1) * (total - in_view) * height / total) --math.ceil might be necessary if some options are cut off
+    return(round(((index - 1) * (total - in_view) * height / total),0)) --math.ceil might be necessary if some options are cut off
   else return(0)
   end
 end
 
 function redraw()
   screen.clear()
+  screen.aa(0)
+  if params:get('do_follow') == 1 then
+    screen.level(15)
+    screen.pixel(32,9)
+    screen.fill(15)
+  end
   screen.level(7)
   screen.move(36,0)
   screen.line_rel(0,64)
@@ -767,10 +784,9 @@ function redraw()
     screen.level(page_name == pages[i] and 15 or 3)
     screen.text(pages[i])
   end
+  
   --menu and scroll stuff
-  
   local menu_offset = scroll_offset(menu_index,#menus[page_index], 6, 10)
-  
   line = 1
   for i = 1,#menus[page_index] do
     screen.move(40, line*10 - menu_offset)
@@ -798,6 +814,9 @@ function redraw()
       rect_x = rect_x + rect_w
     end
   end
+  -- screen.level(15)
+  -- screen.pixel(0, view_index * 10 - 3)
+  -- screen.fill(15)
   screen.update()
 end
 
