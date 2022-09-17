@@ -1,8 +1,8 @@
 -- Bento
 --
--- KEY 1: intructions (WIP)
+-- KEY 1: n/a
 -- KEY 2: start/stop
--- KEY 3: follow on
+-- KEY 3: arrange on/off
 --
 -- ENC 1: select page
 -- ENC 2: select menu
@@ -25,149 +25,151 @@ in_midi = midi.connect(1)
 chord_out_midi = midi.connect(1)
 harmonizer_out_midi = midi.connect(1)
 
+
 function init()
-  
---Global params
-params:add_separator ('Global')
-params:add_number("transpose","Transpose",-24, 24, 0)
--- params:add_number("mode","Mode",1 , 9, 1)
-params:add{
-  type = 'number',
-  id = 'mode',
-  name = 'Mode',
-  min = 1,
-  max = 9,
-  default = 1,
-  formatter = function(param) return mode_index_to_name(param:get()) end,
-  }
+  -- crow_pullup()
+  crow.ii.jf.mode(1)
 
-
---Arrange params
-params:add_separator ('Arrange')
-params:add{
-  type = 'number',
-  id = 'do_follow',
-  name = 'Follow',
-  min = 0,
-  max = 1,
-  default = 1,
-  formatter = function(param) return t_f_string(param:get()) end,
-  -- action = function() reset_arrangement() end, function() grid_redraw() end
-    action = function() grid_redraw() end,
-  }
+  --Global params
+  params:add_separator ('Global')
+  params:add_number("transpose","Transpose",-24, 24, 0)
   params:add{
-  type = 'number',
-  id = 'playback',
-  name = 'Playback',
-  min = 0,
-  max = 1,
-  default = 1,
-  formatter = function(param) return playback_string(param:get()) end,
-  }
-
---Chord params
-params:add_separator ('Chord')
-params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,65,96,128,192,256
-params:add_option("chord_dest", "Destination", {'None',"Engine", 'MIDI'},2)
-  params:set_action("chord_dest",function() menu_update() end)
-params:add{
-  type = 'number',
-  id = 'chord_pp_amp',
-  name = 'Amp',
-  min = 0,
-  max = 100,
-  default = 80,
-  formatter = function(param) return percent(param:get()) end}
-params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-params:add_number("chord_pp_gain","Gain",0, 400, 200)
-params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
-params:add_number("chord_pp_release","Release",1, 10, 5)
-params:add_number('chord_midi_velocity','Velocity',0, 127, 127)
-params:add_number('chord_midi_ch','Channel',1, 16, 1)
--- params:add_number("chord_midi_cc1","MIDI Mod",0, 127, 0)
-
---Arp params
-params:add_separator ('Arp')
-params:add_number('arp_div', 'Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
-params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
-  params:set_action("arp_dest",function() menu_update() end)
-params:add{
-  type = 'number',
-  id = 'arp_pp_amp',
-  name = 'Amp',
-  min = 0,
-  max = 100,
-  default = 80,
-  formatter = function(param) return percent(param:get()) end}
-params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-params:add_number("arp_pp_gain","Gain",0, 400, 200)
-params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
-params:add_number("arp_pp_release","Release",1, 10, 5)
-params:add_number('arp_midi_velocity','Velocity',0, 127, 127)
-params:add_number('arp_midi_ch','Channel',1, 16, 2)
-
---MIDI params
-params:add_separator ('MIDI')
-params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
-  params:set_action("midi_dest",function() menu_update() end)
-params:add{
-  type = 'number',
-  id = 'midi_pp_amp',
-  name = 'Amp',
-  min = 0,
-  max = 100,
-  default = 80,
-  formatter = function(param) return percent(param:get()) end}
-params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-params:add_number("midi_pp_gain","Gain",0, 400, 200)
-params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
-params:add_number("midi_pp_release","Release",1, 10, 5)
-params:add_number('midi_midi_ch','Channel',1, 16, 3)
-params:add_number('midi_midi_velocity','Velocity',0, 127, 127)
-params:add{
-  type = 'number',
-  id = 'do_midi_velocity_passthru',
-  name = 'Velocity Passthru',
-  min = 0,
-  max = 1,
-  default = 0,
-  formatter = function(param) return t_f_string(param:get()) end}
-
---Crow params
-params:add_separator ('Crow')
-params:add_number('crow_div', 'Clock out div', 1, 32, 8) --most useful TBD
-params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
-  params:set_action("crow_dest",function() menu_update() end)
-params:add{
-  type = 'number',
-  id = 'crow_pp_amp',
-  name = 'Amp',
-  min = 0,
-  max = 100,
-  default = 80,
-  formatter = function(param) return percent(param:get()) end}
-params:add{
-  type = 'number',
-  id = 'do_crow_auto_rest',
-  name = 'Auto-rest',
-  min = 0,
-  max = 1,
-  default = 0,
-  formatter = function(param) return t_f_string(param:get()) end}
-params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-params:add_number("crow_pp_gain","Gain",0, 400, 200)
-params:add_number("crow_pp_pw","Pulse width",1, 99, 50)
-params:add_number("crow_pp_release","Release",1, 10, 5)
-params:add_number('crow_midi_ch','Channel',1, 16, 4)
-params:add_number('crow_midi_velocity','Velocity',0, 127, 127)
-
--- params:bang()
+    type = 'number',
+    id = 'mode',
+    name = 'Mode',
+    min = 1,
+    max = 9,
+    default = 1,
+    formatter = function(param) return mode_index_to_name(param:get()) end,
+    }
   
-  -- mode = math.random(1,9)
--- scale = music.generate_scale_of_length(60,music.SCALES[params:get('mode')].name,8)
-prev_harmonizer_note = -999
-chord_seq_retrig = true
+  --Arrange params
+  params:add_separator ('Arrange')
+  params:add{
+    type = 'number',
+    id = 'do_follow',
+    name = 'Follow',
+    min = 0,
+    max = 1,
+    default = 1,
+    formatter = function(param) return t_f_string(param:get()) end,
+    -- action = function() reset_arrangement() end, function() grid_redraw() end
+      action = function() grid_redraw() end,
+    }
+    params:add{
+    type = 'number',
+    id = 'playback',
+    name = 'Playback',
+    min = 0,
+    max = 1,
+    default = 1,
+    formatter = function(param) return playback_string(param:get()) end,
+    }
+  
+  --Chord params
+  params:add_separator ('Chord')
+  params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,65,96,128,192,256
+  params:add_option("chord_dest", "Destination", {'None',"Engine", 'MIDI', 'ii-JF'},2)
+    params:set_action("chord_dest",function() menu_update() end)
+  params:add{
+    type = 'number',
+    id = 'chord_pp_amp',
+    name = 'Amp',
+    min = 0,
+    max = 100,
+    default = 80,
+    formatter = function(param) return percent(param:get()) end}
+  params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
+  params:add_number("chord_pp_gain","Gain",0, 400, 200)
+  params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
+  params:add_number("chord_pp_release","Release",1, 10, 5)
+  params:add_number('chord_midi_velocity','Velocity',0, 127, 127)
+  params:add_number('chord_midi_ch','Channel',1, 16, 1)
+  params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end)
+    params:set_action("crow_pullup",function() crow_pullup() end)
 
+
+
+  -- params:add_number("chord_midi_cc1","MIDI Mod",0, 127, 0)
+  
+  --Arp params
+  params:add_separator ('Arp')
+  params:add_number('arp_div', 'Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
+    params:set_action("arp_dest",function() menu_update() end)
+  params:add{
+    type = 'number',
+    id = 'arp_pp_amp',
+    name = 'Amp',
+    min = 0,
+    max = 100,
+    default = 80,
+    formatter = function(param) return percent(param:get()) end}
+  params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
+  params:add_number("arp_pp_gain","Gain",0, 400, 200)
+  params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
+  params:add_number("arp_pp_release","Release",1, 10, 5)
+  params:add_number('arp_midi_velocity','Velocity',0, 127, 127)
+  params:add_number('arp_midi_ch','Channel',1, 16, 2)
+  
+  --MIDI params
+  params:add_separator ('MIDI')
+  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
+    params:set_action("midi_dest",function() menu_update() end)
+  params:add{
+    type = 'number',
+    id = 'midi_pp_amp',
+    name = 'Amp',
+    min = 0,
+    max = 100,
+    default = 80,
+    formatter = function(param) return percent(param:get()) end}
+  params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
+  params:add_number("midi_pp_gain","Gain",0, 400, 200)
+  params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
+  params:add_number("midi_pp_release","Release",1, 10, 5)
+  params:add_number('midi_midi_ch','Channel',1, 16, 3)
+  params:add_number('midi_midi_velocity','Velocity',0, 127, 127)
+  params:add{
+    type = 'number',
+    id = 'do_midi_velocity_passthru',
+    name = 'Velocity Passthru',
+    min = 0,
+    max = 1,
+    default = 0,
+    formatter = function(param) return t_f_string(param:get()) end}
+  
+  --Crow params
+  params:add_separator ('Crow')
+  params:add_number('crow_div', 'Clock out div', 1, 32, 8) --most useful TBD
+  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
+    params:set_action("crow_dest",function() menu_update() end)
+  params:add{
+    type = 'number',
+    id = 'crow_pp_amp',
+    name = 'Amp',
+    min = 0,
+    max = 100,
+    default = 80,
+    formatter = function(param) return percent(param:get()) end}
+  params:add{
+    type = 'number',
+    id = 'do_crow_auto_rest',
+    name = 'Auto-rest',
+    min = 0,
+    max = 1,
+    default = 0,
+    formatter = function(param) return t_f_string(param:get()) end}
+  params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
+  params:add_number("crow_pp_gain","Gain",0, 400, 200)
+  params:add_number("crow_pp_pw","Pulse width",1, 99, 50)
+  params:add_number("crow_pp_release","Release",1, 10, 5)
+  params:add_number('crow_midi_ch','Channel',1, 16, 4)
+  params:add_number('crow_midi_velocity','Velocity',0, 127, 127)
+
+  prev_harmonizer_note = -999
+  chord_seq_retrig = true
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
@@ -202,7 +204,7 @@ chord_seq_retrig = true
   end
   chord_seq_position = 0
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
-  chord = {music.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, false)}
+  chord = music.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, false)
   chord_hanging_notes = {}  
   harmonizer_hanging_notes = {{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}}
   arp_seq = {{0,0,0,0,0,0,0,0},
@@ -231,6 +233,8 @@ function menu_update()
     menus[2] = {'chord_dest', 'chord_div', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw', 'chord_pp_release'}
   elseif params:string('chord_dest') == 'MIDI' then
     menus[2] = {'chord_dest', 'chord_div', 'chord_midi_ch', 'chord_midi_velocity'}
+  elseif params:string('chord_dest') == 'ii-JF' then
+    menus[2] = {'chord_dest', 'chord_div', 'chord_jf_amp', 'crow_pullup'}
   end
   
   --arp menus
@@ -271,6 +275,11 @@ function menu_update()
 end
 
 
+function crow_pullup()
+    crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
+    print('crow pullup: ' .. t_f_string(params:get('crow_pullup')))
+end
+
 function first_to_upper(str)
     return (str:gsub("^%l", string.upper))
 end
@@ -290,6 +299,10 @@ end
 
 function t_f_string(x)
   return(x == 1 and 'True' or 'False')
+end
+
+function t_f_bool(x)
+  return(x == 1 and true or false)
 end
 
 function playback_string(x)
@@ -436,20 +449,24 @@ end
 
 function play_chord(destination)
   stop_chord()
-  chord = {music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, false)}
+  chord = music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, false)
   if destination == 'Engine' then
-    for i=1,#chord[1] do -- only one chord is stored but it's in index 1. Kinda weird IDK.
+    for i=1,#chord do
       engine.amp(params:get('chord_pp_amp') / 100)
       engine.cutoff(params:get('chord_pp_cutoff'))
       engine.release(params:get('chord_pp_release'))
       engine.gain(params:get('chord_pp_gain') / 100)
       engine.pw(params:get('chord_pp_pw') / 100)
-      engine.hz(music.note_num_to_freq(chord[1][i] + params:get('transpose')+ 48 )) -- same as above
+      engine.hz(music.note_num_to_freq(chord[i] + params:get('transpose')+ 48 ))
     end
   elseif destination == 'MIDI' then
-    for i=1,#chord[1] do -- only one chord is stored but it's in index 1. Kinda weird IDK.
-      chord_out_midi:note_on((chord[1][i] + params:get('transpose')+ 48 ),params:get('chord_midi_velocity')) 
-      chord_hanging_notes[i] = {chord[1][i] + params:get('transpose')+ 48, params:get('chord_midi_ch')} --note index, note, channel (simplified)
+    for i=1,#chord do -- only one chord is stored but it's in index 1. Kinda weird IDK.
+      chord_out_midi:note_on((chord[i] + params:get('transpose')+ 48 ),params:get('chord_midi_velocity')) 
+      chord_hanging_notes[i] = {chord[i] + params:get('transpose')+ 48, params:get('chord_midi_ch')} --note index, note, channel (simplified)
+    end
+  elseif destination == 'ii-JF' then
+    for i=1,#chord do
+      crow.ii.jf.play_note((chord[i] + params:get('transpose') + 0)/12, params:get('chord_jf_amp')/10)
     end
   end
 end
@@ -463,8 +480,8 @@ end
 function harmonizer(destination, note_num, channel, velocity, amp, cutoff, gain, pw, release)
   -- print('Harmonizer: ' ..destination .. ' '.. note_num .. ' ' .. channel .. ' ' .. velocity)
   prev_harmonizer_note = harmonizer_note
-  harmonizer_note = chord[1][util.wrap(note_num, 1, #chord[1])]
-  harmonizer_octave = math.floor((note_num - 1) / #chord[1],0)
+  harmonizer_note = chord[util.wrap(note_num, 1, #chord)]
+  harmonizer_octave = math.floor((note_num - 1) / #chord,0)
   -- print(arp_note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
   if chord_seq_retrig == true or params:get('do_crow_auto_rest') == 0 or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
     if destination == 'Engine' then
@@ -633,8 +650,11 @@ function key(n,z)
         clock.transport.start()
       end
     elseif n == 3 then
-      -- params:delta('do_follow', 1)
-      params:set('do_follow', 0)
+      if params:get('do_follow') == 1 then
+        params:set('do_follow', 0)
+      else
+        params:set('do_follow', 1)  
+      end
       redraw()
     end
   end
