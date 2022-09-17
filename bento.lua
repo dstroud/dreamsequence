@@ -54,8 +54,7 @@ function init()
     default = 1,
     formatter = function(param) return t_f_string(param:get()) end,
     -- action = function() reset_arrangement() end, function() grid_redraw() end
-      action = function() grid_redraw() end,
-    }
+      action = function() grid_redraw() end}
     params:add{
     type = 'number',
     id = 'playback',
@@ -63,8 +62,7 @@ function init()
     min = 0,
     max = 1,
     default = 1,
-    formatter = function(param) return playback_string(param:get()) end,
-    }
+    formatter = function(param) return playback_string(param:get()) end}
   
   --Chord params
   params:add_separator ('Chord')
@@ -134,11 +132,12 @@ function init()
   params:add{
     type = 'number',
     id = 'do_midi_velocity_passthru',
-    name = 'Velocity Passthru',
+    name = 'Pass velocity',
     min = 0,
     max = 1,
     default = 0,
-    formatter = function(param) return t_f_string(param:get()) end}
+    formatter = function(param) return t_f_string(param:get()) end,
+    action = function() menu_update() end}
   
   --Crow params
   params:add_separator ('Crow')
@@ -254,7 +253,11 @@ function menu_update()
   elseif params:string('midi_dest') == 'Engine' then
     menus[4] = {'midi_dest', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw', 'midi_pp_release'}
   elseif params:string('midi_dest') == 'MIDI' then
-    menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_midi_velocity'}
+    if params:get('do_midi_velocity_passthru') == 1 then
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'do_midi_velocity_passthru'}
+    else
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+    end
   elseif params:string('midi_dest') == 'Crow' then
     menus[4] = {'midi_dest'}
   end
@@ -423,7 +426,9 @@ function loop(rate)
         end
         if arp_seq[arp_pattern][arp_seq_position] > 0 then
           arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
-          harmonizer(params:string('arp_dest'), 
+          harmonizer(
+            'arp',
+            params:string('arp_dest'), 
             arp_note_num, 
             params:get('arp_midi_ch'), 
             params:get('arp_midi_velocity'), 
@@ -477,33 +482,41 @@ function stop_chord()
   end
 end
 
-function harmonizer(destination, note_num, channel, velocity, amp, cutoff, gain, pw, release)
-  -- print('Harmonizer: ' ..destination .. ' '.. note_num .. ' ' .. channel .. ' ' .. velocity)
-  prev_harmonizer_note = harmonizer_note
+function harmonizer(source, destination, note_num, channel, velocity, amp, cutoff, gain, pw, release)
   harmonizer_note = chord[util.wrap(note_num, 1, #chord)]
   harmonizer_octave = math.floor((note_num - 1) / #chord,0)
-  -- print(arp_note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
-  if chord_seq_retrig == true or params:get('do_crow_auto_rest') == 0 or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
-    if destination == 'Engine' then
-      engine.amp(amp / 100)
-      engine.cutoff(cutoff)
-      engine.release(release)
-      engine.gain(gain / 100)
-      engine.pw(pw / 100)
-      engine.hz(music.note_num_to_freq(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48))
-    elseif destination == 'Crow' then
-      crow.output[1].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
-      crow.output[2].slew = 0
-      crow.output[2].volts = 8
-      crow.output[2].slew = 0.005
-      crow.output[2].volts = 0
-    elseif destination == 'MIDI' then
-      stop_harmonizer(channel)
-      harmonizer_out_midi:note_on((harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48), velocity, channel)
-      harmonizer_hanging_notes[channel] = {(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48)}
+  -- print(source .. ' ' .. note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
+  -- Logic for auto-rest. Needs to be source-independent.
+  if 
+    source ~= 'crow'
+    or chord_seq_retrig == true 
+    or params:get('do_crow_auto_rest') == 0 
+    or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
+      if destination == 'Engine' then
+        engine.amp(amp / 100)
+        engine.cutoff(cutoff)
+        engine.release(release)
+        engine.gain(gain / 100)
+        engine.pw(pw / 100)
+        engine.hz(music.note_num_to_freq(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48))
+      elseif destination == 'Crow' then
+        crow.output[1].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
+        crow.output[2].slew = 0
+        crow.output[2].volts = 8
+        crow.output[2].slew = 0.005
+        crow.output[2].volts = 0
+      elseif destination == 'MIDI' then
+        stop_harmonizer(channel) -- This needs to redone for poly notes. Also doesn't address channel switching.
+        harmonizer_out_midi:note_on((harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48), velocity, channel)
+        harmonizer_hanging_notes[channel] = {(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48)}
+      end
     end
+  if source == 'crow' then
+    if chord_seq_trig == true then -- Check if this is used for anything other than auto-rest
+      chord_seq_retrig = false
+    end
+    prev_harmonizer_note = harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')
   end
-  chord_seq_retrig = false -- Fix: Needs to be fired by calling function depending on where enabled
 end
 
 function stop_harmonizer(channel) --midi
@@ -706,7 +719,9 @@ function sample_crow(v)
   volts = v
   crow_note_num =  round(volts * 12,0) + 1
   -- harmonizer(params:string('crow_dest'), crow_note_num, params:get('crow_midi_ch'), params:get('crow_midi_vel'))
-  harmonizer(params:string('crow_dest'), 
+  harmonizer(
+    'crow',
+    params:string('crow_dest'), 
     crow_note_num, 
     params:get('crow_midi_ch'), 
     params:get('crow_midi_velocity'), 
@@ -722,8 +737,10 @@ in_midi.event = function(data)
   local d = midi.to_msg(data)
   if d.type == "note_on" then
     if params:get('do_midi_velocity_passthru') == 1 then  --Clunky
-      harmonizer(params:string('midi_dest'), 
-        d.note - 36, 
+      harmonizer(
+        'midi',
+        params:string('midi_dest'), 
+        d.note - 35,  -- Check that this offset works on other devices 
         params:get('midi_midi_ch'), 
         d.vel,
         params:get('midi_pp_amp'), 
@@ -732,8 +749,10 @@ in_midi.event = function(data)
         params:get('midi_pp_pw'), 
         params:get('midi_pp_release'))
     else
-      harmonizer(params:string('midi_dest'), 
-        d.note - 36, 
+      harmonizer(
+        'midi',
+        params:string('midi_dest'), 
+        d.note - 35, 
         params:get('midi_midi_ch'), 
         params:get('midi_midi_velocity'),   
         params:get('midi_pp_amp'), 
