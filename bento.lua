@@ -113,7 +113,7 @@ function init()
   
   --MIDI params
   params:add_separator ('MIDI')
-  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
+  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},3)
     params:set_action("midi_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -142,7 +142,7 @@ function init()
   --Crow params
   params:add_separator ('Crow')
   params:add_number('crow_div', 'Clock out div', 1, 32, 8) --most useful TBD
-  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
+  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},3) --Fix: change back from MIDI
     params:set_action("crow_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -215,9 +215,10 @@ function init()
   arp_pattern = 1
   arp_seq_position = 0
   arp_seq_note = 8
-  -- engine.release(5)
+  note_off_buffer = {}
   reset_clock() -- will turn over to step 0 on first loop
   -- clock.run(grid_redraw_clock) --Not used currently
+  timing_clock_id = clock.run(timing_clock) -- used for midi event timing. Needs to be synced to main clock for better quantization.
   grid_redraw()
 end
 
@@ -328,6 +329,21 @@ function print_this(x)
   print(x)
 end
 
+function timing_clock()
+  -- while transport_active do
+  while true do
+    clock.sync(1/64)
+    local reverse_index = #note_off_buffer + 1
+    for i = #note_off_buffer, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
+      note_off_buffer[i][1] = note_off_buffer[i][1] - 1
+      if note_off_buffer[i][1] == 0 then
+        harmonizer_out_midi:note_off(note_off_buffer[i][2], 0, note_off_buffer[i][3]) -- note, vel, ch.
+        table.remove(note_off_buffer, i)
+      end
+    end
+  end
+end
+    
 function clock.transport.start()
   transport_active = true
   clock_loop_id = clock.run(loop, global_clock_div) --8 == global clock at 32nd notes
@@ -483,41 +499,52 @@ function stop_chord()
 end
 
 function harmonizer(source, destination, note_num, channel, velocity, amp, cutoff, gain, pw, release)
-  harmonizer_note = chord[util.wrap(note_num, 1, #chord)]
+  quantized_note = chord[util.wrap(note_num, 1, #chord)]
   harmonizer_octave = math.floor((note_num - 1) / #chord,0)
-  -- print(source .. ' ' .. note_num.. "  " .. harmonizer_note.."  "..harmonizer_octave)
-  -- Logic for auto-rest. Needs to be source-independent.
+  harmonizer_note = quantized_note + (harmonizer_octave * 12) + params:get('transpose')   
+  -- print(source .. ' ' .. note_num.. "  " .. quantized_note.."  "..harmonizer_octave)
   if 
-    source ~= 'crow'
-    or chord_seq_retrig == true 
-    or params:get('do_crow_auto_rest') == 0 
-    or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
+  source ~= 'crow'   -- Logic for auto-rest
+  or chord_seq_retrig == true 
+  or params:get('do_crow_auto_rest') == 0 
+  or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
+
       if destination == 'Engine' then
         engine.amp(amp / 100)
         engine.cutoff(cutoff)
         engine.release(release)
         engine.gain(gain / 100)
         engine.pw(pw / 100)
-        engine.hz(music.note_num_to_freq(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48))
+        engine.hz(music.note_num_to_freq(harmonizer_note + 48))
       elseif destination == 'Crow' then
-        crow.output[1].volts = (harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')) / 12
+        crow.output[1].volts = (harmonizer_note) / 12
         crow.output[2].slew = 0
         crow.output[2].volts = 8
         crow.output[2].slew = 0.005
         crow.output[2].volts = 0
       elseif destination == 'MIDI' then
-        stop_harmonizer(channel) -- This needs to redone for poly notes. Also doesn't address channel switching.
-        harmonizer_out_midi:note_on((harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48), velocity, channel)
-        harmonizer_hanging_notes[channel] = {(harmonizer_note + (harmonizer_octave * 12) + params:get('transpose') + 48)}
+        harmonizer_out_midi:note_on((harmonizer_note + 48), velocity, channel)
+        harmonizer_hanging_notes[channel] = {(harmonizer_note + 48)}
+        for i = 1, #note_off_buffer do
+          if note_off_buffer[i][2] == harmonizer_note + 48 and note_off_buffer[i][3] == channel then
+            note_off_buffer[i][1] = 128 -- Fix: param duration
+            block = true
+          end
+        end
+        if block == false then
+          table.insert(note_off_buffer, {128, harmonizer_note + 48, channel}) -- Fix: param duration
+        end
+        block = false
       end
     end
   if source == 'crow' then
     if chord_seq_trig == true then -- Check if this is used for anything other than auto-rest
       chord_seq_retrig = false
     end
-    prev_harmonizer_note = harmonizer_note + (harmonizer_octave * 12) + params:get('transpose')
+    prev_harmonizer_note = harmonizer_note
   end
 end
+
 
 function stop_harmonizer(channel) --midi
   -- for i = #harmonizer_hanging_notes[channel], #harmonizer_hanging_notes[channel] do 
@@ -718,7 +745,6 @@ end
 function sample_crow(v)
   volts = v
   crow_note_num =  round(volts * 12,0) + 1
-  -- harmonizer(params:string('crow_dest'), crow_note_num, params:get('crow_midi_ch'), params:get('crow_midi_vel'))
   harmonizer(
     'crow',
     params:string('crow_dest'), 
