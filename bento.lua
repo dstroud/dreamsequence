@@ -26,8 +26,8 @@ out_midi = midi.connect(1) --Multi outs prob needed
 
 
 function init()
-  -- crow_pullup()
   crow.ii.jf.mode(1)
+  params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with Bento's clock
 
   durations = {
     {'1/32', 8}, 
@@ -182,6 +182,7 @@ function init()
   crow.input[1].mode("none")
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
   crow.input[2].change = crow_trigger
+  crow.output[3].action = "pulse(.001,5,1)" -- Need to test this more vs. roll-your-own pulse
   grid_dirty = true
   views = {'Arrange','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
   view_index = 2
@@ -213,13 +214,11 @@ function init()
   chord_seq_position = 0
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
   chord = music.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, false)
-  -- chord_hanging_notes = {}  
-  -- harmonizer_hanging_notes = {{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}}
   arp_seq = {{0,0,0,0,0,0,0,0},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8}
-            } -- sub table in case we want multiple arp patterns
+            } -- sub table for multiple arp patterns
   arp_pattern_length = {8,8,8,8}
   arp_pattern = 1
   arp_seq_position = 0
@@ -227,7 +226,7 @@ function init()
   note_off_buffer = {}
   reset_clock() -- will turn over to step 0 on first loop
   -- clock.run(grid_redraw_clock) --Not used currently
-  timing_clock_id = clock.run(timing_clock) -- used for midi event timing. Needs to be synced to main clock for better quantization.
+  clock_start_method = 'start'
   grid_redraw()
 end
 
@@ -284,7 +283,7 @@ function menu_update()
   end  
   
   --Global menu
-  menus[6] = {'clock_tempo','mode','transpose'}
+  menus[6] = {'clock_source', 'clock_tempo', 'mode', 'transpose', 'clock_midi_out'}
 end
 
 
@@ -347,8 +346,8 @@ function print_this(x)
 end
 
 function timing_clock()
-  -- while transport_active do
   while true do
+    -- print('Timing clock running')
     clock.sync(1/64)
     for i = #note_off_buffer, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       note_off_buffer[i][1] = note_off_buffer[i][1] - 1
@@ -362,20 +361,29 @@ end
     
 function clock.transport.start()
   transport_active = true
-  clock_loop_id = clock.run(loop, global_clock_div) --8 == global clock at 32nd notes
-  print("Clock "..clock_loop_id.. " started")
+  clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
+  timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
+  sequence_clock_id = clock.run(sequence_loop, global_clock_div) --8 == global clock at 32nd notes
+  if params:get('clock_midi_out') ~= 1 then 
+    if clock_start_method == 'start' then
+      out_midi:start()
+    else
+      out_midi:continue()
+    end
+  end
+  clock_start_method = 'continue'
+  print("Clock "..sequence_clock_id.. " started")
 end
 
 function clock.transport.stop()
+  if params:get('clock_midi_out') ~= 1 then 
+    out_midi:stop() --Stop vs continue?
+  end
   transport_active = false
-  clock.cancel(clock_loop_id)
+  clock.cancel(sequence_clock_id)
   if params:get('do_follow') == 1 then
     reset_arrangement()
   end
-  -- for i = 1,16 do
-  --   stop_harmonizer(i)
-  -- end
-  -- stop_chord()
 end
    
 function reset_arrangement() -- check: how to send a reset out to Crow for external clocking
@@ -391,11 +399,12 @@ function reset_arrangement() -- check: how to send a reset out to Crow for exter
 end
 
 function reset_clock()
-  clock_step = params:get('chord_div') - 1    
+  clock_step = params:get('chord_div') - 1
+  clock_start_method = 'start'
 end
 
 -- One clock to control all sequence events
-function loop(rate)
+function sequence_loop(rate)
   while transport_active do
     clock.sync(1/rate)
     clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) -- 0-indexed counter for checking when to fire events
@@ -439,14 +448,8 @@ function loop(rate)
       if chord_seq[pattern][chord_seq_position].c > 0 then
         play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
       end
-      -- if pattern_seq_position >= pattern_seq_length and then
-      --   if do_follow == 1 and playback == 0 --last step of arrangement
-      --     print('stop chord seq')
-      --     arrange_seq_retrig = true
-      --   end
-      -- end  
-      grid_redraw() -- move
-      redraw() -- to update Arrange mini chart. Worth it?
+      grid_redraw() 
+      redraw() -- to update Arrange mini chart.
     end
     
     -- arp clock
@@ -474,12 +477,13 @@ function loop(rate)
         grid_redraw() --move
       end
 
-    --crow clock out
+    --crow clock out. Maybe should use puls
     if clock_step % params:get('crow_div') == 0 then
-      crow.output[3].slew = 0
-      crow.output[3].volts = 8
-      crow.output[3].slew = 0.005 --WAG here
-      crow.output[3].volts = 0  
+      -- crow.output[3].slew = 0
+      -- crow.output[3].volts = 8
+      -- crow.output[3].slew = 0.005 --WAG here
+      -- crow.output[3].volts = 0 
+      crow.output[3]() --pulse defined in init
     end
     -- end
   end
@@ -518,12 +522,6 @@ function play_chord(destination, channel)
     end
   end
 end
-
--- function stop_chord()
---   for i = 1, #chord_hanging_notes do          --Turn off any hanging chord notes
---     out_midi:note_off(chord_hanging_notes[i][1], 0, chord_hanging_notes[i][2])
---   end
--- end
 
 function harmonizer(source, destination, note_num, channel, velocity, amp, cutoff, gain, pw, release,duration)
   quantized_note = chord[util.wrap(note_num, 1, #chord)]
@@ -571,14 +569,6 @@ function harmonizer(source, destination, note_num, channel, velocity, amp, cutof
     prev_harmonizer_note = harmonizer_note
   end
 end
-
-
--- function stop_harmonizer(channel) --midi
---   -- for i = #harmonizer_hanging_notes[channel], #harmonizer_hanging_notes[channel] do 
---   if #harmonizer_hanging_notes[channel] then
---     out_midi:note_off(harmonizer_hanging_notes[channel][1], 0, channel) -- note, vel, ch. Not sure if there is a reason we need [i] index
---   end
--- end
 
 function grid_redraw()
   g:all(0)
@@ -695,8 +685,8 @@ function g.key(x,y,z)
     params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
     if y == pattern_queue then
       pattern = y
-      arp_seq_position = 0
-      chord_seq_position = 0
+      -- arp_seq_position = 0       -- Not necessary any more I think
+      -- chord_seq_position = 0
       reset_clock()
     else
       pattern_queue = y
@@ -709,12 +699,14 @@ end
 function key(n,z)
   if z == 1 then
     if n == 2 then
-      if transport_active then
-        print('Stop')
-        clock.transport.stop()
-      else
-        print('Start')
-        clock.transport.start()
+      if params:get('clock_source') == 1 then --Internal clock only
+        if transport_active then
+          print('Stop')
+          clock.transport.stop()
+        else
+          print('Start')
+          clock.transport.start()
+        end
       end
     elseif n == 3 then
       if params:get('do_follow') == 1 then
@@ -726,26 +718,6 @@ function key(n,z)
     end
   end
 end
-
---   if n == 1 then
---     if z == 0 then -- Transport control operates on key up because of the K1 delay
---       if transport_active then
---         print("stop key")
---         clock.transport.stop()
---       else
---         print("start key")
---         clock.transport.start()
---       end
---     end
---   elseif z == 1 then
---     if n == 2 then 
---       params:delta(selected_menu, -1)
---     else 
---       params:delta(selected_menu, 1)
---     end
---   redraw()
---   end
--- end
 
 function enc(n,d)
   if n == 1 then
@@ -789,7 +761,10 @@ end
 
 in_midi.event = function(data)
   local d = midi.to_msg(data)
-  if d.type == "note_on" then
+  -- print(d.type)
+  if d.type == 'stop'and params:get('clock_source') == 2 then
+    reset_clock()
+  elseif d.type == "note_on" then
     if params:get('do_midi_velocity_passthru') == 1 then  --Clunky
       harmonizer(
         'midi',
