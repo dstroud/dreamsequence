@@ -89,7 +89,7 @@ function init()
   params:add_number("chord_pp_gain","Gain",0, 400, 200)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
   params:add_number("chord_pp_release","Release",1, 10, 5)
-  params:add_number('chord_midi_velocity','Velocity',0, 127, 127)
+  params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
@@ -134,7 +134,7 @@ function init()
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
   params:add_number("midi_pp_release","Release",1, 10, 5)
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
-  params:add_number('midi_midi_velocity','Velocity',0, 127, 127)
+  params:add_number('midi_midi_velocity','Velocity',0, 127, 110)
   params:add{
     type = 'number',
     id = 'do_midi_velocity_passthru',
@@ -227,6 +227,8 @@ function init()
   reset_clock() -- will turn over to step 0 on first loop
   -- clock.run(grid_redraw_clock) --Not used currently
   reset_clock()
+  get_next_chord() -- Placeholder for when table loading from file is implemented
+  grid_dirty = true
   grid_redraw()
 end
 
@@ -363,7 +365,7 @@ function clock.transport.start()
   transport_active = true
   clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
-  sequence_clock_id = clock.run(sequence_loop, global_clock_div) --8 == global clock at 32nd notes
+  sequence_clock_id = clock.run(sequence_clock, global_clock_div) --8 == global clock at 32nd notes
   if params:get('clock_midi_out') ~= 1 then 
     if clock_start_method == 'start' then
       out_midi:start()
@@ -380,10 +382,14 @@ function clock.transport.stop()
     out_midi:stop() --Stop vs continue?
   end
   transport_active = false
-  clock.cancel(sequence_clock_id)
+  clock.cancel(sequence_clock_id or 0)
   if params:get('do_follow') == 1 then
+    reset_arrangement() --this isn't being triggered when Link pauses then is reset. Hmm.
+  end
+  if params:get('clock_source') == 3 then --Ableton link doesn't send Continue events
     reset_arrangement()
   end
+  get_next_chord()
 end
    
 function reset_arrangement() -- check: how to send a reset out to Crow for external clocking
@@ -404,167 +410,126 @@ function reset_clock()
 end
 
 
-function chord_pre_load()
-
-    store_chord_seq_position = chord_seq_position
-    store_pattern_seq_retrig = pattern_seq_retrig
-    store_chord_seq_position = chord_seq_position
-    
-    -- disabling a bunch of stuff to test with just one chord pattern 
-    -- if clock_step % params:get('chord_div') == 0 then
-    --   chord_seq_retrig = true -- indicates when we're on a new chord seq step for arp filtering
-      
-      -- If Arranger is enabled and we're on/after the last step in the pattern
-      -- if params:get("do_follow") == 1 and chord_seq_position >= pattern_length[pattern] then 
-        
-        --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is turned off midway through. Maybe fix this.
-        -- if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then 
-          -- arrangement_reset = true
-          -- print('arrangement_reset = true')
-        -- end
-        
-        -- Update the arranger sequence position
-        -- pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
-        -- pattern = pattern_seq[pattern_seq_position]
-        
-        -- Prevents arp from extending beyond chord pattern length. I think this needs to be checked on the Arp loop (set chord div to 16)
-        -- pattern_seq_retrig = true 
-      -- end
-      
-      -- if arrangement_reset == true and params:string('playback') == 'One-shot' then
-        -- print('arrangement ended')
-        -- clock.transport.stop()
-        -- arrangement_reset = false
-        -- print('arrangement_reset = false')
-        -- break
-      -- end
-    
-      if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
-        -- if pattern_queue then
-          -- pattern = pattern_queue
-          -- pattern_queue = false
-        -- end
-        chord_seq_position = 1
-        pattern_seq_retrig = false
-      else  
-        chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
-      end
-      if chord_seq[pattern][chord_seq_position].c > 0 then
-        -- play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
-        -- HERE IS THE PRE=CHORD UPDATE
-        chord = music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, false)
-      end
-      -- grid_redraw() 
-      -- redraw() -- to update Arrange mini chart.
-      
-    -- unfuck stuff  
-  chord_seq_position = store_chord_seq_position
-  pattern_seq_retrig = store_pattern_seq_retrig
-  chord_seq_position = store_chord_seq_position
-end
-
-
-
--- One clock to control all sequence events
-function sequence_loop(rate)
+ --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
+function sequence_clock(rate)
   while transport_active do
     clock.sync(1/rate)
-    
-    --early chord load to address midi/crow events that might come in a little ahead of the chord change. One whole tic is prob too large.
-    if util.wrap(clock_step + 2, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
-      chord_pre_load()
+    clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
+    if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
+      get_next_chord()
     end
-    
-    -- if 1 == 1 then
-    --   -- print('ok')
-    --   chord_pre_load()
-    -- end
-    
-    -- Check if it's time to move to the next chord step
-    clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) -- 0-indexed counter for checking when to fire events
-    
-    --chord clock
     if clock_step % params:get('chord_div') == 0 then
-      chord_seq_retrig = true -- indicates when we're on a new chord seq step for arp filtering
-      
-      -- If Arranger is enabled and we're on/after the last step in the pattern
-      if params:get("do_follow") == 1 and chord_seq_position >= pattern_length[pattern] then 
-        
-        --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is turned off midway through. Maybe fix this.
-        if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then 
-          arrangement_reset = true
-          print('arrangement_reset = true')
-        end
-        
-        -- Update the arranger sequence position
-        pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
-        pattern = pattern_seq[pattern_seq_position]
-        
-        -- Prevents arp from extending beyond chord pattern length. I think this needs to be checked on the Arp loop (set chord div to 16)
-        pattern_seq_retrig = true 
-      end
-      
-      if arrangement_reset == true and params:string('playback') == 'One-shot' then
-        print('arrangement ended')
-        clock.transport.stop()
-        arrangement_reset = false
-        -- print('arrangement_reset = false')
-        break
-      end
-    
-      if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
-        -- print('pattern retrig')
-        if pattern_queue then
-          pattern = pattern_queue
-          pattern_queue = false
-        end
-        chord_seq_position = 1
-        pattern_seq_retrig = false
-      else  
-        chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
-      end
-      if chord_seq[pattern][chord_seq_position].c > 0 then
-        play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
-      end
-      grid_redraw() 
-      redraw() -- to update Arrange mini chart.
+      advance_chord_seq()
+      grid_dirty = true
     end
- 
-    -- arp clock
-      if clock_step % params:get('arp_div') == 0 then
-        if arp_seq_position > arp_pattern_length[arp_pattern] then 
-          arp_seq_position = 1
-        else  
-          arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
-        end
-        if arp_seq[arp_pattern][arp_seq_position] > 0 then
-          arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
-          harmonizer(
-            'arp',
-            params:string('arp_dest'), 
-            arp_note_num, 
-            params:get('arp_midi_ch'), 
-            params:get('arp_midi_velocity'), 
-            params:get('arp_pp_amp'), 
-            params:get('arp_pp_cutoff'), 
-            params:get('arp_pp_gain'), 
-            params:get('arp_pp_pw'), 
-            params:get('arp_pp_release'),
-            duration_int(params:get('arp_duration')))
-        end
-        grid_redraw() --move
-      end
-
+    if clock_step % params:get('arp_div') == 0 then
+      advance_arp_seq()
+      grid_dirty = true
+    end
     if clock_step % params:get('crow_div') == 0 then
-      -- crow.output[3].slew = 0
-      -- crow.output[3].volts = 8
-      -- crow.output[3].slew = 0.005 --WAG here
-      -- crow.output[3].volts = 0 
       crow.output[3]() --pulse defined in init
     end
-    -- end
+    if grid_dirty == true then
+      grid_redraw()
+      grid_dirty = false
+    end
   end
 end
+
+
+function advance_chord_seq()
+  chord_seq_retrig = true -- indicates when we're on a new chord seq step for auto-rest logic
+  
+  -- If Arranger is enabled and we're on/after the last step in the pattern
+  if params:get("do_follow") == 1 and chord_seq_position >= pattern_length[pattern] then
+    
+    --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is turned off midway through. Maybe fix this.
+    if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then
+      arrangement_reset = true
+      print('arrangement_reset = true')
+    end
+    
+    -- Update the arranger sequence position
+    pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
+    pattern = pattern_seq[pattern_seq_position]
+    
+    -- Prevents arp from extending beyond chord pattern length. Fix: add check to Arp loop (set chord div to 16)
+    pattern_seq_retrig = true 
+  end
+  
+  if arrangement_reset == true and params:string('playback') == 'One-shot' then
+    print('arrangement ended')
+    clock.transport.stop()
+    arrangement_reset = false
+    -- break --  To-do: Need to check if this was preventing the following from running...
+  end
+
+  if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
+    if pattern_queue then
+      pattern = pattern_queue
+      pattern_queue = false
+    end
+    chord_seq_position = 1
+    pattern_seq_retrig = false
+  else  
+    chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
+  end
+  if chord_seq[pattern][chord_seq_position].c > 0 then
+    play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
+  end
+  -- grid_redraw()  -- moved up to clock
+  redraw() -- To update Arrange mini chart
+end
+
+
+-- Pre-load upcoming chord to address race condition. To-do: Call at init, when transport is stopped and pattern/seq is changed.
+function get_next_chord()
+  local temp_pattern = pattern
+  local temp_chord_seq_position = chord_seq_position
+  local temp_pattern_seq_retrig = false
+  if params:get("do_follow") == 1 and temp_chord_seq_position >= pattern_length[temp_pattern] then 
+    temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
+    temp_pattern_seq_retrig = true
+  end
+  if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_pattern_seq_retrig then
+    if pattern_queue then
+      temp_pattern = pattern_queue
+    end
+    temp_chord_seq_position = 1
+    temp_pattern_seq_retrig = false
+  else  
+    temp_chord_seq_position = util.wrap(temp_chord_seq_position + 1, 1, pattern_length[temp_pattern])
+  end
+  if chord_seq[temp_pattern][temp_chord_seq_position].c > 0 then
+    chord = music.generate_chord_scale_degree(chord_seq[temp_pattern][temp_chord_seq_position].o * 12, params:get('mode'), chord_seq[temp_pattern][temp_chord_seq_position].c, false)
+  end
+end
+
+
+function advance_arp_seq()
+  print('advance_arp_seq called')
+  if arp_seq_position > arp_pattern_length[arp_pattern] or pattern_seq_retrig == true then -- Validate pattern_seq_retrig addition
+    arp_seq_position = 1
+  else  
+    arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
+  end
+  if arp_seq[arp_pattern][arp_seq_position] > 0 then
+    arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
+    harmonizer(
+      'arp',
+      params:string('arp_dest'), 
+      arp_note_num, 
+      params:get('arp_midi_ch'), 
+      params:get('arp_midi_velocity'), 
+      params:get('arp_pp_amp'), 
+      params:get('arp_pp_cutoff'), 
+      params:get('arp_pp_gain'), 
+      params:get('arp_pp_pw'), 
+      params:get('arp_pp_release'),
+      duration_int(params:get('arp_duration')))
+  end
+end
+
 
 function play_chord(destination, channel)
   chord = music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, false)
@@ -840,7 +805,7 @@ in_midi.event = function(data)
   local d = midi.to_msg(data)
   -- print(d.type)
   if d.type == 'stop'and params:get('clock_source') == 2 then
-    reset_clock()
+    reset_clock() --should this be transport stop?
   elseif d.type == "note_on" then
     if params:get('do_midi_velocity_passthru') == 1 then  --Clunky
       harmonizer(
