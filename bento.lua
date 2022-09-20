@@ -471,14 +471,14 @@ function sequence_loop(rate)
     clock.sync(1/rate)
     
     --early chord load to address midi/crow events that might come in a little ahead of the chord change. One whole tic is prob too large.
-    -- if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
-    --   chord_pre_load()
-    -- end
-    
-    if 1 == 1 then
-      -- print('ok')
+    if util.wrap(clock_step + 2, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
       chord_pre_load()
     end
+    
+    -- if 1 == 1 then
+    --   -- print('ok')
+    --   chord_pre_load()
+    -- end
     
     -- Check if it's time to move to the next chord step
     clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) -- 0-indexed counter for checking when to fire events
