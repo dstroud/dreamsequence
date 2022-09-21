@@ -507,7 +507,7 @@ end
 
 
 function advance_arp_seq()
-  print('advance_arp_seq called')
+  -- print('advance_arp_seq called')
   if arp_seq_position > arp_pattern_length[arp_pattern] or pattern_seq_retrig == true then -- Validate pattern_seq_retrig addition
     arp_seq_position = 1
   else  
@@ -669,8 +669,7 @@ function g.key(x,y,z)
     if x == 16 and y > 5 then --view switcher buttons
       view_index = y - 5
       view_name = views[view_index]
-      
-    --arrange keys
+    --ARRANGER KEYS
     elseif view_name == 'Arrange' then
       if y < 5 then
         if y == pattern_seq[x] and x > 1 then 
@@ -685,9 +684,10 @@ function g.key(x,y,z)
           end
         end 
       end
-    
-    --chord keys
-    -- print('checking for Chord keys')
+      if transport_active == false then -- Update chord for when play starts
+        get_next_chord()
+      end
+    --CHORD KEYS
     elseif view_name == 'Chord' then
       if x < 15 then
         if x == chord_seq[pattern][y].x then
@@ -706,8 +706,10 @@ function g.key(x,y,z)
         -- pattern_preview = y --not implemented yet
         -- print('previewing pattern '.. pattern_preview)
       end
-
-    -- arp keys
+      if transport_active == false then -- Update chord for when play starts
+        get_next_chord()
+      end
+    -- ARP KEYS
     elseif view_name == 'Arp' then
       if x < 15 then
         if x == arp_seq[arp_pattern][y] then
@@ -804,9 +806,10 @@ end
 in_midi.event = function(data)
   local d = midi.to_msg(data)
   -- print(d.type)
-  if d.type == 'stop'and params:get('clock_source') == 2 then
+  if params:get('clock_source') == 2 and d.type == 'stop' then
     reset_clock() --should this be transport stop?
   elseif d.type == "note_on" then
+    -- print('in_midi note_on ' .. clock_step)
     if params:get('do_midi_velocity_passthru') == 1 then  --Clunky
       harmonizer(
         'midi',
