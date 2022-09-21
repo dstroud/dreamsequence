@@ -29,14 +29,14 @@ function init()
   crow.ii.jf.mode(1)
   params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with Bento's clock
 
+  -- Duration name, clock tics, beat multiplier. Triplet vals? To-do: assign calculation of seconds to clock_tempo action.
   durations = {
-    {'1/32', 8}, 
-    {'1/16',16},
-    {'1/8', 32},
-    {'1/4', 64},
-    {'1/2', 128},
-    {'Whole', 256},
-    {'Double', 512}} -- Triplet vals?
+    {'1/32', 8, .125},
+    {'1/16',16, .25},
+    {'1/8', 32, .5},
+    {'1/4', 64, 1}, --clock.get_beat_sec()
+    {'1/2', 128, 2},
+    {'Whole', 256, 4}}
 
   --Global params
   params:add_separator ('Global')
@@ -88,13 +88,13 @@ function init()
   params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_number("chord_pp_gain","Gain",0, 400, 200)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
-  params:add_number("chord_pp_release","Release",1, 10, 5)
-  params:add_number('chord_midi_velocity','Velocity',0, 127, 127)
+  -- params:add_number("chord_pp_release","Release",1, 10, 5)
+  params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
     params:set_action("crow_pullup",function() crow_pullup() end)
-  params:add_number('chord_duration', 'Duration', 1, 7, 6, function(param) return duration_string(param:get()) end)
+  params:add_number('chord_duration', 'Duration', 1, 6, 6, function(param) return duration_string(param:get()) end)
 
   --Arp params
   params:add_separator ('Arp')
@@ -112,10 +112,10 @@ function init()
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_number("arp_pp_gain","Gain",0, 400, 200)
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
-  params:add_number("arp_pp_release","Release",1, 10, 5)
+  -- params:add_number("arp_pp_release","Release",1, 10, 5)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 127)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
-  params:add_number('arp_duration', 'Duration', 1, 7, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('arp_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
 
   --MIDI params
   params:add_separator ('MIDI')
@@ -132,9 +132,9 @@ function init()
   params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_number("midi_pp_gain","Gain",0, 400, 200)
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
-  params:add_number("midi_pp_release","Release",1, 10, 5)
+  -- params:add_number("midi_pp_release","Release",1, 10, 5)
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
-  params:add_number('midi_midi_velocity','Velocity',0, 127, 127)
+  params:add_number('midi_midi_velocity','Velocity',0, 127, 110)
   params:add{
     type = 'number',
     id = 'do_midi_velocity_passthru',
@@ -144,7 +144,7 @@ function init()
     default = 0,
     formatter = function(param) return t_f_string(param:get()) end,
     action = function() menu_update() end}
-  params:add_number('midi_duration', 'Duration', 1, 7, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('midi_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
 
   --Crow params
   params:add_separator ('Crow')
@@ -170,10 +170,10 @@ function init()
   params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_number("crow_pp_gain","Gain",0, 400, 200)
   params:add_number("crow_pp_pw","Pulse width",1, 99, 50)
-  params:add_number("crow_pp_release","Release",1, 10, 5)
+  -- params:add_number("crow_pp_release","Release",1, 10, 5)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 127)
-  params:add_number('crow_duration', 'Duration', 1, 7, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('crow_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
 
 
   prev_harmonizer_note = -999
@@ -226,7 +226,9 @@ function init()
   note_off_buffer = {}
   reset_clock() -- will turn over to step 0 on first loop
   -- clock.run(grid_redraw_clock) --Not used currently
-  clock_start_method = 'start'
+  reset_clock()
+  get_next_chord() -- Placeholder for when table loading from file is implemented
+  grid_dirty = true
   grid_redraw()
 end
 
@@ -238,9 +240,9 @@ function menu_update()
   if params:string('chord_dest') == 'None' then
     menus[2] = {'chord_dest', 'chord_div'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_div', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw', 'chord_pp_release'}
+    menus[2] = {'chord_dest', 'chord_div', 'chord_duration', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_div', 'chord_midi_ch', 'chord_midi_velocity','chord_duration'}
+    menus[2] = {'chord_dest', 'chord_midi_ch', 'chord_div', 'chord_duration', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
     menus[2] = {'chord_dest', 'chord_div', 'chord_jf_amp', 'crow_pullup'}
   end
@@ -249,9 +251,9 @@ function menu_update()
   if params:string('arp_dest') == 'None' then
     menus[3] = {'arp_dest', 'arp_div'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_dest', 'arp_div', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw', 'arp_pp_release'}
+    menus[3] = {'arp_dest', 'arp_div', 'arp_duration', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_div', 'arp_midi_ch', 'arp_midi_velocity','arp_duration'}
+    menus[3] = {'arp_dest', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     menus[3] = {'arp_dest', 'arp_div'}
   end
@@ -260,12 +262,12 @@ function menu_update()
   if params:string('midi_dest') == 'None' then
     menus[4] = {'midi_dest'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[4] = {'midi_dest', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw', 'midi_pp_release'}
+    menus[4] = {'midi_dest', 'midi_duration', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[4] = {'midi_dest', 'midi_midi_ch', 'do_midi_velocity_passthru'}
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'do_midi_velocity_passthru'}
     else
-      menus[4] = {'midi_dest', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity', 'midi_duration'}
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     menus[4] = {'midi_dest'}
@@ -275,9 +277,9 @@ function menu_update()
   if params:string('crow_dest') == 'None' then
     menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw', 'crow_pp_release'}
+    menus[5] = {'crow_dest', 'crow_div', 'crow_duration', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity', 'crow_duration'}
+    menus[5] = {'crow_dest', 'crow_div', 'crow_duration', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest'}
   end  
@@ -302,6 +304,10 @@ end
 
 function duration_int(index)
   return(durations[index][2])  
+end
+
+function duration_sec(index)
+  return(durations[index][3] * clock.get_beat_sec())  
 end
 
 function param_id_to_name(id)
@@ -363,7 +369,7 @@ function clock.transport.start()
   transport_active = true
   clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
-  sequence_clock_id = clock.run(sequence_loop, global_clock_div) --8 == global clock at 32nd notes
+  sequence_clock_id = clock.run(sequence_clock, global_clock_div) --8 == global clock at 32nd notes
   if params:get('clock_midi_out') ~= 1 then 
     if clock_start_method == 'start' then
       out_midi:start()
@@ -380,14 +386,18 @@ function clock.transport.stop()
     out_midi:stop() --Stop vs continue?
   end
   transport_active = false
-  clock.cancel(sequence_clock_id)
+  clock.cancel(sequence_clock_id or 0)
   if params:get('do_follow') == 1 then
+    reset_arrangement() --this isn't being triggered when Link pauses then is reset. Hmm.
+  end
+  if params:get('clock_source') == 3 then --Ableton link doesn't send Continue events
     reset_arrangement()
   end
+  get_next_chord()
 end
    
 function reset_arrangement() -- check: how to send a reset out to Crow for external clocking
-  print('resetting arrangement')
+  -- print('resetting arrangement')
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
@@ -403,91 +413,126 @@ function reset_clock()
   clock_start_method = 'start'
 end
 
--- One clock to control all sequence events
-function sequence_loop(rate)
+
+ --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
+function sequence_clock(rate)
   while transport_active do
     clock.sync(1/rate)
-    clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) -- 0-indexed counter for checking when to fire events
-    
-    --chord clock
-    -- print(pattern_seq_retrig)
-    if clock_step % params:get('chord_div') == 0 then
-      chord_seq_retrig = true -- indicates when we're on a new chord seq step for arp filtering
-      
-      --New pattern, I think?
-      if params:get("do_follow") == 1 and chord_seq_position >= pattern_length[pattern] then  
-        --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is de-selected. Seems OK?
-        if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then 
-          arrangement_reset = true
-          print('arrangement_reset = true')
-        end
-        pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
-        pattern = pattern_seq[pattern_seq_position]
-        pattern_seq_retrig = true -- prevents arp from extending beyond chord pattern length
-      end
-      -- print(pattern_seq_retrig)
-      if arrangement_reset == true and params:string('playback') == 'One-shot' then
-        print('arrangement ended')
-        clock.transport.stop()
-        arrangement_reset = false
-        print('arrangement_reset = false')
-        break
-      end
-    
-      if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
-        -- print('pattern retrig')
-        if pattern_queue then
-          pattern = pattern_queue
-          pattern_queue = false
-        end
-        chord_seq_position = 1
-        pattern_seq_retrig = false
-      else  
-        chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
-      end
-      if chord_seq[pattern][chord_seq_position].c > 0 then
-        play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
-      end
-      grid_redraw() 
-      redraw() -- to update Arrange mini chart.
+    clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
+    if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
+      get_next_chord()
     end
-    
-    -- arp clock
-      if clock_step % params:get('arp_div') == 0 then
-        if arp_seq_position > arp_pattern_length[arp_pattern] then 
-          arp_seq_position = 1
-        else  
-          arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
-        end
-        if arp_seq[arp_pattern][arp_seq_position] > 0 then
-          arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
-          harmonizer(
-            'arp',
-            params:string('arp_dest'), 
-            arp_note_num, 
-            params:get('arp_midi_ch'), 
-            params:get('arp_midi_velocity'), 
-            params:get('arp_pp_amp'), 
-            params:get('arp_pp_cutoff'), 
-            params:get('arp_pp_gain'), 
-            params:get('arp_pp_pw'), 
-            params:get('arp_pp_release'),
-            duration_int(params:get('arp_duration')))
-        end
-        grid_redraw() --move
-      end
-
-    --crow clock out. Maybe should use puls
+    if clock_step % params:get('chord_div') == 0 then
+      advance_chord_seq()
+      grid_dirty = true
+    end
+    if clock_step % params:get('arp_div') == 0 then
+      advance_arp_seq()
+      grid_dirty = true
+    end
     if clock_step % params:get('crow_div') == 0 then
-      -- crow.output[3].slew = 0
-      -- crow.output[3].volts = 8
-      -- crow.output[3].slew = 0.005 --WAG here
-      -- crow.output[3].volts = 0 
       crow.output[3]() --pulse defined in init
     end
-    -- end
+    if grid_dirty == true then
+      grid_redraw()
+      grid_dirty = false
+    end
   end
 end
+
+
+function advance_chord_seq()
+  chord_seq_retrig = true -- indicates when we're on a new chord seq step for auto-rest logic
+  
+  -- If Arranger is enabled and we're on/after the last step in the pattern
+  if params:get("do_follow") == 1 and chord_seq_position >= pattern_length[pattern] then
+    
+    --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is turned off midway through. Maybe fix this.
+    if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then
+      arrangement_reset = true
+      print('arrangement_reset = true')
+    end
+    
+    -- Update the arranger sequence position
+    pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
+    pattern = pattern_seq[pattern_seq_position]
+    
+    -- Prevents arp from extending beyond chord pattern length. Fix: add check to Arp loop (set chord div to 16)
+    pattern_seq_retrig = true 
+  end
+  
+  if arrangement_reset == true and params:string('playback') == 'One-shot' then
+    print('arrangement ended')
+    clock.transport.stop()
+    arrangement_reset = false
+    -- break --  To-do: Need to check if this was preventing the following from running...
+  end
+
+  if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
+    if pattern_queue then
+      pattern = pattern_queue
+      pattern_queue = false
+    end
+    chord_seq_position = 1
+    pattern_seq_retrig = false
+  else  
+    chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
+  end
+  if chord_seq[pattern][chord_seq_position].c > 0 then
+    play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
+  end
+  -- grid_redraw()  -- moved up to clock
+  redraw() -- To update Arrange mini chart
+end
+
+
+-- Pre-load upcoming chord to address race condition. To-do: Call at init, when transport is stopped and pattern/seq is changed.
+function get_next_chord()
+  local temp_pattern = pattern
+  local temp_chord_seq_position = chord_seq_position
+  local temp_pattern_seq_retrig = false
+  if params:get("do_follow") == 1 and temp_chord_seq_position >= pattern_length[temp_pattern] then 
+    temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
+    temp_pattern_seq_retrig = true
+  end
+  if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_pattern_seq_retrig then
+    if pattern_queue then
+      temp_pattern = pattern_queue
+    end
+    temp_chord_seq_position = 1
+    temp_pattern_seq_retrig = false
+  else  
+    temp_chord_seq_position = util.wrap(temp_chord_seq_position + 1, 1, pattern_length[temp_pattern])
+  end
+  if chord_seq[temp_pattern][temp_chord_seq_position].c > 0 then
+    chord = music.generate_chord_scale_degree(chord_seq[temp_pattern][temp_chord_seq_position].o * 12, params:get('mode'), chord_seq[temp_pattern][temp_chord_seq_position].c, false)
+  end
+end
+
+
+function advance_arp_seq()
+  if arp_seq_position > arp_pattern_length[arp_pattern] or pattern_seq_retrig == true then -- Validate pattern_seq_retrig addition
+    arp_seq_position = 1
+  else  
+    arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
+  end
+  if arp_seq[arp_pattern][arp_seq_position] > 0 then
+    arp_note_num =  arp_seq[arp_pattern][arp_seq_position]
+    harmonizer(
+      'arp',
+      params:string('arp_dest'), 
+      arp_note_num, 
+      params:get('arp_midi_ch'), 
+      params:get('arp_midi_velocity'), 
+      params:get('arp_pp_amp'), 
+      params:get('arp_pp_cutoff'), 
+      params:get('arp_pp_gain'), 
+      params:get('arp_pp_pw'), 
+      duration_sec(params:get('arp_duration')), --release
+      duration_int(params:get('arp_duration')))
+  end
+end
+
 
 function play_chord(destination, channel)
   chord = music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, false)
@@ -496,7 +541,7 @@ function play_chord(destination, channel)
     for i=1,#chord do
       engine.amp(params:get('chord_pp_amp') / 100)
       engine.cutoff(params:get('chord_pp_cutoff'))
-      engine.release(params:get('chord_pp_release'))
+      engine.release(duration_sec(params:get('chord_duration')))
       engine.gain(params:get('chord_pp_gain') / 100)
       engine.pw(params:get('chord_pp_pw') / 100)
       engine.hz(music.note_num_to_freq(chord[i] + params:get('transpose') + 48 ))
@@ -627,8 +672,7 @@ function g.key(x,y,z)
     if x == 16 and y > 5 then --view switcher buttons
       view_index = y - 5
       view_name = views[view_index]
-      
-    --arrange keys
+    --ARRANGER KEYS
     elseif view_name == 'Arrange' then
       if y < 5 then
         if y == pattern_seq[x] and x > 1 then 
@@ -643,9 +687,10 @@ function g.key(x,y,z)
           end
         end 
       end
-    
-    --chord keys
-    -- print('checking for Chord keys')
+      if transport_active == false then -- Update chord for when play starts
+        get_next_chord()
+      end
+    --CHORD KEYS
     elseif view_name == 'Chord' then
       if x < 15 then
         if x == chord_seq[pattern][y].x then
@@ -664,8 +709,10 @@ function g.key(x,y,z)
         -- pattern_preview = y --not implemented yet
         -- print('previewing pattern '.. pattern_preview)
       end
-
-    -- arp keys
+      if transport_active == false then -- Update chord for when play starts
+        get_next_chord()
+      end
+    -- ARP KEYS
     elseif view_name == 'Arp' then
       if x < 15 then
         if x == arp_seq[arp_pattern][y] then
@@ -701,10 +748,10 @@ function key(n,z)
     if n == 2 then
       if params:get('clock_source') == 1 then --Internal clock only
         if transport_active then
-          print('Stop')
+          -- print('Stop')
           clock.transport.stop()
         else
-          print('Start')
+          -- print('Start')
           clock.transport.start()
         end
       end
@@ -754,7 +801,7 @@ function sample_crow(v)
     params:get('crow_pp_cutoff'), 
     params:get('crow_pp_gain'), 
     params:get('crow_pp_pw'), 
-    params:get('crow_pp_release'),
+    duration_sec(params:get('crow_duration')), --release
     duration_int(params:get('crow_duration')))
   chord_seq_retrig = false -- Check this to make sure it's working correct
 end
@@ -762,9 +809,10 @@ end
 in_midi.event = function(data)
   local d = midi.to_msg(data)
   -- print(d.type)
-  if d.type == 'stop'and params:get('clock_source') == 2 then
-    reset_clock()
+  if params:get('clock_source') == 2 and d.type == 'stop' then
+    reset_clock() --should this be transport stop?
   elseif d.type == "note_on" then
+    -- print('in_midi note_on ' .. clock_step)
     if params:get('do_midi_velocity_passthru') == 1 then  --Clunky
       harmonizer(
         'midi',
@@ -776,7 +824,7 @@ in_midi.event = function(data)
         params:get('midi_pp_cutoff'), 
         params:get('midi_pp_gain'), 
         params:get('midi_pp_pw'), 
-        params:get('midi_pp_release'),
+        duration_sec(params:get('midi_duration')), --release
         duration_int(params:get('midi_duration')))
     else
       harmonizer(
@@ -789,7 +837,7 @@ in_midi.event = function(data)
         params:get('midi_pp_cutoff'), 
         params:get('midi_pp_gain'), 
         params:get('midi_pp_pw'), 
-        params:get('midi_pp_release'),
+        duration_sec(params:get('midi_duration')), --release
         duration_int(params:get('midi_duration')))
       end
   end
@@ -808,7 +856,7 @@ function arrangement_time()
   return(arrangement_time_clock)
 end  
 
--- WIP to turn arrangement timer into a countdown clock
+-- WIP to turn arrangement timer into a countdown clock USE util.s_to_hms (s)
 -- function arrangement_time()
 --   steps_remaining_in_pattern = math.min(pattern_length[pattern_seq_position], pattern_length[pattern_seq_position] - chord_seq_position + 1)
 --   -- print(steps_remaining_in_pattern)
@@ -870,12 +918,12 @@ function redraw()
     screen.move(40,50)
     screen.level(3)
     screen.text('Time: ' .. arrangement_time())
-    -- All the following needs to be revisited after getting pattern switching figured out
+    -- All the following needs to be revisited after getting pattern switching figured out. Also use s_to_hms (s)
     local rect_x = 39
     -- local rect_gap_adj = 0
     for i = params:get('do_follow') == 1 and pattern_seq_position or 1, pattern_seq_length do
       screen.level(15)
-      elapsed = params:get('do_follow') == 1 and (i == pattern_seq_position and chord_seq_position or 0) or 0 --recheck if this is needed when not following
+      elapsed = params:get('do_follow') == 1 and (i == pattern_seq_position and chord_seq_position or 0) or 0 --recheck if this is needed when not following.
       rect_w = pattern_length[pattern_seq[i]] - elapsed
       rect_h = pattern_seq[i]
       rect_gap_adj = params:get('do_follow') == 1 and (pattern_seq_position - 1) or 0 --recheck if this is needed when not following
