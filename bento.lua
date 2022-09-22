@@ -48,9 +48,17 @@ function init()
     min = 1,
     max = 9,
     default = 1,
-    formatter = function(param) return mode_index_to_name(param:get()) end,
-    }
-  
+    formatter = function(param) return mode_index_to_name(param:get()) end,}
+  -- params:add_number('block_repeats', 'Suppress Repeat', 0, 1, function(param) return t_f_string(param:get()) end)
+  params:add{
+  type = 'number',
+  id = 'block_repeats',
+  name = 'Block Repeats',
+  min = 0,
+  max = 1,
+  default = 0,
+  formatter = function(param) return t_f_string(param:get()) end}
+
   --Arrange params
   params:add_separator ('Arrange')
   params:add{
@@ -63,14 +71,14 @@ function init()
     formatter = function(param) return t_f_string(param:get()) end,
     -- action = function() reset_arrangement() end, function() grid_redraw() end
       action = function() grid_redraw() end}
-    params:add{
-    type = 'number',
-    id = 'playback',
-    name = 'Playback',
-    min = 0,
-    max = 1,
-    default = 1,
-    formatter = function(param) return playback_string(param:get()) end}
+  params:add{
+  type = 'number',
+  id = 'playback',
+  name = 'Playback',
+  min = 0,
+  max = 1,
+  default = 1,
+  formatter = function(param) return playback_string(param:get()) end}
   
   --Chord params
   params:add_separator ('Chord')
@@ -95,6 +103,7 @@ function init()
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
     params:set_action("crow_pullup",function() crow_pullup() end)
   params:add_number('chord_duration', 'Duration', 1, 6, 6, function(param) return duration_string(param:get()) end)
+  params:add_number('chord_octave','Octave',-2, 2, 0)
 
   --Arp params
   params:add_separator ('Arp')
@@ -116,7 +125,8 @@ function init()
   params:add_number('arp_midi_velocity','Velocity',0, 127, 127)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
-
+  params:add_number('arp_octave','Octave',-2, 2, 0)
+  
   --MIDI params
   params:add_separator ('MIDI')
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},3)
@@ -145,7 +155,8 @@ function init()
     formatter = function(param) return t_f_string(param:get()) end,
     action = function() menu_update() end}
   params:add_number('midi_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
-
+  params:add_number('midi_octave','Octave',-2, 2, 0)
+  
   --Crow params
   params:add_separator ('Crow')
   params:add_number('crow_div', 'Clock out div', 1, 32, 8) --most useful TBD
@@ -174,7 +185,8 @@ function init()
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 127)
   params:add_number('crow_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
-
+  params:add_number('crow_octave','Octave',-2, 2, 0)
+  
   glyphs = {
     {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}}, --repeat glyph     
     {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}}, --one-shot glyph
@@ -241,54 +253,54 @@ function menu_update()
   
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_dest', 'chord_div'}
+    menus[2] = {'chord_dest', 'chord_div', 'chord_octave'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_div', 'chord_duration', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_div', 'chord_duration', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_midi_ch', 'chord_div', 'chord_duration', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_midi_ch', 'chord_div', 'chord_duration', 'chord_octave', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_div', 'chord_jf_amp', 'crow_pullup'}
+    menus[2] = {'chord_dest', 'chord_div', 'chord_octave', 'chord_jf_amp', 'crow_pullup'}
   end
   
   --arp menus
   if params:string('arp_dest') == 'None' then
-    menus[3] = {'arp_dest', 'arp_div'}
+    menus[3] = {'arp_dest', 'arp_div', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_dest', 'arp_div', 'arp_duration', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
+    menus[3] = {'arp_dest', 'arp_div', 'arp_duration', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_midi_velocity'}
+    menus[3] = {'arp_dest', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
-    menus[3] = {'arp_dest', 'arp_div'}
+    menus[3] = {'arp_dest', 'arp_div', 'arp_octave'}
   end
   
     --MIDI menus
   if params:string('midi_dest') == 'None' then
-    menus[4] = {'midi_dest'}
+    menus[4] = {'midi_dest', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[4] = {'midi_dest', 'midi_duration', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[4] = {'midi_dest', 'midi_duration', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'do_midi_velocity_passthru'}
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'midi_octave', 'do_midi_velocity_passthru'}
     else
-      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
-    menus[4] = {'midi_dest'}
+    menus[4] = {'midi_dest', 'midi_octave'}
   end
   
     --Crow menus
   if params:string('crow_dest') == 'None' then
-    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest'}
+    menus[5] = {'crow_dest', 'crow_div', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[5] = {'crow_dest', 'crow_div', 'crow_duration', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[5] = {'crow_dest', 'crow_div', 'crow_duration', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_dest', 'crow_div', 'crow_duration', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
+    menus[5] = {'crow_dest', 'crow_div', 'crow_duration', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
-    menus[5] = {'crow_dest', 'crow_div', 'do_crow_auto_rest'}
+    menus[5] = {'crow_dest', 'crow_div', 'crow_octave', 'do_crow_auto_rest'}
   end  
   
   --Global menu
-  menus[6] = {'clock_source', 'clock_tempo', 'mode', 'transpose', 'clock_midi_out'}
+  menus[6] = {'clock_source', 'clock_tempo', 'mode', 'transpose', 'clock_midi_out', 'block_repeats'}
 end
 
 
@@ -453,7 +465,7 @@ function advance_chord_seq()
     --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is turned off midway through. Maybe fix this.
     if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then
       arrangement_reset = true
-      print('arrangement_reset = true')
+      -- print('arrangement_reset = true')
     end
     
     -- Update the arranger sequence position
@@ -484,12 +496,11 @@ function advance_chord_seq()
   if chord_seq[pattern][chord_seq_position].c > 0 then
     play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
   end
-  -- grid_redraw()  -- moved up to clock
   redraw() -- To update Arrange mini chart
 end
 
 
--- Pre-load upcoming chord to address race condition. To-do: Call at init, when transport is stopped and pattern/seq is changed.
+-- Pre-load upcoming chord to address race condition.
 function get_next_chord()
   local temp_pattern = pattern
   local temp_chord_seq_position = chord_seq_position
@@ -524,7 +535,8 @@ function advance_arp_seq()
     harmonizer(
       'arp',
       params:string('arp_dest'), 
-      arp_note_num, 
+      arp_note_num,
+      params:get('arp_octave'),
       params:get('arp_midi_ch'), 
       params:get('arp_midi_velocity'), 
       params:get('arp_pp_amp'), 
@@ -547,41 +559,41 @@ function play_chord(destination, channel)
       engine.release(duration_sec(params:get('chord_duration')))
       engine.gain(params:get('chord_pp_gain') / 100)
       engine.pw(params:get('chord_pp_pw') / 100)
-      engine.hz(music.note_num_to_freq(chord[i] + params:get('transpose') + 48 ))
+      engine.hz(music.note_num_to_freq(chord[i] + params:get('transpose') + 48 + (params:get('chord_octave') * 12)))
     end
   elseif destination == 'MIDI' then
-    block_chord = false
+    chord_note_off_insert = true
     for i=1,#chord do
-      chord_note = chord[i] + params:get('transpose') + 48 
+      chord_note = chord[i] + params:get('transpose') + 48 + (params:get('chord_octave') * 12)
       out_midi:note_on(chord_note, params:get('chord_midi_velocity'), channel) 
       for i = 1, #note_off_buffer do
         if note_off_buffer[i][2] == chord_note and note_off_buffer[i][3] == channel then
-          note_off_buffer[i][1] =  chord_duration_int -- Fix: param duration
-          block_chord = true
+          note_off_buffer[i][1] =  chord_duration_int
+          chord_note_off_insert = false
         end
       end
-      if block_chord == false then
-        table.insert(note_off_buffer, {chord_duration_int, chord_note, channel}) -- Fix: param duration
+      if chord_note_off_insert == true then
+        table.insert(note_off_buffer, {chord_duration_int, chord_note, channel})
       end
     end
   elseif destination == 'ii-JF' then
     for i=1,#chord do
-      crow.ii.jf.play_note((chord[i] + params:get('transpose') + 0)/12, params:get('chord_jf_amp')/10)
+      crow.ii.jf.play_note((chord[i] + params:get('transpose') + (params:get('chord_octave') * 12))/12, params:get('chord_jf_amp')/10)
     end
   end
 end
 
-function harmonizer(source, destination, note_num, channel, velocity, amp, cutoff, gain, pw, release,duration)
+--Update with if params:get('block_repeats') == 1 then
+function harmonizer(source, destination, note_num, octave, channel, velocity, amp, cutoff, gain, pw, release,duration)
   quantized_note = chord[util.wrap(note_num, 1, #chord)]
-  harmonizer_octave = math.floor((note_num - 1) / #chord,0)
-  harmonizer_note = quantized_note + (harmonizer_octave * 12) + params:get('transpose')   
+  harmonizer_octave = math.floor((note_num - 1) / #chord)
+  harmonizer_note = quantized_note + ((harmonizer_octave + octave) * 12) + params:get('transpose')   
   -- print(source .. ' ' .. note_num.. "  " .. quantized_note.."  "..harmonizer_octave)
   if 
   source ~= 'crow'   -- Logic for auto-rest
   or chord_seq_retrig == true 
   or params:get('do_crow_auto_rest') == 0 
   or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
-
       if destination == 'Engine' then
         engine.amp(amp / 100)
         engine.cutoff(cutoff)
@@ -596,17 +608,16 @@ function harmonizer(source, destination, note_num, channel, velocity, amp, cutof
         crow.output[2].slew = 0.005
         crow.output[2].volts = 0
       elseif destination == 'MIDI' then
-        block = false
+        harmonizer_note_off_insert = true
         out_midi:note_on((harmonizer_note + 48), velocity, channel)
-        -- harmonizer_hanging_notes[channel] = {(harmonizer_note + 48)}
         for i = 1, #note_off_buffer do
           if note_off_buffer[i][2] == harmonizer_note + 48 and note_off_buffer[i][3] == channel then
             note_off_buffer[i][1] = duration
-            block = true
+            harmonizer_note_off_insert = false
           end
         end
-        if block == false then
-          table.insert(note_off_buffer, {duration, harmonizer_note + 48, channel}) -- Fix: param duration
+        if harmonizer_note_off_insert == true then
+          table.insert(note_off_buffer, {duration, harmonizer_note + 48, channel})
         end
       end
     end
@@ -798,6 +809,7 @@ function sample_crow(v)
     'crow',
     params:string('crow_dest'), 
     crow_note_num, 
+    params:get('crow_octave'),
     params:get('crow_midi_ch'), 
     params:get('crow_midi_velocity'), 
     params:get('crow_pp_amp'), 
@@ -820,7 +832,8 @@ in_midi.event = function(data)
       harmonizer(
         'midi',
         params:string('midi_dest'), 
-        d.note - 35,  -- Check that this offset works on other devices 
+        d.note - 35,  
+        params:get('midi_octave'),
         params:get('midi_midi_ch'), 
         d.vel,
         params:get('midi_pp_amp'), 
@@ -834,6 +847,7 @@ in_midi.event = function(data)
         'midi',
         params:string('midi_dest'), 
         d.note - 35, 
+        params:get('midi_octave'),
         params:get('midi_midi_ch'), 
         params:get('midi_midi_velocity'),   
         params:get('midi_pp_amp'), 
