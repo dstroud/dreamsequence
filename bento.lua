@@ -175,7 +175,10 @@ function init()
   params:add_number('crow_midi_velocity','Velocity',0, 127, 127)
   params:add_number('crow_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
 
-
+  glyphs = {
+    {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}}, --repeat glyph     
+    {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}}, --one-shot glyph
+          }
   prev_harmonizer_note = -999
   chord_seq_retrig = true
   crow.input[1].stream = sample_crow
@@ -880,7 +883,7 @@ end
 --This needs some work and will get off if the menu is too long
 function scroll_offset(index, total, in_view ,height) --index of list, count of items in list, #viewable, line height
   if total > in_view then
-    return(round(((index - 1) * (total - in_view) * height / total),0)) --math.ceil might be necessary if some options are cut off
+    return(math.ceil(((index - 1) * (total - in_view) * height / total))) --math.ceil might be necessary if some options are cut off
   else return(0)
   end
 end
@@ -888,17 +891,12 @@ end
 function redraw()
   screen.clear()
   screen.aa(0)
-  if params:get('do_follow') == 1 then
-    screen.level(15)
-    screen.pixel(32,9)
-    screen.fill(15)
-  end
   screen.level(7)
   screen.move(36,0)
   screen.line_rel(0,64)
   screen.stroke()
   for i = 1,#pages do
-    screen.move(0,i*10)
+    screen.move(0,i*10 - 1)
     screen.level(page_name == pages[i] and 15 or 3)
     screen.text(pages[i])
   end
@@ -907,7 +905,7 @@ function redraw()
   local menu_offset = scroll_offset(menu_index,#menus[page_index], 6, 10)
   line = 1
   for i = 1,#menus[page_index] do
-    screen.move(40, line*10 - menu_offset)
+    screen.move(40, line*10 - 1 - menu_offset)
     screen.level(menu_index == i and 15 or 3)
     screen.text(first_to_upper(param_id_to_name(menus[page_index][i])) .. ': ' .. params:string(menus[page_index][i]))
     line = line + 1
@@ -932,8 +930,21 @@ function redraw()
       rect_x = rect_x + rect_w
     end
   end
-  -- screen.level(15)
-  -- screen.pixel(0, view_index * 10 - 3)
-  -- screen.fill(15)
+  --Draw glyphs
+  if params:get('do_follow') == 1 then
+  local x_offset = 123
+  local y_offset = 0
+  screen.level(15)
+    if params:get('playback') == 1 then
+    for i = 1, #glyphs[1] do
+      screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
+    end
+  else 
+    for i = 1, #glyphs[2] do
+      screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
+    end
+  end
+  screen.fill(15)
+  end
   screen.update()
 end
