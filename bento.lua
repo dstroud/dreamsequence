@@ -80,7 +80,7 @@ function init()
   --Chord params
   params:add_separator ('Chord')
   params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,65,96,128,192,256
-  params:add_option("chord_dest", "Destination", {'None',"Engine", 'MIDI', 'ii-JF'},3)
+  params:add_option("chord_dest", "Destination", {'None',"Engine", 'MIDI', 'ii-JF'},2)
     params:set_action("chord_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -104,7 +104,7 @@ function init()
   --Arp params
   params:add_separator ('Arp')
   params:add_number('arp_div', 'Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},3)
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},2)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -154,7 +154,7 @@ function init()
   --Crow params
   params:add_separator ('Crow')
   params:add_number('crow_div', 'Clock out div', 1, 32, 8) --most useful TBD
-  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},3) --Fix: change back from MIDI
+  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow'},1) --Fix: change back from MIDI
     params:set_action("crow_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -213,6 +213,7 @@ function init()
   pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
   pattern_seq_position = 1
   pattern_seq_length = 1 
+  pattern_keys = {}
   pattern_key_count = 0
   global_clock_div = 8
   chord_seq = {{},{},{},{}} 
@@ -237,7 +238,6 @@ function init()
   arp_seq_note = 8
   note_off_buffer = {}
   reset_clock() -- will turn over to step 0 on first loop
-  -- clock.run(grid_redraw_clock) --Not used currently
   reset_clock()
   get_next_chord() -- Placeholder for when table loading from file is implemented
   grid_dirty = true
@@ -660,7 +660,7 @@ function grid_redraw()
       next_pattern_indicator = pattern_queue or pattern
     end
   for i = 1,4 do
-      g:led(16, i, i == next_pattern_indicator and 7 or 3)
+    g:led(16, i, i == next_pattern_indicator and 7 or pattern_keys[i] and 7 or 3) 
     if i == pattern then
       g:led(16, i, 15)
     end
@@ -723,12 +723,12 @@ function g.key(x,y,z)
           chord_seq[pattern][y].x = x --raw key x coordinate
           chord_seq[pattern][y].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
           chord_seq[pattern][y].o = math.floor(x / 8) --octave
-          grid_dirty = true
         end
       elseif x == 15 then
         pattern_length[pattern] = y
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
         pattern_key_count = pattern_key_count + 1
+        pattern_keys[y] = 1
         if pattern_key_count == 1 then
           pattern_copy_source = y
         elseif pattern_key_count > 1 then
@@ -758,44 +758,48 @@ function g.key(x,y,z)
         arp_pattern_length[arp_pattern] = y
       end
     end
-  redraw()
-  grid_redraw()
-  elseif view_name == 'Chord' and x == 16 and y <5 then --z == 0, pattern key UP
-    pattern_key_count = pattern_key_count - 1
-    if pattern_key_count == 0 and pattern_copy_performed == false then
-      if y == pattern then
-        print('a - manual reset of current pattern')
-        params:set("do_follow", 0)
-        pattern_queue = false
-        arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-        chord_seq_position = 0
-        reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
-      elseif y == pattern_queue then -- Manual jump to queued pattern
-        print('b - manual jump to queued pattern')
-        pattern_queue = false
-        pattern = y
-        arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-        chord_seq_position = 0
-        reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
-      else                        -- Queue up a new pattern
-        print('c - new pattern queued')
-        if pattern_copy_performed == false then
-          pattern_queue = y
+  -- redraw()   
+  -- grid_redraw()
+    elseif view_name == 'Chord' and x == 16 and y <5 then --z == 0, pattern key UP
+      pattern_key_count = pattern_key_count - 1
+      pattern_keys[y] = nil
+      if pattern_key_count == 0 and pattern_copy_performed == false then
+        if y == pattern then
+          print('a - manual reset of current pattern')
           params:set("do_follow", 0)
+          pattern_queue = false
+          arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+          chord_seq_position = 0
+          reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
+        elseif y == pattern_queue then -- Manual jump to queued pattern
+          print('b - manual jump to queued pattern')
+          pattern_queue = false
+          pattern = y
+          arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+          chord_seq_position = 0
+          reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
+        else                        -- Queue up a new pattern
+          print('c - new pattern queued')
+          if pattern_copy_performed == false then
+            pattern_queue = y
+            params:set("do_follow", 0)
+          end
         end
       end
+      -- redraw()
+      -- grid_redraw()
     end
-    redraw()
-    grid_redraw()
-  end
   if pattern_key_count == 0 then
     pattern_copy_performed = false
   end
+  redraw()
+  grid_redraw()
 end
 
 function key(n,z)
   if z == 1 then
-    if n == 2 then
+    if n == 1 then randomize()
+    elseif n == 2 then
       if params:get('clock_source') == 1 then --Internal clock only
         if transport_active then
           clock.transport.stop()
@@ -997,4 +1001,63 @@ function redraw()
   screen.fill(15)
   end
   screen.update()
+end
+
+function randomize()
+  --Sequence randomizations
+  if params:get('clock_source') == 1 then 
+    params:set('clock_tempo', math.random(70,130))
+  end
+  params:set('mode', math.random(1,9))
+  params:set('mode', math.random(1,9))
+  params:set('transpose', math.random(-12,12))
+  random_pattern_lengths = {3,4,6,8}
+  random_pattern_length = random_pattern_lengths[math.random(1,2)]
+  pattern_length[pattern] = random_pattern_length
+  random_chord_offset = math.random (0,7)
+  for i = 1, 8 do
+    chord_seq[pattern][i].x = 0
+    chord_seq[pattern][i].c = 0
+    chord_seq[pattern][i].o = 0
+  end
+  for i = 1, pattern_length[pattern] do
+    local random_note = math.random(1,7) + random_chord_offset
+    chord_seq[pattern][i].x = random_note --raw key x coordinate
+    chord_seq[pattern][i].c = util.wrap(random_note, 1, 7) --chord 1-7 (no octave)
+    chord_seq[pattern][i].o = math.floor(random_note / 8) --octave
+  end
+  random_note_offset = math.random (0,7)
+  for i = 1,8 do
+    arp_seq[1][i] = math.random(1,7) + random_note_offset
+  end
+  random_modulo = math.random(2,8)
+  for i = 1,8 do
+    arp_seq[1][i] = i % random_modulo ~= 0 and arp_seq[1][i] or 0
+  end
+  
+  --Sound-based randomizations here
+  params:set('chord_octave', math.random(-1,2))
+  random_divisions = {8,12,16,24,32}
+  params:set('chord_div', random_divisions[math.random(1,5)])
+  params:set('chord_pp_cutoff', math.random(200,5000))
+  params:set('chord_pp_gain', math.random(100,350))
+  params:set('chord_pp_pw', math.random(10,90))
+  -- params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
+  -- params:add_number('chord_midi_ch','Channel',1, 16, 1)
+  -- params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:set('chord_duration', math.random(3,6))
+  
+  
+  params:set('arp_octave', math.random(-2,0)) -- lowering only until ranges are adjusted
+  random_divisions = {1,2,4,6,8,12}
+  params:set('arp_div', random_divisions[math.random(1,6)])
+  params:set('arp_pp_cutoff', math.random(300,5000))
+  params:set('arp_pp_gain', math.random(100,350))
+  params:set('arp_pp_pw', math.random(10,90))
+  -- params:add_number('arpmidi_velocity','Velocity',0, 127, 100)
+  -- params:add_number('arp_midi_ch','Channel',1, 16, 1)
+  params:set('arp_duration', math.random(3,5))
+  
+  grid_redraw()
+  redraw()
 end
