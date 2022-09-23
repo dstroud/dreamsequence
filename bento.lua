@@ -19,10 +19,9 @@
 g = grid.connect()
 engine.name = "PolyPerc"
 music = require 'musicutil'
--- UI = require "ui"
 
 in_midi = midi.connect(1)
-out_midi = midi.connect(1) --Multi outs prob needed
+out_midi = midi.connect(1) -- To-do: multiple MIDI in/out
 
 
 function init()
@@ -49,7 +48,6 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-  -- params:add_number('block_repeats', 'Suppress Repeat', 0, 1, function(param) return t_f_string(param:get()) end)
   params:add{
   type = 'number',
   id = 'block_repeats',
@@ -69,7 +67,6 @@ function init()
     max = 1,
     default = 1,
     formatter = function(param) return t_f_string(param:get()) end,
-    -- action = function() reset_arrangement() end, function() grid_redraw() end
       action = function() grid_redraw() end}
   params:add{
   type = 'number',
@@ -96,7 +93,6 @@ function init()
   params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_number("chord_pp_gain","Gain",0, 400, 200)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
-  -- params:add_number("chord_pp_release","Release",1, 10, 5)
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -121,7 +117,6 @@ function init()
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_number("arp_pp_gain","Gain",0, 400, 200)
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
-  -- params:add_number("arp_pp_release","Release",1, 10, 5)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 127)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
@@ -142,7 +137,6 @@ function init()
   params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_number("midi_pp_gain","Gain",0, 400, 200)
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
-  -- params:add_number("midi_pp_release","Release",1, 10, 5)
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('midi_midi_velocity','Velocity',0, 127, 110)
   params:add{
@@ -212,11 +206,14 @@ function init()
   transport_active = false
   pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
   pattern = 1
+  -- pattern_queue = pattern
   pattern_queue = false
+  pattern_copy_performed = false
   pattern_seq_retrig = false
   pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
   pattern_seq_position = 1
   pattern_seq_length = 1 
+  pattern_key_count = 0
   global_clock_div = 8
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
@@ -397,28 +394,40 @@ function clock.transport.start()
 end
 
 function clock.transport.stop()
+  print('Transport stopping')
+  transport_active = false
   if params:get('clock_midi_out') ~= 1 then 
     out_midi:stop() --Stop vs continue?
   end
-  transport_active = false
-  clock.cancel(sequence_clock_id or 0)
-  if params:get('do_follow') == 1 then
-    reset_arrangement() --this isn't being triggered when Link pauses then is reset. Hmm.
-  end
-  if params:get('clock_source') == 3 then --Ableton link doesn't send Continue events
-    reset_arrangement()
+  if params:get('clock_source') ~= 1 then -- External clock
+    if params:get('do_follow') == 1 then -- When following an external clock, reset arranegement.
+      reset_arrangement()
+    else
+      reset_pattern()
+    end
   end
   get_next_chord()
+  print('Canceling clock id ' .. sequence_clock_id or 0)
+  clock.cancel(sequence_clock_id or 0)
 end
    
+ function reset_pattern()
+  pattern_queue = false
+  arp_seq_position = 0
+  chord_seq_position = 0
+  reset_clock()
+  grid_redraw()
+  redraw()
+end
+
 function reset_arrangement() -- check: how to send a reset out to Crow for external clocking
-  -- print('resetting arrangement')
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
   pattern_seq_position = 1
   pattern = pattern_seq[1]
   reset_clock()
+  get_next_chord() -- New. Seems OK?
   grid_redraw()
   redraw()
 end
@@ -427,7 +436,6 @@ function reset_clock()
   clock_step = params:get('chord_div') - 1
   clock_start_method = 'start'
 end
-
 
  --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock(rate)
@@ -485,8 +493,10 @@ function advance_chord_seq()
 
   if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
     if pattern_queue then
+    -- if pattern_queue ~= pattern then
       pattern = pattern_queue
       pattern_queue = false
+      -- pattern_queue = pattern
     end
     chord_seq_position = 1
     pattern_seq_retrig = false
@@ -511,6 +521,7 @@ function get_next_chord()
   end
   if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_pattern_seq_retrig then
     if pattern_queue then
+    -- if pattern_queue ~= pattern then
       temp_pattern = pattern_queue
     end
     temp_chord_seq_position = 1
@@ -651,7 +662,7 @@ function grid_redraw()
       next_pattern_indicator = pattern_queue or pattern
     end
   for i = 1,4 do
-      g:led(16, i, i == next_pattern_indicator and 7 or 3) --Should add something to highlight when pattern_preview is ~= nil
+      g:led(16, i, i == next_pattern_indicator and 7 or 3)
     if i == pattern then
       g:led(16, i, 15)
     end
@@ -708,22 +719,34 @@ function g.key(x,y,z)
     elseif view_name == 'Chord' then
       if x < 15 then
         if x == chord_seq[pattern][y].x then
-          chord_seq[pattern][y].x = 0 -- Only need to set one of these TBH
-          chord_seq[pattern][y].c = 0 -- Only need to set one of these TBH
-          chord_seq[pattern][y].o = 0 -- Only need to set one of these TBH
+          chord_seq[pattern][y].x = 0
+          chord_seq[pattern][y].c = 0
+          chord_seq[pattern][y].o = 0
         else
-          chord_seq[pattern][y].x = x --raw
+          chord_seq[pattern][y].x = x --raw key x coordinate
           chord_seq[pattern][y].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
           chord_seq[pattern][y].o = math.floor(x / 8) --octave
           grid_dirty = true
         end
       elseif x == 15 then
         pattern_length[pattern] = y
-      elseif x == 16 and y <5 then  --Pattern switcher
-        -- pattern_preview = y --not implemented yet
-        -- print('previewing pattern '.. pattern_preview)
+      elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
+        pattern_key_count = pattern_key_count + 1
+        if pattern_key_count == 1 then
+          -- pattern_copy_performed = false 
+          pattern_copy_source = y       -- To-do: test after init. Might need to init a value here.
+        elseif pattern_key_count > 1 then
+          print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
+          pattern_copy_performed = true
+          for i = 1,8 do
+            chord_seq[y][i].x = chord_seq[pattern_copy_source][i].x
+            chord_seq[y][i].c = chord_seq[pattern_copy_source][i].c
+            chord_seq[y][i].o = chord_seq[pattern_copy_source][i].o
+          end
+          pattern_length[y] = pattern_length[pattern_copy_source]
+        end
       end
-      if transport_active == false then -- Update chord for when play starts
+      if transport_active == false then -- Pre-load chord for when play starts
         get_next_chord()
       end
     -- ARP KEYS
@@ -741,20 +764,39 @@ function g.key(x,y,z)
     end
   redraw()
   grid_redraw()
-  elseif view_name == 'Chord' and x == 16 and y <5 then --z == 0, pattern key released
-    -- pattern_preview = false
-    params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
-    if y == pattern_queue then
-      pattern = y
-      -- arp_seq_position = 0       -- Not necessary any more I think
-      -- chord_seq_position = 0
-      reset_clock()
-    else
-      pattern_queue = y
+  elseif view_name == 'Chord' and x == 16 and y <5 then --z == 0, pattern key UP
+    pattern_key_count = pattern_key_count - 1
+    if pattern_key_count == 0 and pattern_copy_performed == false then
+      if y == pattern then -- and pattern_copy_performed == false then  -- Manual reset of current pattern
+        print('a - manual reset of current pattern')
+        params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
+        -- pattern_queue = pattern
+        pattern_queue = false
+        arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+        chord_seq_position = 0
+        reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
+      elseif y == pattern_queue then -- Manual jump to queued pattern
+        print('b - manual jump to queued pattern')
+        pattern_queue = false
+        pattern = y
+        arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+        chord_seq_position = 0
+        reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
+      else                        -- Queue up a new pattern
+        print('c - new pattern queued')
+        if pattern_copy_performed == false then
+          pattern_queue = y
+          params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
+        end
+      end
     end
     redraw()
     grid_redraw()
   end
+  if pattern_key_count == 0 then
+    pattern_copy_performed = false
+  end
+  -- print(pattern_copy_performed)
 end
 
 function key(n,z)
@@ -762,18 +804,22 @@ function key(n,z)
     if n == 2 then
       if params:get('clock_source') == 1 then --Internal clock only
         if transport_active then
-          -- print('Stop')
           clock.transport.stop()
         else
-          -- print('Start')
           clock.transport.start()
         end
       end
     elseif n == 3 then
-      if params:get('do_follow') == 1 then
+      if params:get('do_follow') == 1 then  -- If follow is on, turn off
         params:set('do_follow', 0)
-      else
-        params:set('do_follow', 1)  
+      elseif transport_active == true then  -- If follow is off but we're playing, pick up arrangement
+        print('Resuming arrangement on next pattern advance')
+        params:set('do_follow', 1)
+      else 
+        print('Transport stopped; resetting arrangement')
+        params:set('do_follow', 1)  -- If follow is off and transport is stopped, reset arrangement
+        reset_arrangement()
+        -- pattern_queue = pattern 
       end
       redraw()
     end
@@ -799,7 +845,6 @@ function crow_trigger(s) --Trigger in used to sample voltage from Crow IN 1
     state = s
     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
-    -- print('crow trigger in')
 end
 
 function sample_crow(v)
@@ -824,10 +869,10 @@ end
 in_midi.event = function(data)
   local d = midi.to_msg(data)
   -- print(d.type)
-  if params:get('clock_source') == 2 and d.type == 'stop' then
-    reset_clock() --should this be transport stop?
+  if params:get('clock_source') == 2 and d.type == 'stop' then -- Fix
+    --clock.transport.stop() is already called so disabling this. Not sure what my intent was.
+    -- reset_clock() --should this be transport stop?
   elseif d.type == "note_on" then
-    -- print('in_midi note_on ' .. clock_step)
     if params:get('do_midi_velocity_passthru') == 1 then  --Clunky
       harmonizer(
         'midi',
