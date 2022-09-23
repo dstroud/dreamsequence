@@ -365,7 +365,6 @@ end
 
 function timing_clock()
   while true do
-    -- print('Timing clock running')
     clock.sync(1/64)
     for i = #note_off_buffer, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       note_off_buffer[i][1] = note_off_buffer[i][1] - 1
@@ -473,7 +472,6 @@ function advance_chord_seq()
     --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is turned off midway through. Maybe fix this.
     if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then
       arrangement_reset = true
-      -- print('arrangement_reset = true')
     end
     
     -- Update the arranger sequence position
@@ -707,7 +705,6 @@ function g.key(x,y,z)
         for i = 1,17 do
           if pattern_seq[i] == 0  or i == 17 then
             pattern_seq_length = i - 1
-            -- print("pattern_seq_length "..pattern_seq_length)
             break
           end
         end 
@@ -733,8 +730,7 @@ function g.key(x,y,z)
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
         pattern_key_count = pattern_key_count + 1
         if pattern_key_count == 1 then
-          -- pattern_copy_performed = false 
-          pattern_copy_source = y       -- To-do: test after init. Might need to init a value here.
+          pattern_copy_source = y
         elseif pattern_key_count > 1 then
           print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
           pattern_copy_performed = true
@@ -767,10 +763,9 @@ function g.key(x,y,z)
   elseif view_name == 'Chord' and x == 16 and y <5 then --z == 0, pattern key UP
     pattern_key_count = pattern_key_count - 1
     if pattern_key_count == 0 and pattern_copy_performed == false then
-      if y == pattern then -- and pattern_copy_performed == false then  -- Manual reset of current pattern
+      if y == pattern then
         print('a - manual reset of current pattern')
-        params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
-        -- pattern_queue = pattern
+        params:set("do_follow", 0)
         pattern_queue = false
         arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
         chord_seq_position = 0
@@ -786,7 +781,7 @@ function g.key(x,y,z)
         print('c - new pattern queued')
         if pattern_copy_performed == false then
           pattern_queue = y
-          params:set("do_follow", 0) -- Check: Maybe allow follow to stay on if y == pattern or if transport is stopped?
+          params:set("do_follow", 0)
         end
       end
     end
@@ -796,7 +791,6 @@ function g.key(x,y,z)
   if pattern_key_count == 0 then
     pattern_copy_performed = false
   end
-  -- print(pattern_copy_performed)
 end
 
 function key(n,z)
@@ -868,11 +862,8 @@ end
 
 in_midi.event = function(data)
   local d = midi.to_msg(data)
-  -- print(d.type)
-  if params:get('clock_source') == 2 and d.type == 'stop' then -- Fix
-    --clock.transport.stop() is already called so disabling this. Not sure what my intent was.
-    -- reset_clock() --should this be transport stop?
-  elseif d.type == "note_on" then
+  -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
+  if d.type == "note_on" then
     if params:get('do_midi_velocity_passthru') == 1 then  --Clunky
       harmonizer(
         'midi',
