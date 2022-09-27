@@ -50,7 +50,7 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-    params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1) 
+    params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
 
   --Arrange params
   params:add_separator ('Arranger')
@@ -125,7 +125,7 @@ function init()
   params:add_control("arp_pp_gain","Gain", pp_gain)
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
-  params:add_number('arp_midi_velocity','Velocity',0, 127, 127)
+  params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('arp_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
   params:add_number('arp_octave','Octave',-2, 4, 0)
@@ -147,7 +147,7 @@ function init()
   params:add_control("midi_pp_gain","Gain", pp_gain)
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
-  params:add_number('midi_midi_velocity','Velocity',0, 127, 110)
+  params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
   params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add{
     type = 'number',
@@ -188,7 +188,7 @@ function init()
   params:add_number("crow_pp_pw","Pulse width",1, 99, 50)
   -- params:add_number("crow_pp_release","Release",1, 10, 5)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
-  params:add_number('crow_midi_velocity','Velocity',0, 127, 127)
+  params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('crow_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
   params:add_number('crow_octave','Octave',-2, 4, 0)
@@ -198,7 +198,7 @@ function init()
     {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}}, --repeat glyph     
     {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}}, --one-shot glyph
           }
-  prev_harmonizer_note = -999
+  -- prev_harmonizer_note = -999
   chord_seq_retrig = true
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
@@ -255,7 +255,10 @@ function init()
   arp_pattern = 1
   arp_seq_position = 0
   arp_seq_note = 8
-  note_off_buffer = {}
+  midi_note_off_queue = {}
+  engine_note_off_queue = {}
+  crow_note_off_queue = {}
+  jf_note_off_queue = {}
   reset_clock() -- will turn over to step 0 on first loop
   reset_clock()
   get_next_chord() -- Placeholder for when table loading from file is implemented
@@ -488,13 +491,36 @@ end
 function timing_clock()
   while true do
     clock.sync(1/64)
-    for i = #note_off_buffer, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
-      note_off_buffer[i][1] = note_off_buffer[i][1] - 1
-      if note_off_buffer[i][1] == 0 then
-        out_midi:note_off(note_off_buffer[i][2], 0, note_off_buffer[i][3]) -- note, vel, ch.
-        table.remove(note_off_buffer, i)
+    -- Once midi_note_off_queue is refactored, check out lib.tabutil:select_values (t, condition)
+    for i = #midi_note_off_queue, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
+      midi_note_off_queue[i][1] = midi_note_off_queue[i][1] - 1
+      if midi_note_off_queue[i][1] == 0 then
+        out_midi:note_off(midi_note_off_queue[i][2], 0, midi_note_off_queue[i][3]) -- note, vel, ch.
+        table.remove(midi_note_off_queue, i)
       end
     end
+    
+    for i = #engine_note_off_queue, 1, -1 do
+      engine_note_off_queue[i][1] = engine_note_off_queue[i][1] - 1
+      if engine_note_off_queue[i][1] == 0 then
+        table.remove(engine_note_off_queue, i)
+      end
+    end
+    
+    for i = #crow_note_off_queue, 1, -1 do
+      crow_note_off_queue[i][1] = crow_note_off_queue[i][1] - 1
+      if crow_note_off_queue[i][1] == 0 then
+        table.remove(crow_note_off_queue, i)
+      end
+    end
+    
+    for i = #jf_note_off_queue, 1, -1 do
+      jf_note_off_queue[i][1] = jf_note_off_queue[i][1] - 1
+      if jf_note_off_queue[i][1] == 0 then
+        table.remove(jf_note_off_queue, i)
+      end
+    end
+    
   end
 end
     
@@ -638,12 +664,11 @@ end
 
 
 function play_chord(destination, channel)
-  local duration = duration_int(params:get('chord_duration'))
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
       local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_engine(note, params:get('chord_pp_amp'), params:get('chord_pp_cutoff'), params:get('chord_pp_gain'), params:get('chord_pp_pw'), duration_sec(params:get('chord_duration')))
+      to_engine('chord', note)
     end
   elseif destination == 'MIDI' then
     for i = 1, params:get('chord_type') do
@@ -653,12 +678,12 @@ function play_chord(destination, channel)
   elseif destination == 'Crow' then
     for i = 1, params:get('chord_type') do
       local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_crow(note)
+      to_crow('chord',note)
     end
   elseif destination =='ii-JF' then
     for i = 1, params:get('chord_type') do
       local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_jf(note, params:get('chord_jf_amp')/10)
+      to_jf('chord',note, params:get('chord_jf_amp')/10)
     end
   end
 end
@@ -707,13 +732,13 @@ function advance_arp_seq()
     local destination = params:string('arp_dest')
     local note = quantize_note(arp_seq[arp_pattern][arp_seq_position], 'arp')
     if destination == 'Engine' then
-      to_engine(note, params:get('arp_pp_amp'), params:get('arp_pp_cutoff'), params:get('arp_pp_gain'), params:get('arp_pp_pw'), duration_sec(params:get('arp_duration')))
+      to_engine('arp', note)
     elseif destination == 'MIDI' then
       to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), duration_int(params:get('arp_duration')))
     elseif destination == 'Crow' then
-      to_crow(note)
+      to_crow('arp',note)
     elseif destination =='ii-JF' then
-      to_jf(note, params:get('arp_jf_amp')/10)
+      to_jf('arp',note, params:get('arp_jf_amp')/10)
     end
   end
 end
@@ -752,14 +777,14 @@ function sample_crow(volts)
   --     elseif destination == 'MIDI' then
   --       harmonizer_note_off_insert = true
   --       out_midi:note_on((harmonizer_note + 36), velocity, channel)
-  --       for i = 1, #note_off_buffer do
-  --         if note_off_buffer[i][2] == harmonizer_note + 36 and note_off_buffer[i][3] == channel then
-  --           note_off_buffer[i][1] = duration
+  --       for i = 1, #midi_note_off_queue do
+  --         if midi_note_off_queue[i][2] == harmonizer_note + 36 and midi_note_off_queue[i][3] == channel then
+  --           midi_note_off_queue[i][1] = duration
   --           harmonizer_note_off_insert = false
   --         end
   --       end
   --       if harmonizer_note_off_insert == true then
-  --         table.insert(note_off_buffer, {duration, harmonizer_note + 36, channel})
+  --         table.insert(midi_note_off_queue, {duration, harmonizer_note + 36, channel})
   --       end
   --     end
   --   end
@@ -774,13 +799,13 @@ function sample_crow(volts)
   local note = quantize_note(note, 'crow')
     local destination = params:string('crow_dest')
     if destination == 'Engine' then
-      to_engine(note, params:get('crow_pp_amp'), params:get('crow_pp_cutoff'), params:get('crow_pp_gain'), params:get('crow_pp_pw'), duration_sec(params:get('crow_duration')))
+      to_engine('crow', note)
     elseif destination == 'MIDI' then
       to_midi(note, params:get('crow_midi_velocity'), params:get('crow_midi_ch'), duration_int(params:get('crow_duration')))
     elseif destination == 'Crow' then
-      to_crow(note)
+      to_crow('crow', note)
     elseif destination =='ii-JF' then
-      to_jf(note, params:get('crow_jf_amp')/10)
+      to_jf('crow',note, params:get('crow_jf_amp')/10)
     end
   
   chord_seq_retrig = false -- Check this to make sure it's working correct
@@ -794,105 +819,160 @@ in_midi.event = function(data)
     local note = quantize_note(d.note - 35, 'midi')
     local destination = params:string('midi_dest')
     if destination == 'Engine' then
-      to_engine(note, params:get('midi_pp_amp'), params:get('midi_pp_cutoff'), params:get('midi_pp_gain'), params:get('midi_pp_pw'), duration_sec(params:get('midi_duration')))
+      to_engine('midi', note)
     elseif destination == 'MIDI' then
       to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), duration_int(params:get('midi_duration')))
     elseif destination == 'Crow' then
-      to_crow(note)
+      to_crow('midi', note)
     elseif destination =='ii-JF' then
-      to_jf(note, params:get('midi_jf_amp')/10)
+      to_jf('midi', note, params:get('midi_jf_amp')/10)
     end
   end
 end
 
 
-function to_engine(note, amp, cutoff, gain, pw, release)
-  engine.amp(amp / 100)
-  engine.cutoff(cutoff)
-  engine.release(release)
-  engine.gain(gain / 100)
-  engine.pw(pw / 100)
-  engine.hz(music.note_num_to_freq(note + 36))
+function to_engine(source, note)
+    local amp = params:get(source..'_pp_amp')
+    local cutoff = params:get(source..'_pp_cutoff')
+    local gain = params:get(source..'_pp_gain')
+    local pw = params:get(source..'_pp_pw')
+    local release = duration_sec(params:get(source..'_duration'))
+    local duration = duration_int(params:get(source..'_duration'))
+    
+-- Default note handling where repeat notes retrigger and use the longer duration value
+  if params:string('repeat_notes') == 'Retrigger' then
+    engine.amp(amp / 100)
+    engine.cutoff(cutoff)
+    engine.release(release)
+    engine.gain(gain / 100)
+    engine.pw(pw / 100)
+    engine.hz(music.note_num_to_freq(note + 36))    
+    local note_off_insert = true
+    for i = 1, #engine_note_off_queue do
+      if engine_note_off_queue[i][2] == note then
+        engine_note_off_queue[i][1] = math.max(duration, engine_note_off_queue[i][1])
+        note_off_insert = false
+      end
+    end
+    if note_off_insert == true then
+      table.insert(engine_note_off_queue, {duration, note})
+    end
+-- Alternate note handling where repeat notes are suppressed
+  elseif params:string('repeat_notes') == 'Dedupe' then
+    local play_note = true
+    for i = 1, #engine_note_off_queue do
+      -- print(engine_note_off_queue[i][2])
+      if engine_note_off_queue[i][2] == note then
+        play_note = false
+      end
+    end
+    -- print(play_note)
+    if play_note == true then
+      engine.amp(amp / 100)
+      engine.cutoff(cutoff)
+      engine.release(release)
+      engine.gain(gain / 100)
+      engine.pw(pw / 100)
+      engine.hz(music.note_num_to_freq(note + 36))
+      table.insert(engine_note_off_queue, {duration, note})
+    end
+  end
 end
 
 
 function to_midi(note, velocity, channel, duration)
   local midi_note = note + 36
+-- Default note handling where repeat notes retrigger and use the longer duration value
   if params:string('repeat_notes') == 'Retrigger' then
     local note_off_insert = true
     out_midi:note_on((midi_note), velocity, channel)
-    for i = 1, #note_off_buffer do
-      if note_off_buffer[i][2] == midi_note and note_off_buffer[i][3] == channel then
-        note_off_buffer[i][1] = math.max(duration, note_off_buffer[i][1]) -- Preserves longer note-off
-        -- note_off_buffer[i][1] = duration -- Alt mode where the new duration is always prioritized
+    for i = 1, #midi_note_off_queue do    -- Fix: this would prob be faster if we just indexed the table with channel + note
+      if midi_note_off_queue[i][2] == midi_note and midi_note_off_queue[i][3] == channel then
+        midi_note_off_queue[i][1] = math.max(duration, midi_note_off_queue[i][1]) -- Preserves longer note-off. Alt could just use duration.
         note_off_insert = false
       end
     end
     if note_off_insert == true then
-      table.insert(note_off_buffer, {duration, midi_note, channel})
+      table.insert(midi_note_off_queue, {duration, midi_note, channel})
     end
+-- Alternate note handling where repeat notes are suppressed
   elseif params:string('repeat_notes') == 'Dedupe' then
+    local play_note = true
+    for i = 1, #midi_note_off_queue do
+      if midi_note_off_queue[i][2] == midi_note and midi_note_off_queue[i][3] == channel then
+        play_note = false
+      end
+    end
+    if play_note == true then
+      out_midi:note_on((midi_note), velocity, channel)
+      table.insert(midi_note_off_queue, {duration, midi_note, channel})
+    end
   end
 end
 
 
-function to_crow(note)
-  crow.output[1].volts = (note) / 12
-  crow.output[2].slew = 0
-  crow.output[2]() --pulse defined in init
-end
-
-
-function to_jf(note, amp)
-  crow.ii.jf.play_note((note - 24)/12, amp)
-end
-
-
-function harmonizer(source, destination, note_num, octave, channel, velocity, amp, cutoff, gain, pw, release,duration)
-  harmonizer_chord_type = params:get(source..'_chord_type')
-  quantized_note = chord[util.wrap(note_num, 1, harmonizer_chord_type)]
-  harmonizer_octave = math.floor((note_num - 1) / harmonizer_chord_type)
-  harmonizer_note = quantized_note + ((harmonizer_octave + octave) * 12) + params:get('transpose')   
-  -- print(source .. ' ' .. note_num.. "  " .. quantized_note.."  "..harmonizer_octave)
-  if 
-  source ~= 'crow'   -- Logic for auto-rest
-  or chord_seq_retrig == true 
-  or params:get('do_crow_auto_rest') == 0 
-  or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
-      if destination == 'Engine' then
-        engine.amp(amp / 100)
-        engine.cutoff(cutoff)
-        engine.release(release)
-        engine.gain(gain / 100)
-        engine.pw(pw / 100)
-        engine.hz(music.note_num_to_freq(harmonizer_note + 36))
-      elseif destination == 'Crow' then
-        crow.output[1].volts = (harmonizer_note) / 12
-        --pulse this
-        crow.output[2].slew = 0
-        crow.output[2]() --pulse defined in init
-        -- crow.output[2].volts = 8
-        -- crow.output[2].slew = 0.005
-        -- crow.output[2].volts = 0
-      elseif destination == 'MIDI' then
-        harmonizer_note_off_insert = true
-        out_midi:note_on((harmonizer_note + 36), velocity, channel)
-        for i = 1, #note_off_buffer do
-          if note_off_buffer[i][2] == harmonizer_note + 36 and note_off_buffer[i][3] == channel then
-            note_off_buffer[i][1] = duration
-            harmonizer_note_off_insert = false
-          end
-        end
-        if harmonizer_note_off_insert == true then
-          table.insert(note_off_buffer, {duration, harmonizer_note + 36, channel})
-        end
+function to_crow(source, note)
+    local duration = duration_int(params:get(source..'_duration'))
+-- Default note handling where repeat notes retrigger and use the longer duration value
+  if params:string('repeat_notes') == 'Retrigger' then
+    crow.output[1].volts = (note) / 12
+    crow.output[2].slew = 0
+    crow.output[2]() --pulse defined in init
+    local note_off_insert = true
+    for i = 1, #crow_note_off_queue do
+      if crow_note_off_queue[i][2] == note then
+        crow_note_off_queue[i][1] = math.max(duration, crow_note_off_queue[i][1])
+        note_off_insert = false
       end
     end
-  if source == 'crow' then
-    if chord_seq_trig == true then -- Check if this is used for anything other than auto-rest
-      chord_seq_retrig = false
+    if note_off_insert == true then
+      table.insert(crow_note_off_queue, {duration, note})
     end
-    prev_harmonizer_note = harmonizer_note
+-- Alternate note handling where repeat notes are suppressed
+  elseif params:string('repeat_notes') == 'Dedupe' then
+    local play_note = true
+    for i = 1, #crow_note_off_queue do
+      if crow_note_off_queue[i][2] == note then
+        play_note = false
+      end
+    end
+    if play_note == true then
+      crow.output[1].volts = (note) / 12
+      crow.output[2].slew = 0
+      crow.output[2]() --pulse defined in init
+      table.insert(crow_note_off_queue, {duration, note})
+    end
+  end
+end
+
+
+function to_jf(source, note, amp)
+  local duration = duration_int(params:get(source..'_duration'))
+-- Default note handling where repeat notes retrigger and use the longer duration value
+  if params:string('repeat_notes') == 'Retrigger' then
+    crow.ii.jf.play_note((note - 24)/12, amp)
+    local note_off_insert = true
+    for i = 1, #jf_note_off_queue do
+      if jf_note_off_queue[i][2] == note then
+        jf_note_off_queue[i][1] = math.max(duration, jf_note_off_queue[i][1])
+        note_off_insert = false
+      end
+    end
+    if note_off_insert == true then
+      table.insert(jf_note_off_queue, {duration, note})
+    end
+-- Alternate note handling where repeat notes are suppressed
+  elseif params:string('repeat_notes') == 'Dedupe' then
+    local play_note = true
+    for i = 1, #jf_note_off_queue do
+      if jf_note_off_queue[i][2] == note then
+        play_note = false
+      end
+    end
+    if play_note == true then
+      crow.ii.jf.play_note((note - 24)/12, amp)
+      table.insert(jf_note_off_queue, {duration, note})
+    end
   end
 end
 
