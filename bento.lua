@@ -1,8 +1,8 @@
 -- Dreamsequence
 --
--- KEY 1: Function key
+-- KEY 1: Fn (hold)
 -- KEY 2: Start/pause
--- KEY 3: Arranger on/off
+-- KEY 3: Arranger on/off/reset
 --
 -- ENC 1: Page
 -- ENC 2: Scroll
@@ -1156,7 +1156,7 @@ function redraw()
   elseif keys[1] == 1 then
     screen.level(15)
     screen.move(2,8)
-    screen.text('HOLD FN +')
+    screen.text('FN KEY +')
     screen.move(2,28)
     screen.text('KEY 2: Randomize')
     screen.move(2,48)
@@ -1164,22 +1164,6 @@ function redraw()
     screen.move(2,58)
     screen.text('ENC 3: Transpose seq ←→')
   else
-    
-    -- Standard screen. Vertical line
-    -- screen.level(3)
-    -- screen.move(97,0)
-    -- screen.line_rel(0,64)
-    -- screen.stroke()
-
-    -- Chord readout rect
-    
-    -- --bordered squre
-    -- screen.level(7)
-    -- screen.rect(96,0,32,32)
-    -- screen.fill()
-    -- screen.level(0)
-    -- screen.rect(97,1,30,30)
-    -- screen.fill()
     
     --Arranger time rect
     screen.level(7)
@@ -1197,12 +1181,7 @@ function redraw()
     screen.rect(95,14,32,18)
     screen.fill()
     
-    -- degrees and chord name
-    -- screen.move(98,19)
-    -- screen.level(0)
-    -- screen.text(chord_roman_name or '') -- Chord degree
-    -- screen.move(98,29)
-    -- screen.text((chord_name or '')..(chord_name_modifier or '')) -- Chord name
+    -- Chord degree and name
     screen.move(111,21)
     screen.level(15)
     screen.text_center(chord_roman_name or '') -- Chord degree
@@ -1256,6 +1235,7 @@ function redraw()
         rect_x = rect_x + rect_w
       end
     end
+    
     
     --Draw arranger time and glyphs
     screen.level(15)
