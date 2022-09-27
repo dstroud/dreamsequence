@@ -1,11 +1,11 @@
 -- Dreamsequence
 --
--- KEY 1: Modifiers
+-- KEY 1: Function key
 -- KEY 2: Start/pause
--- KEY 3: Arrange on/off
+-- KEY 3: Arranger on/off
 --
--- ENC 1: Select page
--- ENC 2: Select menu
+-- ENC 1: Page
+-- ENC 2: Scroll
 -- ENC 3: Edit value 
 --
 -- Crow IN 1: CV in
@@ -39,6 +39,8 @@ function init()
 
   --Global params
   params:add_separator ('Global')
+  -- params:add_number('page', 'Page', 1, 6, 1, function(param) return page_string(param:get()) end)
+    -- params:set_action("page",function() fix_set_page() end)
   params:add_number("transpose","Transpose",-24, 24, 0)
   params:add{
     type = 'number',
@@ -58,7 +60,7 @@ function init()
   formatter = function(param) return t_f_string(param:get()) end}
 
   --Arrange params
-  params:add_separator ('Arrange')
+  params:add_separator ('Arranger')
   params:add{
     type = 'number',
     id = 'do_follow',
@@ -76,11 +78,12 @@ function init()
   max = 1,
   default = 1,
   formatter = function(param) return playback_string(param:get()) end}
+  params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
   
   --Chord params
   params:add_separator ('Chord')
   params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,64,96,128,192,256
-  params:add_option("chord_dest", "Destination", {'None',"Engine", 'MIDI', 'ii-JF'},2)
+  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
     params:set_action("chord_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -91,7 +94,18 @@ function init()
     default = 80,
     formatter = function(param) return percent(param:get()) end}
   params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-  params:add_number("chord_pp_gain","Gain",0, 400, 200)
+    pp_gain = controlspec.def{
+    min=0,
+    max=400,
+    warp='lin',
+    step=5,
+    default=100,
+    quantum=.01,
+    wrap=false,
+    -- units='khz'
+    
+  }
+  params:add_control("chord_pp_gain","Gain", pp_gain)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
@@ -116,7 +130,7 @@ function init()
     default = 80,
     formatter = function(param) return percent(param:get()) end}
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-  params:add_number("arp_pp_gain","Gain",0, 400, 200)
+  params:add_control("arp_pp_gain","Gain", pp_gain)
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 127)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
@@ -137,7 +151,7 @@ function init()
     default = 80,
     formatter = function(param) return percent(param:get()) end}
   params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-  params:add_number("midi_pp_gain","Gain",0, 400, 200)
+  params:add_control("midi_pp_gain","Gain", pp_gain)
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('midi_midi_velocity','Velocity',0, 127, 110)
@@ -176,7 +190,7 @@ function init()
     default = 0,
     formatter = function(param) return t_f_string(param:get()) end}
   params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-  params:add_number("crow_pp_gain","Gain",0, 400, 200)
+  params:add_control("crow_pp_gain","Gain", pp_gain)
   params:add_number("crow_pp_pw","Pulse width",1, 99, 50)
   -- params:add_number("crow_pp_release","Release",1, 10, 5)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
@@ -198,15 +212,16 @@ function init()
   crow.output[2].action = "pulse(.001,5,1)" -- Need to test this more vs. roll-your-own pulse
   crow.output[3].action = "pulse(.001,5,1)" 
   grid_dirty = true
-  views = {'Arrange','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
+  views = {'Arranger','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
   view_index = 2
   view_name = views[view_index]
-  pages = {'Global', 'Arrange', 'Chord', 'Arp', 'MIDI', 'Crow'}
+  pages = {'GLOBAL', 'ARRANGER', 'CHORD', 'ARP', 'MIDI IN', 'CROW IN'}
+  -- pages = {'Global', 'Arranger', 'Chord', 'Arp', 'MIDI in', 'Crow in'}
   page_index = 1
   page_name = pages[page_index]
   menus = {}
   menu_update()
-  menu_index = 1
+  menu_index = 0
   selected_menu = menus[page_index][menu_index]
   transport_active = false
   pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
@@ -256,10 +271,10 @@ end
 
 function menu_update()
   --Global menu
-  menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'block_repeats'}
+  menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'block_repeats', 'crow_pullup'}
   
   -- Arrange menu
-  menus[2] = {'do_follow','playback'}
+  menus[2] = {'do_follow', 'playback', 'crow_assignment'}
   
   --chord menus   
   if params:string('chord_dest') == 'None' then
@@ -269,7 +284,7 @@ function menu_update()
   elseif params:string('chord_dest') == 'MIDI' then
     menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div', 'chord_duration', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[3] = {'chord_dest', 'chord_div', 'chord_type', 'chord_octave', 'chord_jf_amp', 'crow_pullup'}
+    menus[3] = {'chord_dest', 'chord_div', 'chord_type', 'chord_octave', 'chord_jf_amp'}
   end
   
   --arp menus
@@ -347,6 +362,17 @@ end
 
 function t_f_string(x)
   return(x == 1 and 'True' or 'False')
+end
+
+function page_string(index)
+  return(pages[index])
+end
+
+function fix_set_page()
+  page_index = params:get('page')  
+  page_name = pages[params:get('page')]
+  redraw()
+  -- print('page updated but fix this if kept')
 end
 
 function t_f_bool(x)
@@ -752,7 +778,7 @@ function grid_redraw()
   for i = 6,8 do
     g:led(16,i,4)
   end
-  if view_name == 'Arrange' then
+  if view_name == 'Arranger' then
     g:led(16,6,15)
     for x = 1,16 do
       for y = 1,4 do
@@ -806,7 +832,7 @@ function g.key(x,y,z)
       view_index = y - 5
       view_name = views[view_index]
     --ARRANGER KEYS
-    elseif view_name == 'Arrange' then
+    elseif view_name == 'Arranger' then
       if y < 5 then
         if y == pattern_seq[x] and x > 1 then 
           pattern_seq[x] = 0
@@ -831,13 +857,13 @@ function g.key(x,y,z)
           chord_seq[pattern][y].o = 0
         else
           chord_seq[pattern][y].x = x --raw key x coordinate
-          chord_seq[pattern][y].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+          chord_seq[pattern][y].c = util.wrap(x, 1, 7) --chord 1-7 (no octave). Should move this to a function since it's called a few places.
           chord_seq[pattern][y].o = math.floor(x / 8) --octave
         end
       elseif x == 15 then
         pattern_length[pattern] = y
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
-        pattern_key_count = pattern_key_count + 1
+        pattern_key_count = pattern_key_count + 1 -- Fix: issue with this not firing resulting in negative key count?
         pattern_keys[y] = 1
         if pattern_key_count == 1 then
           pattern_copy_source = y
@@ -871,45 +897,46 @@ function g.key(x,y,z)
   -- redraw()   
   -- grid_redraw()
   
-    --Z == 0, KEY RELEASED
-  else
-    if x == 16 and y > 5 then --view switcher buttons
-    view_key_count = view_key_count - 1
-    elseif x == 16 and y <5 then
-      pattern_key_count = pattern_key_count - 1
-      pattern_keys[y] = nil
-      if pattern_key_count == 0 and pattern_copy_performed == false then
-        if y == pattern then
-          print('a - manual reset of current pattern')
-          params:set("do_follow", 0)
-          pattern_queue = false
-          arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-          chord_seq_position = 0
-          reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
-        elseif y == pattern_queue then -- Manual jump to queued pattern
-          print('b - manual jump to queued pattern')
-          pattern_queue = false
-          pattern = y
-          arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-          chord_seq_position = 0
-          reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
-        else                        -- Queue up a new pattern
-          print('c - new pattern queued')
-          if pattern_copy_performed == false then
-            pattern_queue = y
+  --Z == 0, KEY RELEASED
+  elseif z == 0 then
+    if view_name == 'Chord' then
+      if x == 16 and y <5 then
+        pattern_key_count = math.max( 0, pattern_key_count - 1)
+        pattern_keys[y] = nil
+        if pattern_key_count == 0 and pattern_copy_performed == false then
+          if y == pattern then
+            print('a - manual reset of current pattern')
             params:set("do_follow", 0)
+            pattern_queue = false
+            arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+            chord_seq_position = 0
+            reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
+          elseif y == pattern_queue then -- Manual jump to queued pattern
+            print('b - manual jump to queued pattern')
+            pattern_queue = false
+            pattern = y
+            arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+            chord_seq_position = 0
+            reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
+          else                        -- Queue up a new pattern
+            print('c - new pattern queued')
+            if pattern_copy_performed == false then
+              pattern_queue = y
+              params:set("do_follow", 0)
+            end
           end
         end
       end
-      -- redraw()
-      -- grid_redraw()
     end
+  if x == 16 and y > 5 then --view switcher buttons
+    view_key_count = view_key_count - 1
   end
   if pattern_key_count == 0 then
     pattern_copy_performed = false
   end
-  redraw()
-  grid_redraw()
+end
+redraw()
+grid_redraw()
 end
 
 function key(n,z)
@@ -950,9 +977,9 @@ function key(n,z)
 end
 
 function enc(n,d)
-  if keys[1] == 1 then -- alt mode
+  if keys[1] == 1 then -- function key (KEY1) held down mode
     if n == 2 then
-      if view_name == 'Chord' then  -- To-do: check on how this handles pattern changes mid ENC change.
+      if view_name == 'Chord' then
         local length = pattern_length[pattern]
         local temp_chord_seq = {}
         for i = 1, length do
@@ -975,21 +1002,46 @@ function enc(n,d)
           arp_seq[arp_pattern][i] = temp_arp_seq[util.wrap(i - d,1,length)]
         end
       end
-      grid_redraw()
+      -- grid_redraw()
+      
+    -- "Transposes" pattern if you can call it that.  
+    elseif n == 3 then
+      if view_name == 'Chord' then
+        for y = 1,8 do
+          if chord_seq[pattern][y]['x'] ~= 0 then
+            chord_seq[pattern][y]['x'] = util.wrap(chord_seq[pattern][y]['x'] + d, 1, 14)
+            chord_seq[pattern][y].c = util.wrap(chord_seq[pattern][y]['x'], 1, 7) --chord 1-7 (no octave)
+            chord_seq[pattern][y].o = math.floor(chord_seq[pattern][y]['x'] / 8) --octave
+          end
+        end
+      elseif view_name == 'Arp' then
+        for y = 1,8 do
+          if arp_seq[arp_pattern][y] ~= 0 then
+            arp_seq[arp_pattern][y] = util.wrap(arp_seq[arp_pattern][y] + d, 1, 14)
+          end
+        end
+      end  
     end
+    grid_redraw()
   else
-    if n == 1 then
-      menu_index = 1
+      if n == 1 then
+      menu_index = 0
       page_index = util.clamp(page_index + d, 1, #pages)
       page_name = pages[page_index]
       selected_menu = menus[page_index][menu_index]
     elseif n == 2 then
-      menu_index = util.clamp(menu_index + d, 1, #menus[page_index])
+      menu_index = util.clamp(menu_index + d, 0, #menus[page_index])
       selected_menu = menus[page_index][menu_index]
     else
-      params:delta(selected_menu, d)
+      if menu_index == 0 then
+        menu_index = 0
+        page_index = util.clamp(page_index + d, 1, #pages)
+        page_name = pages[page_index]
+        selected_menu = menus[page_index][menu_index]
+      else
+        params:delta(selected_menu, d)
+      end
     end
-    -- redraw()
   end
   redraw()
 end
@@ -1048,7 +1100,8 @@ function arrangement_time()
   hours = string.format("%02.f", math.floor(arrangement_time_s/3600));
   mins = string.format("%02.f", math.floor(arrangement_time_s/60 - (hours*60)));
   secs = string.format("%02.f", math.floor(arrangement_time_s - hours*3600 - mins *60));
-  arrangement_time_clock = hours..":"..mins..":"..secs
+  arrangement_time_clock = hours..":"..mins..":"..secs --
+  arrangement_time_clock = mins..":"..secs -- Fix: Truncating hours here IDK
   return(arrangement_time_clock)
 end  
 
@@ -1084,8 +1137,8 @@ end
 -- end  
 
 --This needs some work and will get off if the menu is too long
-function scroll_offset(index, total, in_view ,height) --index of list, count of items in list, #viewable, line height
-  if total > in_view then
+function scroll_offset(index, total, in_view, height) --index of list, count of items in list, #viewable, line height
+  if total > in_view and menu_index > 1 then
     return(math.ceil(((index - 1) * (total - in_view) * height / total))) --math.ceil might be necessary if some options are cut off
   else return(0)
   end
@@ -1102,82 +1155,128 @@ function redraw()
     screen.font_size(8)
   elseif keys[1] == 1 then
     screen.level(15)
-    screen.move(0,9)
-    screen.text('MODIFIERS')
-    screen.move(0,29)
+    screen.move(2,8)
+    screen.text('HOLD FN +')
+    screen.move(2,28)
     screen.text('KEY 2: Randomize')
-    screen.move(0,39)
-    screen.text('ENC 2: Rotate sequence ±')
+    screen.move(2,48)
+    screen.text('ENC 2: Rotate seq ↑↓')
+    screen.move(2,58)
+    screen.text('ENC 3: Transpose seq ←→')
   else
+    
+    -- Standard screen. Vertical line
+    -- screen.level(3)
+    -- screen.move(97,0)
+    -- screen.line_rel(0,64)
+    -- screen.stroke()
+
+    -- Chord readout rect
+    
+    -- --bordered squre
+    -- screen.level(7)
+    -- screen.rect(96,0,32,32)
+    -- screen.fill()
+    -- screen.level(0)
+    -- screen.rect(97,1,30,30)
+    -- screen.fill()
+    
+    --Arranger time rect
     screen.level(7)
-    screen.move(36,0)
-    screen.line_rel(0,64)
-    screen.stroke()
-    -- for i = 1,#pages do
-    --   screen.move(0,i*10 - 1)
-    --   screen.level(page_name == pages[i] and 15 or 3)
-    --   screen.text(pages[i])
-    -- end
+    screen.rect(94,0,34,11)
+    screen.fill()
+    screen.level(0)
+    screen.rect(95,1,32,9)
+    screen.fill()
+ 
+    --Chord readout rect
+    screen.level(4)
+    screen.rect(94,13,34,20)
+    screen.fill()
+    screen.level(0)
+    screen.rect(95,14,32,18)
+    screen.fill()
     
-    --experimental chord readout
-    screen.move(0,9)
+    -- degrees and chord name
+    -- screen.move(98,19)
+    -- screen.level(0)
+    -- screen.text(chord_roman_name or '') -- Chord degree
+    -- screen.move(98,29)
+    -- screen.text((chord_name or '')..(chord_name_modifier or '')) -- Chord name
+    screen.move(111,21)
     screen.level(15)
-    screen.text(page_name)
+    screen.text_center(chord_roman_name or '') -- Chord degree
+    screen.move(111,29)
+    screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
     
-    screen.move(0,29)
-    screen.text(chord_roman_name or '') -- Chord degree
-    screen.move(0,39)
-    screen.text((chord_name or '')..(chord_name_modifier or '')) -- Chord name
-    -- screen.move(0,49)
-    -- screen.text('→')
-    
-    --menu and scroll stuff
-    local menu_offset = scroll_offset(menu_index,#menus[page_index], 6, 10)
+    -- Scrolling menus
+    local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
     line = 1
     for i = 1,#menus[page_index] do
-      screen.move(40, line*10 - 1 - menu_offset)
+      -- screen.move(40, line*10 - 1 - menu_offset)
+      screen.move(2, line * 10 + 8 - menu_offset)    --exp
       screen.level(menu_index == i and 15 or 3)
       screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. params:string(menus[page_index][i]))
       line = line + 1
     end
-  
+ 
+    --Sticky header
+    screen.level(menu_index == 0 and 15 or 4)
+    screen.rect(0,0,92,11)
+    screen.fill()
+    screen.move(2,8)
+    screen.level(0)
+    screen.text(page_index .. '-' .. page_name)
+    
     -- Draw the sequence and add timer for Arrange
-    if page_name == 'Arrange' then
-      screen.move(40,50)
+    if page_name == 'ARRANGER' then
+      screen.move(2,50)
       screen.level(3)
-      screen.text('Time: ' .. arrangement_time())
+      -- screen.text('Time: ' .. arrangement_time())
+      
       -- All the following needs to be revisited after getting pattern switching figured out. Also use s_to_hms (s)
-      local rect_x = 39
+      -- Reference marks so it's easier to distinguish the pattern position
+      for i = 1,4 do
+        screen.level(i == pattern and 15 or 2)
+        screen.rect(0,50 + i * 3, 1, 2)
+        screen.fill()
+      end
+      
+      local rect_x = 0
       -- local rect_gap_adj = 0
       for i = params:get('do_follow') == 1 and pattern_seq_position or 1, pattern_seq_length do
         screen.level(15)
         elapsed = params:get('do_follow') == 1 and (i == pattern_seq_position and chord_seq_position or 0) or 0 --recheck if this is needed when not following.
         rect_w = pattern_length[pattern_seq[i]] - elapsed
-        rect_h = pattern_seq[i]
+        rect_h = 2
+        rect_y = 50 + (pattern_seq[i]* 2) + pattern_seq[i]
         rect_gap_adj = params:get('do_follow') == 1 and (pattern_seq_position - 1) or 0 --recheck if this is needed when not following
-        screen.rect(rect_x + i - rect_gap_adj, 60, rect_w, rect_h)
+        screen.rect(rect_x + i - rect_gap_adj, rect_y, rect_w, rect_h)
         screen.fill()
         rect_x = rect_x + rect_w
       end
     end
     
-    --Draw glyphs
-    if params:get('do_follow') == 1 then
-    local x_offset = 0
-    local y_offset = 54
+    --Draw arranger time and glyphs
     screen.level(15)
-      if params:get('playback') == 1 then
-      for i = 1, #glyphs[1] do
-        screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
+    screen.move(97,8)
+    if params:get('do_follow') == 0 then
+      -- screen.text(' arr x')
+    else
+      screen.text(arrangement_time())
+      local x_offset = 120
+      local y_offset = 3
+        if params:get('playback') == 1 then
+        for i = 1, #glyphs[1] do
+          screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
+        end
+      else 
+        for i = 1, #glyphs[2] do
+          screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
+        end
       end
-    else 
-      for i = 1, #glyphs[2] do
-        screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
-      end
+      screen.fill()
     end
-    screen.fill(15)
-    end
-    -- screen.update()
   end
   screen.update()
 end
@@ -1258,6 +1357,7 @@ function randomize()
 
   
   --Sound-based randomizations
+  params:set('chord_pp_amp', 80)
   params:set('chord_octave', math.random(-1,2))
   random_divisions = {8,12,16,24,32}
   params:set('chord_div', random_divisions[math.random(1,5)])
@@ -1269,7 +1369,7 @@ function randomize()
   -- params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:set('chord_duration', math.random(4,6))
   
-  
+    params:set('arp_pp_amp', 80)
   params:set('arp_octave', math.random(-1,1)) -- Link to cutoff?
   random_divisions = {1,2,4,6,8,12,16}
   params:set('arp_div', random_divisions[math.random(1,7)])
