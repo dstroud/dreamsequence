@@ -50,14 +50,7 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-  params:add{
-  type = 'number',
-  id = 'block_repeats',
-  name = 'Block Repeats',
-  min = 0,
-  max = 1,
-  default = 0,
-  formatter = function(param) return t_f_string(param:get()) end}
+    params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1) 
 
   --Arrange params
   params:add_separator ('Arranger')
@@ -83,7 +76,7 @@ function init()
   --Chord params
   params:add_separator ('Chord')
   params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,64,96,128,192,256
-  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
+  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},3)
     params:set_action("chord_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -103,7 +96,6 @@ function init()
     quantum=.01,
     wrap=false,
     -- units='khz'
-    
   }
   params:add_control("chord_pp_gain","Gain", pp_gain)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
@@ -119,7 +111,7 @@ function init()
   --Arp params
   params:add_separator ('Arp')
   params:add_number('arp_div', 'Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -274,7 +266,7 @@ end
 
 function menu_update()
   --Global menu
-  menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'block_repeats', 'crow_pullup'}
+  menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'repeat_notes', 'crow_pullup'}
   
   -- Arrange menu
   menus[2] = {'do_follow', 'playback', 'crow_assignment'}
@@ -316,8 +308,8 @@ function menu_update()
     end
   elseif params:string('midi_dest') == 'Crow' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
-  elseif params:string('arp_dest') == 'ii-JF' then
-    menus[5] = {'midi_dest', 'midi_div', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+  elseif params:string('midi_dest') == 'ii-JF' then
+    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
   end
   
     --Crow menus
@@ -326,10 +318,10 @@ function menu_update()
   elseif params:string('crow_dest') == 'Engine' then
     menus[6] = {'crow_dest', 'crow_div', 'crow_duration', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[6] = {'crow_dest', 'crow_div', 'crow_duration', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
+    menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_div', 'crow_duration', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     menus[6] = {'crow_dest', 'crow_div', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
-  elseif params:string('arp_dest') == 'ii-JF' then
+  elseif params:string('crow_dest') == 'ii-JF' then
     menus[6] = {'crow_dest', 'crow_div', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
   end  
 end
@@ -406,6 +398,90 @@ end
 
 function chord_type(x)
   return(x == 3 and 'Triad' or '7th')
+end
+
+-- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
+-- @treturn chord_type
+function get_chord_name(root_num, scale_type, roman_chord_type)
+
+  local rct = roman_chord_type or "I"
+
+  -- treat extended ascii degree symbols as asterisks
+  rct = string.gsub(rct, "\u{B0}", "*")
+  rct = string.gsub(rct, "\u{BA}", "*")
+
+  local degree_string, augdim_string, added_string, bass_string, inv_string =
+    string.match(rct, "([ivxIVX]+)([+*]?)([0-9]*)-?([0-9]?)([bcdefg]?)")
+
+  local d = string.lower(degree_string)
+  local is_major = degree_string ~= d
+  local is_augmented = augdim_string == "+"
+  local is_diminished = augdim_string == "*"
+  local is_seventh = added_string == "7"
+
+  local chord_type = nil
+  if is_major then
+    if is_augmented then
+      if is_seventh then
+        chord_type = "aug7"
+      else
+        chord_type = "aug"
+      end
+    elseif is_diminished then
+      if is_seventh then
+        chord_type = "dim7"
+      else
+        chord_type = "dim"
+      end
+    elseif added_string == "6" then
+      if bass_string == "9" then
+        chord_type = "maj69"
+      else
+        chord_type = "maj6"
+      end
+    elseif is_seventh then
+      chord_type = "maj7"
+    elseif added_string == "9" then
+      chord_type = "maj9"
+    elseif added_string == "11" then
+      chord_type = "maj11"
+    elseif added_string == "13" then
+      chord_type = "maj13"
+    else
+      chord_type = "maj"
+    end
+  else -- minor
+    if is_augmented then
+      if is_seventh then
+        chord_type = "aug7"
+      else
+        chord_type = "aug"
+      end
+    elseif is_diminished then
+      if is_seventh then
+        chord_type = "dim7"
+      else
+        chord_type = "dim"
+      end
+    elseif added_string == "6" then
+      if bass_string == "9" then
+        chord_type = "min69"
+      else
+        chord_type = "min6"
+      end
+    elseif is_seventh then
+      chord_type = "min7"
+    elseif added_string == "9" then
+      chord_type = "min9"
+    elseif added_string == "11" then
+      chord_type = "min11"
+    elseif added_string == "13" then
+      chord_type = "min13"
+    else
+      chord_type = "min"
+    end
+  end
+  return(chord_type)
 end
 
 
@@ -560,92 +636,35 @@ function advance_chord_seq()
   redraw() -- To update Arrange mini chart
 end
 
--- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
--- @treturn chord_type
-function get_chord_name(root_num, scale_type, roman_chord_type)
 
-  local rct = roman_chord_type or "I"
-
-  -- treat extended ascii degree symbols as asterisks
-  rct = string.gsub(rct, "\u{B0}", "*")
-  rct = string.gsub(rct, "\u{BA}", "*")
-
-  local degree_string, augdim_string, added_string, bass_string, inv_string =
-    string.match(rct, "([ivxIVX]+)([+*]?)([0-9]*)-?([0-9]?)([bcdefg]?)")
-
-  local d = string.lower(degree_string)
-  local is_major = degree_string ~= d
-  local is_augmented = augdim_string == "+"
-  local is_diminished = augdim_string == "*"
-  local is_seventh = added_string == "7"
-
-  local chord_type = nil
-  if is_major then
-    if is_augmented then
-      if is_seventh then
-        chord_type = "aug7"
-      else
-        chord_type = "aug"
-      end
-    elseif is_diminished then
-      if is_seventh then
-        chord_type = "dim7"
-      else
-        chord_type = "dim"
-      end
-    elseif added_string == "6" then
-      if bass_string == "9" then
-        chord_type = "maj69"
-      else
-        chord_type = "maj6"
-      end
-    elseif is_seventh then
-      chord_type = "maj7"
-    elseif added_string == "9" then
-      chord_type = "maj9"
-    elseif added_string == "11" then
-      chord_type = "maj11"
-    elseif added_string == "13" then
-      chord_type = "maj13"
-    else
-      chord_type = "maj"
+function play_chord(destination, channel)
+  local duration = duration_int(params:get('chord_duration'))
+  local destination = params:string('chord_dest')
+  if destination == 'Engine' then
+    for i = 1, params:get('chord_type') do
+      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      to_engine(note, params:get('chord_pp_amp'), params:get('chord_pp_cutoff'), params:get('chord_pp_gain'), params:get('chord_pp_pw'), duration_sec(params:get('chord_duration')))
     end
-  else -- minor
-    if is_augmented then
-      if is_seventh then
-        chord_type = "aug7"
-      else
-        chord_type = "aug"
-      end
-    elseif is_diminished then
-      if is_seventh then
-        chord_type = "dim7"
-      else
-        chord_type = "dim"
-      end
-    elseif added_string == "6" then
-      if bass_string == "9" then
-        chord_type = "min69"
-      else
-        chord_type = "min6"
-      end
-    elseif is_seventh then
-      chord_type = "min7"
-    elseif added_string == "9" then
-      chord_type = "min9"
-    elseif added_string == "11" then
-      chord_type = "min11"
-    elseif added_string == "13" then
-      chord_type = "min13"
-    else
-      chord_type = "min"
+  elseif destination == 'MIDI' then
+    for i = 1, params:get('chord_type') do
+      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), duration_int(params:get('chord_duration')))
+    end
+  elseif destination == 'Crow' then
+    for i = 1, params:get('chord_type') do
+      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      to_crow(note)
+    end
+  elseif destination =='ii-JF' then
+    for i = 1, params:get('chord_type') do
+      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      to_jf(note, params:get('chord_jf_amp')/10)
     end
   end
-  return(chord_type)
 end
 
 
--- Pre-load upcoming chord to address race condition.
+-- Pre-load upcoming chord to address race condition around quantize_note() events occurring before chord change
 function get_next_chord()
   local temp_pattern = pattern
   local temp_chord_seq_position = chord_seq_position
@@ -656,7 +675,6 @@ function get_next_chord()
   end
   if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_pattern_seq_retrig then
     if pattern_queue then
-    -- if pattern_queue ~= pattern then
       temp_pattern = pattern_queue
     end
     temp_chord_seq_position = 1
@@ -670,15 +688,23 @@ function get_next_chord()
 end
 
 
+function quantize_note(note_num, source)
+  local chord_length = params:get(source..'_chord_type') -- Move upstream?
+  local source_octave = params:get(source..'_octave') -- Move upstream?
+  local quantized_note = chord[util.wrap(note_num, 1, chord_length)]
+  local quantized_octave = math.floor((note_num - 1) / chord_length)
+  return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
+end
+
+
 function advance_arp_seq()
-  local source = 'arp'  --May hardcode once done
-  local destination = params:string(source..'_dest')
   if arp_seq_position > arp_pattern_length[arp_pattern] or pattern_seq_retrig == true then -- Validate pattern_seq_retrig addition
     arp_seq_position = 1
   else  
     arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
   end
   if arp_seq[arp_pattern][arp_seq_position] > 0 then
+    local destination = params:string('arp_dest')
     local note = quantize_note(arp_seq[arp_pattern][arp_seq_position], 'arp')
     if destination == 'Engine' then
       to_engine(note, params:get('arp_pp_amp'), params:get('arp_pp_cutoff'), params:get('arp_pp_gain'), params:get('arp_pp_pw'), duration_sec(params:get('arp_duration')))
@@ -692,14 +718,93 @@ function advance_arp_seq()
   end
 end
 
-
-function quantize_note(note_num, source)
-  local chord_length = params:get(source..'_chord_type') -- Move upstream?
-  local source_octave = params:get(source..'_octave') -- Move upstream?
-  local quantized_note = chord[util.wrap(note_num, 1, chord_length)]
-  local quantized_octave = math.floor((note_num - 1) / chord_length)
-  return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
+function crow_trigger(s) --Trigger in used to sample voltage from Crow IN 1
+    state = s
+    crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
+    crow.input[1].query() -- see https://github.com/monome/crow/pull/463
 end
+
+
+function sample_crow(volts)
+  local note = round(volts * 12,0) + 1
+  
+  -- -- Crow-specific dedupe logic here. To-do pending re-work of note handler
+  --   if 
+  -- source ~= 'crow'   -- Logic for auto-rest
+  -- or chord_seq_retrig == true 
+  -- or params:get('do_crow_auto_rest') == 0 
+  -- or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
+  --     if destination == 'Engine' then
+  --       engine.amp(amp / 100)
+  --       engine.cutoff(cutoff)
+  --       engine.release(release)
+  --       engine.gain(gain / 100)
+  --       engine.pw(pw / 100)
+  --       engine.hz(music.note_num_to_freq(harmonizer_note + 36))
+  --     elseif destination == 'Crow' then
+  --       crow.output[1].volts = (harmonizer_note) / 12
+  --       --pulse this
+  --       crow.output[2].slew = 0
+  --       crow.output[2]() --pulse defined in init
+  --       -- crow.output[2].volts = 8
+  --       -- crow.output[2].slew = 0.005
+  --       -- crow.output[2].volts = 0
+  --     elseif destination == 'MIDI' then
+  --       harmonizer_note_off_insert = true
+  --       out_midi:note_on((harmonizer_note + 36), velocity, channel)
+  --       for i = 1, #note_off_buffer do
+  --         if note_off_buffer[i][2] == harmonizer_note + 36 and note_off_buffer[i][3] == channel then
+  --           note_off_buffer[i][1] = duration
+  --           harmonizer_note_off_insert = false
+  --         end
+  --       end
+  --       if harmonizer_note_off_insert == true then
+  --         table.insert(note_off_buffer, {duration, harmonizer_note + 36, channel})
+  --       end
+  --     end
+  --   end
+  -- if source == 'crow' then
+  --   if chord_seq_trig == true then -- Check if this is used for anything other than auto-rest
+  --     chord_seq_retrig = false
+  --   end
+  --   prev_harmonizer_note = harmonizer_note
+  -- end
+
+  
+  local note = quantize_note(note, 'crow')
+    local destination = params:string('crow_dest')
+    if destination == 'Engine' then
+      to_engine(note, params:get('crow_pp_amp'), params:get('crow_pp_cutoff'), params:get('crow_pp_gain'), params:get('crow_pp_pw'), duration_sec(params:get('crow_duration')))
+    elseif destination == 'MIDI' then
+      to_midi(note, params:get('crow_midi_velocity'), params:get('crow_midi_ch'), duration_int(params:get('crow_duration')))
+    elseif destination == 'Crow' then
+      to_crow(note)
+    elseif destination =='ii-JF' then
+      to_jf(note, params:get('crow_jf_amp')/10)
+    end
+  
+  chord_seq_retrig = false -- Check this to make sure it's working correct
+end
+
+
+in_midi.event = function(data)
+  local d = midi.to_msg(data)
+  -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
+  if d.type == "note_on" then
+    local note = quantize_note(d.note - 35, 'midi')
+    local destination = params:string('midi_dest')
+    if destination == 'Engine' then
+      to_engine(note, params:get('midi_pp_amp'), params:get('midi_pp_cutoff'), params:get('midi_pp_gain'), params:get('midi_pp_pw'), duration_sec(params:get('midi_duration')))
+    elseif destination == 'MIDI' then
+      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), duration_int(params:get('midi_duration')))
+    elseif destination == 'Crow' then
+      to_crow(note)
+    elseif destination =='ii-JF' then
+      to_jf(note, params:get('midi_jf_amp')/10)
+    end
+  end
+end
+
 
 function to_engine(note, amp, cutoff, gain, pw, release)
   engine.amp(amp / 100)
@@ -712,17 +817,21 @@ end
 
 
 function to_midi(note, velocity, channel, duration)
-  local note_off_insert = true
   local midi_note = note + 36
-  out_midi:note_on((midi_note), velocity, channel)
-  for i = 1, #note_off_buffer do
-    if note_off_buffer[i][2] == midi_note and note_off_buffer[i][3] == channel then
-      note_off_buffer[i][1] = duration
-      note_off_insert = false
+  if params:string('repeat_notes') == 'Retrigger' then
+    local note_off_insert = true
+    out_midi:note_on((midi_note), velocity, channel)
+    for i = 1, #note_off_buffer do
+      if note_off_buffer[i][2] == midi_note and note_off_buffer[i][3] == channel then
+        note_off_buffer[i][1] = math.max(duration, note_off_buffer[i][1]) -- Preserves longer note-off
+        -- note_off_buffer[i][1] = duration -- Alt mode where the new duration is always prioritized
+        note_off_insert = false
+      end
     end
-  end
-  if note_off_insert == true then
-    table.insert(note_off_buffer, {duration, midi_note, channel})
+    if note_off_insert == true then
+      table.insert(note_off_buffer, {duration, midi_note, channel})
+    end
+  elseif params:string('repeat_notes') == 'Dedupe' then
   end
 end
 
@@ -735,46 +844,7 @@ end
 
 
 function to_jf(note, amp)
-  crow.ii.jf.play_note(note/12, amp)
-end
-      
-      
-function play_chord(destination, channel)
-  -- Testing out removing this since the chord is pre-loaded
-  -- chord = music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, true)
-  chord_duration_int = duration_int(params:get('chord_duration'))
-  if destination == 'Engine' then
-    -- for i=1,#chord do
-    for i = 1, params:get('chord_type') do
-      engine.amp(params:get('chord_pp_amp') / 100)
-      engine.cutoff(params:get('chord_pp_cutoff'))
-      engine.release(duration_sec(params:get('chord_duration')))
-      engine.gain(params:get('chord_pp_gain') / 100)
-      engine.pw(params:get('chord_pp_pw') / 100)
-      engine.hz(music.note_num_to_freq(chord[i] + params:get('transpose') + 48 + (params:get('chord_octave') * 12)))
-    end
-  elseif destination == 'MIDI' then
-    chord_note_off_insert = true
-    -- for i=1,#chord do
-    for i = 1, params:get('chord_type') do
-      chord_note = chord[i] + params:get('transpose') + 48 + (params:get('chord_octave') * 12)
-      out_midi:note_on(chord_note, params:get('chord_midi_velocity'), channel) 
-      for i = 1, #note_off_buffer do
-        if note_off_buffer[i][2] == chord_note and note_off_buffer[i][3] == channel then
-          note_off_buffer[i][1] =  chord_duration_int
-          chord_note_off_insert = false
-        end
-      end
-      if chord_note_off_insert == true then
-        table.insert(note_off_buffer, {chord_duration_int, chord_note, channel})
-      end
-    end
-  elseif destination == 'ii-JF' then
-    -- for i=1,#chord do
-    for i = 1, params:get('chord_type') do
-      crow.ii.jf.play_note((chord[i] - 12 + params:get('transpose') + (params:get('chord_octave') * 12))/12, params:get('chord_jf_amp')/10)
-    end
-  end
+  crow.ii.jf.play_note((note - 24)/12, amp)
 end
 
 
@@ -1099,73 +1169,7 @@ function enc(n,d)
   end
   redraw()
 end
-
-function crow_trigger(s) --Trigger in used to sample voltage from Crow IN 1
-    state = s
-    crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
-    crow.input[1].query() -- see https://github.com/monome/crow/pull/463
-end
-
-
-function sample_crow(v)
-  volts = v
-  crow_note_num =  round(volts * 12,0) + 1
   
-  -- Logic for Crow in deduping needs to be moved here
-  --   if source ~= 'crow'   -- Logic for auto-rest
-  -- or chord_seq_retrig == true 
-  -- or params:get('do_crow_auto_rest') == 0 
-  -- or (params:get('do_crow_auto_rest') == 1 and (prev_final_note ~= final_note)) then
-  --   engine.amp(amp / 100)
-  --   engine.cutoff(cutoff)
-  --   engine.release(release)
-  --   engine.gain(gain / 100)
-  --   engine.pw(pw / 100)
-  --   engine.hz(music.note_num_to_freq(final_note + 36))
-  --   if source == 'crow' then
-  --     if chord_seq_trig == true then -- Check if this is used for anything other than auto-rest
-  --       chord_seq_retrig = false
-  --     end
-  --     local prev_final_note = final_note
-  --   end
-  -- end
-  
-  harmonizer(
-    'crow',
-    params:string('crow_dest'), 
-    crow_note_num, 
-    params:get('crow_octave'),
-    params:get('crow_midi_ch'), 
-    params:get('crow_midi_velocity'), 
-    params:get('crow_pp_amp'), 
-    params:get('crow_pp_cutoff'), 
-    params:get('crow_pp_gain'), 
-    params:get('crow_pp_pw'), 
-    duration_sec(params:get('crow_duration')), --release
-    duration_int(params:get('crow_duration')))
-  chord_seq_retrig = false -- Check this to make sure it's working correct
-end
-
-in_midi.event = function(data)
-  local d = midi.to_msg(data)
-  -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
-  if d.type == "note_on" then
-    -- print('in_midi note_on rcvd')
-    harmonizer(
-      'midi',
-      params:string('midi_dest'), 
-      d.note - 35,  
-      params:get('midi_octave'),
-      params:get('midi_midi_ch'), 
-      params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'),
-      params:get('midi_pp_amp'), 
-      params:get('midi_pp_cutoff'), 
-      params:get('midi_pp_gain'), 
-      params:get('midi_pp_pw'), 
-      duration_sec(params:get('midi_duration')), --release
-      duration_int(params:get('midi_duration')))
-  end
-end
   
 function arrangement_time()
   arrangement_steps = 0
