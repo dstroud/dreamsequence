@@ -33,7 +33,7 @@ function init()
     {'1/32', 8, .125},
     {'1/16',16, .25},
     {'1/8', 32, .5},
-    {'1/4', 64, 1}, --clock.get_beat_sec()
+    {'1/4', 64, 1}, --clock.get_beat_sec() 
     {'1/2', 128, 2},
     {'Whole', 256, 4}}
 
@@ -210,6 +210,7 @@ function init()
   views = {'Arranger','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
   view_index = 2
   view_name = views[view_index]
+  -- flicker = 3
   pages = {'GLOBAL', 'ARRANGER', 'CHORD', 'ARP', 'MIDI IN', 'CROW IN'}
   -- pages = {'Global', 'Arranger', 'Chord', 'Arp', 'MIDI in', 'Crow in'}
   page_index = 1
@@ -226,8 +227,10 @@ function init()
   pattern_copy_performed = false
   pattern_seq_retrig = false
   pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-  pattern_seq_position = 1
-  pattern_seq_length = 1 
+  pattern_seq_position = 0
+  pattern_seq_length = 1
+  elapsed = 0
+  chord_pos = 0
   pattern_keys = {}
   pattern_key_count = 0
   -- view_keys = {}
@@ -491,6 +494,7 @@ end
 function timing_clock()
   while true do
     clock.sync(1/64)
+    -- flicker = util.wrap(flicker + 1, 3,7)
     -- Once midi_note_off_queue is refactored, check out lib.tabutil:select_values (t, condition)
     for i = #midi_note_off_queue, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       midi_note_off_queue[i][1] = midi_note_off_queue[i][1] - 1
@@ -558,7 +562,7 @@ function clock.transport.stop()
   clock.cancel(sequence_clock_id or 0)
 end
    
- function reset_pattern()
+ function reset_pattern() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
@@ -567,11 +571,11 @@ end
   redraw()
 end
 
-function reset_arrangement() -- check: how to send a reset out to Crow for external clocking
+function reset_arrangement() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
-  pattern_seq_position = 1
+  pattern_seq_position = 0  --Changed. Verify
   pattern = pattern_seq[1]
   reset_clock()
   get_next_chord() -- New. Seems OK?
@@ -612,58 +616,63 @@ end
 
 
 function advance_chord_seq()
-  chord_seq_retrig = true -- indicates when we're on a new chord seq step for auto-rest logic
-  
-  -- If Arranger is enabled and we're on/after the last step in the pattern
-  if params:get("do_follow") == 1 and chord_seq_position >= pattern_length[pattern] then
-    
-    --Check if it's the last pattern in the arrangement. Doesn't trigger if last pattern is turned off midway through. Maybe fix this.
-    if pattern_seq_position == pattern_seq_length and params:string('playback') == 'One-shot' then
-      arrangement_reset = true
-    end
-    
-    -- Update the arranger sequence position
-    pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
-    pattern = pattern_seq[pattern_seq_position]
-    
-    -- Prevents arp from extending beyond chord pattern length. Fix: add check to Arp loop (set chord div to 16)
-    pattern_seq_retrig = true 
-  end
-  
-  if arrangement_reset == true and params:string('playback') == 'One-shot' then
-    print('arrangement ended')
-    clock.transport.stop()
-    arrangement_reset = false
-    -- break --  To-do: Need to check if this was preventing the following from running...
-  end
+  chord_seq_retrig = true -- indicates when we're on a new chord seq step for auto-rest logic  
+  local arrangement_reset = false
 
-  if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
-    if pattern_queue then
-    -- if pattern_queue ~= pattern then
-      pattern = pattern_queue
-      pattern_queue = false
-      -- pattern_queue = pattern
+  -- Move arranger sequence if enabled
+  if params:get("do_follow") == 1 then
+
+    -- If it's post-reset or at the end of chord sequence
+    if (pattern_seq_position == 0 and chord_seq_position == 0) or chord_seq_position >= pattern_length[pattern] then
+      
+      --Check if it's the last pattern in the arrangement.
+      if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
+        arrangement_reset = true
+        reset_arrangement()
+        clock.transport.stop()
+      else  -- If not the last pattern in the arrangement, update the arranger sequence position
+        pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
+        pattern = pattern_seq[pattern_seq_position]
+      end
+      
+      -- Prevents arp from extending beyond chord pattern length. Fix: add check to Arp loop (set chord div to 16)
+      pattern_seq_retrig = true 
     end
-    chord_seq_position = 1
-    pattern_seq_retrig = false
-  else  
-    chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
+    
+    -- Flag if arranger is on the last pattern of a 1-shot sequence
+    arranger_one_shot_last_pattern = pattern_seq_position >= pattern_seq_length and params:string('playback') == 'One-shot'
   end
-  if chord_seq[pattern][chord_seq_position].c > 0 then
-    if chord_seq_position >0 then
-      chord_no = chord_seq[pattern][chord_seq_position].c + (params:get('chord_type') == 4 and 7 or 0) --Returns a chord # 1-14. 8+ are 7ths
-      chord_roman_name = music.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
-      --To-do: more thoughful selection of sharps or flats depending on the key
-      chord_name = music.NOTE_NAMES[util.wrap((music.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
-      chord_name_modifier = get_chord_name(1 + 1, params:get('mode'), chord_roman_name) -- transpose root?
+  
+  -- If arrangement was not just reset, update chord position. 
+  if arrangement_reset == false then
+    if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
+      if pattern_queue then
+        pattern = pattern_queue
+        pattern_queue = false
+      end
+      chord_seq_position = 1
+      pattern_seq_retrig = false
+    else  
+      chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
     end
-    play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
+    
+    if chord_seq[pattern][chord_seq_position].c > 0 then
+      if chord_seq_position >0 then
+        chord_no = chord_seq[pattern][chord_seq_position].c + (params:get('chord_type') == 4 and 7 or 0) --Returns a chord # 1-14. 8+ are 7ths
+        chord_roman_name = music.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
+        --To-do: more thoughful selection of sharps or flats depending on the key
+        chord_name = music.NOTE_NAMES[util.wrap((music.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
+        chord_name_modifier = get_chord_name(1 + 1, params:get('mode'), chord_roman_name) -- transpose root?
+          play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
+      end
+    end
   end
-  redraw() -- To update Arrange mini chart
+  redraw() -- Update arranger mini chart
 end
 
 
 function play_chord(destination, channel)
+  chord = music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, true)
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
@@ -983,6 +992,10 @@ function grid_redraw()
     g:led(16,i,4)
   end
   if view_name == 'Arranger' then
+    -- if params:get('do_follow') == 0 then
+    --   flicker = util.wrap(flicker + 1, 7,15)
+    --   g:led(16,6,flicker)
+    -- end
     g:led(16,6,15)
     for x = 1,16 do
       for y = 1,4 do
@@ -993,12 +1006,14 @@ function grid_redraw()
       end
     end
   elseif view_name == 'Chord' then
-    if params:get('do_follow') == 1 then
+    -- if params:get('do_follow') == 1 and pattern_seq_position ~= 0 then
+    if params:get('do_follow') == 1 and arranger_one_shot_last_pattern == false then
       next_pattern_indicator = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
     else
       next_pattern_indicator = pattern_queue or pattern
     end
   for i = 1,4 do
+    -- g:led(16, i, i == next_pattern_indicator and 7 or pattern_keys[i] and 7 or 3) 
     g:led(16, i, i == next_pattern_indicator and 7 or pattern_keys[i] and 7 or 3) 
     if i == pattern then
       g:led(16, i, 15)
@@ -1048,6 +1063,10 @@ function g.key(x,y,z)
             break
           end
         end 
+        -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
+        if params:get('do_follow') == 1 and pattern_seq_position == 0 and chord_seq_position == 0 then  
+          pattern = pattern_seq[1]
+        end
       end
       if transport_active == false then -- Update chord for when play starts
         get_next_chord()
@@ -1105,7 +1124,7 @@ function g.key(x,y,z)
   elseif z == 0 then
     if view_name == 'Chord' then
       if x == 16 and y <5 then
-        pattern_key_count = math.max( 0, pattern_key_count - 1)
+        pattern_key_count = pattern_key_count - 1 --        pattern_key_count = math.max( 0, pattern_key_count - 1)
         pattern_keys[y] = nil
         if pattern_key_count == 0 and pattern_copy_performed == false then
           if y == pattern then
@@ -1265,6 +1284,7 @@ function arrangement_time()
   return(arrangement_time_clock)
 end  
 
+
 function param_formatter(param)
   if param == 'source' then
     return('Clock: ')
@@ -1373,23 +1393,26 @@ function redraw()
       screen.level(3)
       -- screen.text('Time: ' .. arrangement_time())
       
-      -- All the following needs to be revisited after getting pattern switching figured out. Also use s_to_hms (s)
-      -- Reference marks so it's easier to distinguish the pattern position
+      -- Draw the arranger mini chart
+      -- Axis reference marks so it's easier to distinguish the pattern position
       for i = 1,4 do
-        screen.level(i == pattern and 15 or 2)
+        screen.level(i == pattern_seq[pattern_seq_position] and 15 or 2)
         screen.rect(0,50 + i * 3, 1, 2)
         screen.fill()
-      end
-      
-      local rect_x = 0
-      -- local rect_gap_adj = 0
-      for i = params:get('do_follow') == 1 and pattern_seq_position or 1, pattern_seq_length do
-        screen.level(15)
-        elapsed = params:get('do_follow') == 1 and (i == pattern_seq_position and chord_seq_position or 0) or 0 --recheck if this is needed when not following.
+      end  
+ 
+      local rect_x = pattern_seq_position == 0 and 1 or 0
+      screen.level(15)
+      pattern_pos = pattern_seq_position == 0 and 1 or pattern_seq_position
+      for i = pattern_pos, pattern_seq_length do
+        if params:get('do_follow') == 1 then
+          chord_pos = chord_seq_position
+        end
+        elapsed = (i == pattern_pos and chord_pos or 0) or 0
         rect_w = pattern_length[pattern_seq[i]] - elapsed
         rect_h = 2
         rect_y = 50 + (pattern_seq[i]* 2) + pattern_seq[i]
-        rect_gap_adj = params:get('do_follow') == 1 and (pattern_seq_position - 1) or 0 --recheck if this is needed when not following
+        rect_gap_adj = pattern_pos - 1
         screen.rect(rect_x + i - rect_gap_adj, rect_y, rect_w, rect_h)
         screen.fill()
         rect_x = rect_x + rect_w
