@@ -240,7 +240,6 @@ function init()
   pattern_pos = 1 -- Check
   percent_step_elapsed = 0
   seconds_remaining_in_arrangement = 0
-  chord_pos = 0
   chord_no = 0
   pattern_keys = {}
   pattern_key_count = 0
@@ -274,7 +273,6 @@ function init()
   crow_note_off_queue = {}
   jf_note_off_queue = {}
   reset_clock() -- will turn over to step 0 on first loop
-  reset_clock()
   get_next_chord() -- Placeholder for when table loading from file is implemented
   grid_dirty = true
   grid_redraw()
@@ -493,10 +491,48 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
 end
 
 
+ --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
+function sequence_clock(rate)
+  while transport_active do
+    clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
+    
+    if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
+      get_next_chord()
+    end
+    if clock_step % params:get('chord_div') == 0 then
+      advance_chord_seq()
+      grid_dirty = true
+    end
+    if clock_step % params:get('arp_div') == 0 then
+      advance_arp_seq()
+      grid_dirty = true
+    end
+    if clock_step % params:get('crow_div') == 0 then
+      crow.output[3]() --pulse defined in init
+    end
+    if grid_dirty == true then
+      grid_redraw()
+      grid_dirty = false
+    end
+  clock.sync(1/rate)
+  end
+end
+
+
+
+--Clock used to redraw screen every second for arranger countdown timer
+function seconds_clock()
+  while true do
+    redraw()
+    clock.sleep(1)
+  end
+end
+    
+    
 -- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic
 function timing_clock()
   while true do
-    clock.sync(1/64)
+    -- clock.sync(1/64)
 
     for i = #midi_note_off_queue, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       midi_note_off_queue[i][1] = midi_note_off_queue[i][1] - 1
@@ -526,15 +562,26 @@ function timing_clock()
         table.remove(jf_note_off_queue, i)
       end
     end
-    
+    clock.sync(1/64)
   end
 end
     
 function clock.transport.start()
   transport_active = true
+  
+  -- Clock for note duration, note-off events
   clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
+  
+  -- Clock for chord/arp/arranger sequences
   sequence_clock_id = clock.run(sequence_clock, global_clock_div) --8 == global clock at 32nd notes
+  
+  
+  --Clock used to refresh screen once a second for the arranger countdown timer
+  clock.cancel(seconds_clock_id or 0) 
+  seconds_clock_id = clock.run(seconds_clock)
+  
+  -- Send out MIDI start/continue messages
   if params:get('clock_midi_out') ~= 1 then 
     if clock_start_method == 'start' then
       out_midi:start()
@@ -591,36 +638,9 @@ end
 
 
 function reset_clock()
-  clock_step = params:get('chord_div') - 1
+  clock_step = -1 -- clock_step rewrite
+  -- clock_step = params:get('chord_div') - 1
   clock_start_method = 'start'
-end
-
-
- --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
-function sequence_clock(rate)
-  while transport_active do
-    clock.sync(1/rate)
-    clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
-    if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
-      get_next_chord()
-    end
-    if clock_step % params:get('chord_div') == 0 then
-      advance_chord_seq()
-      grid_dirty = true
-    end
-    if clock_step % params:get('arp_div') == 0 then
-      advance_arp_seq()
-      grid_dirty = true
-    end
-    if clock_step % params:get('crow_div') == 0 then
-      crow.output[3]() --pulse defined in init
-    end
-    if grid_dirty == true then
-      grid_redraw()
-      grid_dirty = false
-    end
-  redraw() -- redrawing every tic for arranger countdown timer. Is overkill. To-do: evaluate if we can call every second somehow.
-  end
 end
 
 
@@ -1422,28 +1442,16 @@ function redraw()
   --Calculate what we need to display arrangement time remaining and draw the arranger mini-chart
   local rect_x = pattern_seq_position == 0 and 1 or 0 -- If arranger is reset, add an initial gap to the x position
   pattern_pos = pattern_seq_position == 0 and 1 or pattern_seq_position --same as max 1
-
-  if params:get('arranger_enabled') == 1 then
-    chord_pos = chord_seq_position  --pause updating chord_pos if arranger is off/suspended
-  end
-    
   steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
 
   for i = pattern_pos, pattern_seq_length do
-    steps_elapsed = (i == pattern_pos and chord_pos or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
-    percent_step_elapsed = clock_step % params:get('chord_div') / params:get('chord_div') -- % of current chord step elapsed
+    steps_elapsed = (i == pattern_pos and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
+    percent_step_elapsed = (math.max(clock_step,0) % params:get('chord_div') / (params:get('chord_div')-1)) -- % of current chord step elapsed
+    -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div') / (params:get('chord_div')-1)) -- % of current chord step remaining
     steps_remaining_in_pattern = pattern_length[pattern_seq[i]] - steps_elapsed  --rect_w
     steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
+    seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
     
-    --Freezes the arranger countdown when suspended. Alternative is to have it cycle based on pickup time which is handy but prob confusing.
-    -- This is also preventing the timer from updating when you're setting up the arrangement. Bah.
-    if params:get('arranger_enabled') == 1 then
-      seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed)
-    end
-    
-    -- This was used as an alternative with some rounding to clean up the timer at 120 BPM but I think it's not going to work in all situations
-    -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + (transport_active and (1-percent_step_elapsed) or 0))
-
     if page_name == 'ARRANGER' then
       rect_h = 2
       rect_y = 50 + (pattern_seq[i]* 2) + pattern_seq[i]
