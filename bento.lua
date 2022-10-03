@@ -50,6 +50,8 @@ function init()
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
     params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
+  params:add_option('dedupe_threshold',"Dedupe threshold",{4,8,16,32,64},4)
+    params:set_action('dedupe_threshold', function() dedupe_threshold() end)
 
   --Arrange params
   params:add_separator ('Arranger')
@@ -273,6 +275,7 @@ function init()
   engine_note_off_queue = {}
   crow_note_off_queue = {}
   jf_note_off_queue = {}
+  dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   get_next_chord() -- Placeholder for when table loading from file is implemented
   grid_dirty = true
@@ -282,7 +285,7 @@ end
 
 function menu_update()
   --Global menu
-  menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'crow_pullup'}
+  menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'crow_pullup'}
   
   -- Arrange menu
   menus[2] = {'arranger_enabled', 'playback', 'crow_assignment'}
@@ -412,6 +415,13 @@ function chord_type(x)
   return(x == 3 and 'Triad' or '7th')
 end
 
+-- Establishes the threshold in seconds for considering duplicate notes
+function dedupe_threshold()
+-- 63 is used rather than 60(seconds) to allow a 5% margin of error.
+   dedupe_threshold_s = clock.get_tempo() / params:string('dedupe_threshold') / 63
+end  
+  
+  
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
 -- @treturn chord_type
 function get_chord_name(root_num, scale_type, roman_chord_type)
@@ -908,12 +918,13 @@ end
 
 
 function to_engine(source, note)
-    local amp = params:get(source..'_pp_amp')
-    local cutoff = params:get(source..'_pp_cutoff')
-    local gain = params:get(source..'_pp_gain')
-    local pw = params:get(source..'_pp_pw')
-    local release = duration_sec(params:get(source..'_duration'))
-    local duration = duration_int(params:get(source..'_duration'))
+  local note_on_time = util.time()
+  local amp = params:get(source..'_pp_amp')
+  local cutoff = params:get(source..'_pp_cutoff')
+  local gain = params:get(source..'_pp_gain')
+  local pw = params:get(source..'_pp_pw')
+  local release = duration_sec(params:get(source..'_duration'))
+  local duration = duration_int(params:get(source..'_duration'))
     
 -- Default note handling where repeat notes retrigger and use the longer duration value
   if params:string('repeat_notes') == 'Retrigger' then
@@ -926,20 +937,21 @@ function to_engine(source, note)
     engine_note_off_insert = true
     for i = 1, #engine_note_off_queue do
       if engine_note_off_queue[i][2] == note then
-        engine_note_off_queue[i][1] = math.max(duration, engine_note_off_queue[i][1])
         engine_note_off_insert = false
       end
     end
     if engine_note_off_insert == true then
-      table.insert(engine_note_off_queue, {duration, note})
+      table.insert(engine_note_off_queue, {duration, note, note_on_time})
     end
-    
--- Alternate note handling where repeat notes are suppressed
+
+-- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
   elseif params:string('repeat_notes') == 'Dedupe' then
     engine_play_note = true
     for i = 1, #engine_note_off_queue do
       if engine_note_off_queue[i][2] == note then
-       engine_play_note = false
+        if (note_on_time - engine_note_off_queue[i][3]) < dedupe_threshold_s then
+          engine_play_note = false
+        end
       end
     end
     if engine_play_note == true then
@@ -949,7 +961,7 @@ function to_engine(source, note)
       engine.gain(gain / 100)
       engine.pw(pw / 100)
       engine.hz(music.note_num_to_freq(note + 36))
-      table.insert(engine_note_off_queue, {duration, note})
+      table.insert(engine_note_off_queue, {duration, note, note_on_time})
     end
   end
 end
@@ -957,6 +969,7 @@ end
 
 function to_midi(note, velocity, channel, duration)
   local midi_note = note + 36
+  local note_on_time = util.time()
   
 -- Default note handling where repeat notes retrigger and use the longer duration value
   if params:string('repeat_notes') == 'Retrigger' then
@@ -964,31 +977,35 @@ function to_midi(note, velocity, channel, duration)
     out_midi:note_on((midi_note), velocity, channel)
     for i = 1, #midi_note_off_queue do    -- Fix: this would prob be faster if we just indexed the table with channel + note
       if midi_note_off_queue[i][2] == midi_note and midi_note_off_queue[i][3] == channel then
-        midi_note_off_queue[i][1] = math.max(duration, midi_note_off_queue[i][1]) -- Preserves longer note-off. Alt could just use duration.
-      midi_note_off_insert = false
+        midi_note_off_queue[i][1] = math.max(duration, midi_note_off_queue[i][1]) -- Preserves longer note-off.
+        midi_note_off_insert = false
       end
     end
     if midi_note_off_insert == true then
-      table.insert(midi_note_off_queue, {duration, midi_note, channel})
+      table.insert(midi_note_off_queue, {duration, midi_note, channel, note_on_time})
     end
-    
--- Alternate note handling where repeat notes are suppressed
+  
+-- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
   elseif params:string('repeat_notes') == 'Dedupe' then
     midi_play_note = true
     for i = 1, #midi_note_off_queue do
       if midi_note_off_queue[i][2] == midi_note and midi_note_off_queue[i][3] == channel then
-        midi_play_note = false
+        if (note_on_time - midi_note_off_queue[i][4]) < dedupe_threshold_s then
+          midi_note_off_queue[i][1] = math.max(duration, midi_note_off_queue[i][1]) -- Preserves longer note-off.
+          midi_play_note = false
+        end
       end
     end
     if midi_play_note == true then
       out_midi:note_on((midi_note), velocity, channel)
-      table.insert(midi_note_off_queue, {duration, midi_note, channel})
+      table.insert(midi_note_off_queue, {duration, midi_note, channel, note_on_time})
     end
   end
 end
 
 
 function to_crow(source, note)
+    local note_on_time = util.time()
     crow_play_note = true
     crow_note_off_insert = true
     local duration = duration_int(params:get(source..'_duration'))
@@ -997,24 +1014,26 @@ function to_crow(source, note)
   if params:string('repeat_notes') == 'Retrigger' then
     for i = 1, #crow_note_off_queue do
       if crow_note_off_queue[i][2] == note then
-        crow_note_off_queue[i][1] = math.max(duration, crow_note_off_queue[i][1])
+        -- crow_note_off_queue[i][1] = math.max(duration, crow_note_off_queue[i][1])
         crow_note_off_insert = false
       end
     end
-    
--- Alternate note handling where repeat notes are suppressed
+
+-- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
   elseif params:string('repeat_notes') == 'Dedupe' then
+    -- crow_play_note = true
     for i = 1, #crow_note_off_queue do
       if crow_note_off_queue[i][2] == note then
-        crow_play_note = false
-        crow_note_off_insert = false
+        if (note_on_time - crow_note_off_queue[i][3]) < dedupe_threshold_s then
+          crow_play_note = false
+          crow_note_off_insert = false
+        end
       end
     end
   end
   
   --Play the note
   if crow_play_note == true then
-    -- print('Note played')
     crow.output[1].volts = (note) / 12
     crow.output[2].volts = 0  -- Needed or skew 100 AR gets weird
     if params:get(source..'_tr_env') == 1 then  -- Trigger
@@ -1029,7 +1048,7 @@ function to_crow(source, note)
   
   -- Insert note-off into the queue
   if crow_note_off_insert == true then
-    table.insert(crow_note_off_queue, {duration, note})
+    table.insert(crow_note_off_queue, {duration, note, note_on_time})
   end
 end
 
@@ -1049,6 +1068,7 @@ end
 
 
 function to_jf(source, note, amp)
+  local note_on_time = util.time()
   local duration = duration_int(params:get(source..'_duration'))
   
 -- Default note handling where repeat notes retrigger and use the longer duration value
@@ -1057,25 +1077,27 @@ function to_jf(source, note, amp)
     jf_note_off_insert = true
     for i = 1, #jf_note_off_queue do
       if jf_note_off_queue[i][2] == note then
-        jf_note_off_queue[i][1] = math.max(duration, jf_note_off_queue[i][1])
+        -- jf_note_off_queue[i][1] = math.max(duration, jf_note_off_queue[i][1])
         jf_note_off_insert = false
       end
     end
     if jf_note_off_insert == true then
-      table.insert(jf_note_off_queue, {duration, note})
+      table.insert(jf_note_off_queue, {duration, note, note_on_time})
     end
-    
--- Alternate note handling where repeat notes are suppressed
+
+-- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
   elseif params:string('repeat_notes') == 'Dedupe' then
     jf_play_note = true
     for i = 1, #jf_note_off_queue do
       if jf_note_off_queue[i][2] == note then
-       jf_play_note = false
+        if (note_on_time - jf_note_off_queue[i][3]) < dedupe_threshold_s then
+          jf_play_note = false
+        end
       end
     end
     if jf_play_note == true then
       crow.ii.jf.play_note((note - 24)/12, amp)
-      table.insert(jf_note_off_queue, {duration, note})
+      table.insert(jf_note_off_queue, {duration, note, note_on_time})
     end
   end
 end
@@ -1848,7 +1870,7 @@ function randomize()
   local arp_max_cutoff = util.round(52.8017 * max_arp_x  + 3294.61) -- Setting an upper limit on the cutoff so there is some adjustability after
   local chord_min_cutoff = util.round(math.exp(0.03 * max_arp_x + 6.2)) -- Makes sure the cutoff is appropriate for the chord range
   
-  
+  -- To-do: update cutoff logic to consider pitch change from 4-note (7th chords as well as key/transposition)
   params:set('arp_pp_cutoff', math.random(arp_min_cutoff, arp_min_cutoff + 1000)) -- testing with min first math.random(arp_min_cutoff, arp_max_cutoff))
   params:set('chord_pp_cutoff', math.random(chord_min_cutoff, chord_min_cutoff + 1000)) -- testing with min first
 
