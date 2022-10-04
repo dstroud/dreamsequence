@@ -117,7 +117,7 @@ function init()
 
   --Arp params
   params:add_separator ('Arp')
-  params:add_number('arp_div', 'Division', 1, 32, 4) --most useful {1,2,4,8,16,24,32}
+  params:add_number('arp_div', 'Division', 1, 256, 4) --most useful {1,2,4,8,16,24,32}
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
@@ -134,12 +134,13 @@ function init()
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
-  params:add_option("arp_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
+  params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
   params:set_action("arp_tr_env",function() menu_update() end)
   params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
   params:add_number('arp_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  params:add_option("arp_mode", "Mode", {'Loop','One-shot'},2)
   
   
   --MIDI params
@@ -169,13 +170,12 @@ function init()
     default = 0,
     formatter = function(param) return t_f_string(param:get()) end,
     action = function() menu_update() end}
-  params:add_option("midi_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
+  params:add_option("midi_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("midi_tr_env",function() menu_update() end)
   params:add_number('midi_ar_skew','AR env. skew',0, 100, 0)
   params:add_number('midi_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
   params:add_number('midi_octave','Octave',-2, 4, 0)
   params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
-  -- params:add_option("midi_", "Crow out 2", {'Trigger','AR env.'},1)
 
   
   --Crow params
@@ -205,7 +205,7 @@ function init()
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
-  params:add_option("crow_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
+  params:add_option("crow_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("crow_tr_env",function() menu_update() end)
   params:add_number('crow_ar_skew','AR env. skew',0, 100, 0)
   params:add_number('crow_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
@@ -314,19 +314,19 @@ function menu_update()
   
   --arp menus
   if params:string('arp_dest') == 'None' then
-    menus[4] = {'arp_dest', 'arp_div', 'arp_chord_type', 'arp_octave'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_chord_type', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[4] = {'arp_dest', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[4] = {'arp_dest', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[4] = {'arp_dest', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     else
-      menus[4] = {'arp_dest', 'arp_tr_env', 'arp_duration', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[4] = {'arp_dest', 'arp_div', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
   end
   
     --MIDI menus
@@ -531,46 +531,39 @@ end
  --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock(rate)
   while transport_active do
+    clock.sync(1/8)
+
+    -- clock_step is tied to chord_div which means arp rate can't ever be slower than chord. Hmm....
+    -- clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
     
+    -- Modifying so arp can be slower than chord. #seemsfine
+    clock_step = util.wrap(clock_step + 1, 0, 31)
+    -- print(clock_step)
     
-    -- if params:string('clock_source') == 'link' and first_link_start then
-    -- if first_link_start then
-      clock.sync(1/rate)
-    -- end
-    -- first_link_start = false
+    if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
+      get_next_chord()
+    end
+    if clock_step % params:get('chord_div') == 0 then
+      advance_chord_seq()
+      grid_dirty = true
+      redraw() -- Update chord readout
+    end
     
-    -- clock.sync(1/rate)
-    
-    -- if link_start == false then
-      
-      clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
-      
-      if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
-        get_next_chord()
-      end
-      if clock_step % params:get('chord_div') == 0 then
-        advance_chord_seq()
-        grid_dirty = true
-        redraw() -- Update chord readout
-      end
-      if clock_step % params:get('arp_div') == 0 then
+    if clock_step % params:get('arp_div') == 0 then
+      if params:string('arp_mode') == 'Loop' or play_arp then
         advance_arp_seq()
-        grid_dirty = true
+        grid_dirty = true      
       end
-      if clock_step % params:get('crow_div') == 0 then
-        crow.output[3]() --pulse defined in init
-      end
-      if grid_dirty == true then
-        grid_redraw()
-        grid_dirty = false
-      end
-      
-    -- clock.sync(1/rate)
+    end
     
-    -- else
-    --   link_start = false
-      -- clock.sync(1/rate)
-    -- end
+    if clock_step % params:get('crow_div') == 0 then
+      crow.output[3]() --pulse defined in init
+    end
+    
+    if grid_dirty == true then
+      grid_redraw()
+      grid_dirty = false
+    end
   end
 end
 
@@ -699,13 +692,13 @@ end
 
 function reset_clock()
   clock_step = -1 -- clock_step rewrite
-  -- clock_step = params:get('chord_div') - 1
   clock_start_method = 'start'
 end
 
 
 function advance_chord_seq()
-  chord_seq_retrig = true -- indicates when we're on a new chord seq step for auto-rest logic  
+  chord_seq_retrig = true -- indicates when we're on a new chord seq step for crow auto-rest logic.
+  play_arp = true
   local arrangement_reset = false
 
   -- Move arranger sequence if enabled
@@ -724,8 +717,14 @@ function advance_chord_seq()
         pattern = pattern_seq[pattern_seq_position]
       end
       
-      -- Prevents arp from extending beyond chord pattern length. Fix: add check to Arp loop (set chord div to 16)
-      pattern_seq_retrig = true 
+      -- According to my notes, pattern_seq_retrig "Prevents arp from extending beyond chord pattern length"
+      -- This isn't happenening even when disabled, so probably not needed
+      -- Might be interesting to have several arp modes
+          -- Loop (current Loop)
+          -- Let arp play through to completion (even if multiple chords play), then pause until the next chord retriggers (current one-shot)
+          -- Force arp reset each time a new chord is played
+      -- pattern_seq_retrig = true -- Disabling to see what breaks
+      
     end
     
     -- Flag if arranger is on the last pattern of a 1-shot sequence
@@ -800,19 +799,38 @@ function get_next_chord()
   local temp_pattern = pattern
   local temp_chord_seq_position = chord_seq_position
   local temp_pattern_seq_retrig = false
-  if params:get('arranger_enabled') == 1 and temp_chord_seq_position >= pattern_length[temp_pattern] then 
-    temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
-    temp_pattern_seq_retrig = true
-  end
-  if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_pattern_seq_retrig then
+
+  -- Rewriting this to see if it works without temp_pattern_seq_retrig
+  -- -- If arranger is enabled and it's the last step in the chord sequence, advance the arranger first and set temp_pattern_seq_retrig
+  -- if params:get('arranger_enabled') == 1 and temp_chord_seq_position >= pattern_length[temp_pattern] then 
+  --   temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
+  --   temp_pattern_seq_retrig = true
+  -- end
+  -- -- Irrespective of arranger state, if it's the last step in the chord sequence OR temp_pattern_seq_retrig (redundant?), advance the chord sequence pattern and reset temp_pattern_seq_retrig
+  -- if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_pattern_seq_retrig then
+  --   if pattern_queue then
+  --     temp_pattern = pattern_queue
+  --   end
+  --   temp_chord_seq_position = 1
+  --   temp_pattern_seq_retrig = false
+  -- else  
+  --   temp_chord_seq_position = util.wrap(temp_chord_seq_position + 1, 1, pattern_length[temp_pattern])
+  -- end
+
+  --Refactor
+  if temp_chord_seq_position >= pattern_length[temp_pattern] then
+    if params:get('arranger_enabled') == 1 then
+      temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
+    end
     if pattern_queue then
       temp_pattern = pattern_queue
     end
     temp_chord_seq_position = 1
-    temp_pattern_seq_retrig = false
   else  
     temp_chord_seq_position = util.wrap(temp_chord_seq_position + 1, 1, pattern_length[temp_pattern])
   end
+  
+  
   if chord_seq[temp_pattern][temp_chord_seq_position].c > 0 then
     chord = music.generate_chord_scale_degree(chord_seq[temp_pattern][temp_chord_seq_position].o * 12, params:get('mode'), chord_seq[temp_pattern][temp_chord_seq_position].c, true)
   end
@@ -834,6 +852,7 @@ function advance_arp_seq()
   else  
     arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
   end
+
   if arp_seq[arp_pattern][arp_seq_position] > 0 then
     local destination = params:string('arp_dest')
     local note = quantize_note(arp_seq[arp_pattern][arp_seq_position], 'arp')
@@ -847,6 +866,11 @@ function advance_arp_seq()
       to_jf('arp',note, params:get('arp_jf_amp')/10)
     end
   end
+  
+  if params:string('arp_mode') == 'One-shot' and arp_seq_position >= arp_pattern_length[arp_pattern] then
+     play_arp = false
+  else
+  end   
 end
 
 function crow_trigger(s) --Trigger in used to sample voltage from Crow IN 1
@@ -1519,7 +1543,7 @@ function randomize()
   
   --SEQUENCE RANDOMIZATION
   
-  params:set('transpose', math.random(-6,5)) -- To-do: factor in to cutoff
+  params:set('transpose', math.random(-12,12))
   params:set('chord_type', percent_chance(20) and 4 or 3)
   params:set('arp_chord_type', percent_chance(40) and 4 or 3)
   
@@ -1809,34 +1833,39 @@ function randomize()
   end
 
 
+  params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
+  local random_divisions = {16,24,32} --{12,16,20,24,28,32}
+  params:set('chord_div', random_divisions[math.random(1,3)] - (percent_chance(20) and 4 or 0)) -- Mostly standard
+  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
+  -- tie arp modulo to chord?
+  -- local random_divisions = {1,2,3,4,6,8,12,16,20,24,28,32} 
+  local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
+  params:set('arp_div', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
+  
   --ENGINE BASED RANDOMIZATIONS
-  params:set('chord_pp_amp', 60)
-  params:set('chord_octave', math.random(-1,1)) -- Linked to cutoff
-  random_divisions = {16,24,32}-- {8,12,16,24,32}
-  params:set('chord_div', random_divisions[math.random(1,3)])
+  params:set('chord_pp_amp', 50)
   params:set('chord_pp_gain', math.random(0,350))
   params:set('chord_pp_pw', math.random(10,90))
-  params:set('chord_duration', math.random(5,6))
-  params:set('arp_pp_amp', 80)
-  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
-  random_divisions = {1,2,4,6,8,12,16} 
-  params:set('arp_div', random_divisions[math.random(1,7)])
+  params:set('chord_duration', 7) -- Whole note just works better for PolyPerc math.random(5,6))
+  params:set('arp_pp_amp', 70)
   params:set('arp_pp_gain', math.random(0,350))
   params:set('arp_pp_pw', math.random(10,90))
-  params:set('arp_duration', math.random(3,5))
+  params:set('arp_duration', math.random(4,6))
+  params:set('arp_mode', math.random(1,2))
+
 
 
   -- This is all about setting the engine cutoff values to something reasonable for the pitch of the chord and arp  
   local chord_octave_shift = (params:get('chord_octave') * 7 ) -- octave param effectively shifts chord x by this many colums 
-  local arp_octave_shift = (params:get('arp_octave') * 3 ) -- octave param effectively shifts arp x by this many colums  
+  local arp_octave_shift = (params:get('arp_octave') * params:get('arp_chord_type') ) -- octave param effectively shifts arp x by this many colums  
 
   max_chord_x = 0
   for i = 1,8 do
     max_chord_x = chord_seq[pattern][i].x > max_chord_x and chord_seq[pattern][i].x or max_chord_x
   end
-  max_chord_x = max_chord_x + chord_octave_shift
+  max_chord_x = max_chord_x + chord_octave_shift + params:get('transpose')
   
-  local max_arp_x = math.max(table.unpack(arp_seq[1])) + arp_octave_shift -- Max x + effective offset for arp octave
+  local max_arp_x = math.max(table.unpack(arp_seq[1])) + arp_octave_shift + (params:get('transpose') / params:get('arp_chord_type'))-- Max x + effective offset for arp octave
   local arp_min_cutoff = util.round(math.exp(.09 * max_arp_x + 6.1)) -- Makes sure the cutoff is appropriate for the arp range
   local arp_max_cutoff = util.round(52.8017 * max_arp_x  + 3294.61) -- Setting an upper limit on the cutoff so there is some adjustability after
   local chord_min_cutoff = util.round(math.exp(0.03 * max_arp_x + 6.2)) -- Makes sure the cutoff is appropriate for the chord range
