@@ -31,6 +31,7 @@ function init()
 
   -- Duration name, clock tics, beat multiplier. Triplet vals? To-do: assign calculation of seconds to clock_tempo action.
   durations = {
+    -- {'Pass-thru',nil,nil}
     {'1/32', 8, .125},
     {'1/16',16, .25},
     {'1/8', 32, .5},
@@ -165,9 +166,11 @@ function init()
   params:add_option("midi_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
     params:set_action("midi_tr_env",function() menu_update() end)
   params:add_number('midi_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('midi_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('midi_duration', 'Duration', 0, 6, 3, function(param) return duration_string(param:get()) end)
   params:add_number('midi_octave','Octave',-2, 4, 0)
   params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  -- params:add_option("midi_", "Crow out 2", {'Trigger','AR env.'},1)
+
   
   --Crow params
   params:add_separator ('Crow')
@@ -1597,11 +1600,11 @@ function randomize()
 
   
   --CHORD PROGRESSION ALGOS
-  chord_algo = math.random(1,6)
+  chord_algo = 7 --math.random(1,6)
   
   if chord_algo == 1 then
-    -- I-V-vi-IV based progression ***
-    -- Extended to a few modes other than major that sound nice
+    -- I-V-vi-IV based progression ****
+    -- To-do: logic for 7th
     print('Chord algo: I-V-vi-IV-based progression')
     local modes = {1,2,3,8}
     params:set('mode', modes[math.random(1,4)])
@@ -1704,7 +1707,45 @@ function randomize()
     end  
   
   
-  elseif chord_algo == 6 then  
+    elseif chord_algo == 6 then
+    -- I-ii-iii-IV-V based progression ***
+    print('Chord algo: I-ii-iii-IV-V based progression')
+    local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
+    params:set('mode', modes[math.random(1,4)])
+    local progression = {1,2,3,4,5}
+    local progression = shuffle(progression)
+    pattern_length[pattern] = 4
+    clear_chord_pattern()
+    for i = 1, pattern_length[pattern] do
+      local x = progression[i]
+      chord_seq[pattern][i].x = x --raw key x coordinate
+      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][i].o = math.floor(x / 8) --octave
+    end  
+    rotate_pattern(math.random(0, 3))
+    transpose_pattern(math.random() >= .5 and 7 or 0)
+    
+ 
+     elseif chord_algo == 7 then
+    -- I-vi based major progression ***
+    print('Chord algo: I-vi based major progression')
+    -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
+    params:set('mode', 1) -- modes[math.random(1,4)])
+    local progression = {1,2,3,4,5,6}
+    local progression = shuffle(progression)
+    pattern_length[pattern] = 4
+    clear_chord_pattern()
+    for i = 1, pattern_length[pattern] do
+      local x = progression[i]
+      chord_seq[pattern][i].x = x --raw key x coordinate
+      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][i].o = math.floor(x / 8) --octave
+    end  
+    rotate_pattern(math.random(0, 3))
+    transpose_pattern(math.random() >= .5 and 7 or 0)
+    
+    
+  elseif chord_algo == 8 then  
     -- Some weird mostly random stuff
     print('Chord algo: Weird random chords')
     random_pattern_lengths = {3,4,6,8}
