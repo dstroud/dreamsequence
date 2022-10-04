@@ -31,13 +31,13 @@ function init()
 
   -- Duration name, clock tics, beat multiplier. Triplet vals? To-do: assign calculation of seconds to clock_tempo action.
   durations = {
-    -- {'Pass-thru',nil,nil}
-    {'1/32', 8, .125},
-    {'1/16',16, .25},
-    {'1/8', 32, .5},
-    {'1/4', 64, 1}, --clock.get_beat_sec() 
-    {'1/2', 128, 2},
-    {'Whole', 256, 4}}
+    {'1/64', 4, .0625, 64},
+    {'1/32', 8, .125, 32},
+    {'1/16', 16, .25, 16},
+    {'1/8', 32, .5, 8},
+    {'1/4', 64, 1, 4}, --clock.get_beat_sec() 
+    {'1/2', 128, 2, 2},
+    {'Whole', 256, 4, 1}}
 
   --Global params
   params:add_separator ('Global')
@@ -51,8 +51,11 @@ function init()
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
     params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
-  params:add_option('dedupe_threshold',"Dedupe threshold",{4,8,16,32,64},4)
-    params:set_action('dedupe_threshold', function() dedupe_threshold() end)
+      params:set_action('repeat_notes',function() menu_update() end)
+    params:add_number('dedupe_threshold', ' Threshold', 1, 3, 2, function(param) return duration_string(param:get()) end)
+      params:set_action('dedupe_threshold', function() dedupe_threshold() end)
+      params:set_action('clock_tempo', function() dedupe_threshold() end)
+
 
   --Arrange params
   params:add_separator ('Arranger')
@@ -74,6 +77,7 @@ function init()
   default = 1,
   formatter = function(param) return playback_string(param:get()) end}
   params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
+  
   
   --Chord params
   params:add_separator ('Chord')
@@ -106,9 +110,10 @@ function init()
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
     params:set_action("crow_pullup",function() crow_pullup() end)
-  params:add_number('chord_duration', 'Duration', 1, 6, 6, function(param) return duration_string(param:get()) end)
+  params:add_number('chord_duration', 'Duration', 2, 7, 7, function(param) return duration_string(param:get()) end)
   params:add_number('chord_octave','Octave',-2, 4, 0)
   params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+
 
   --Arp params
   params:add_separator ('Arp')
@@ -132,9 +137,10 @@ function init()
   params:add_option("arp_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
   params:set_action("arp_tr_env",function() menu_update() end)
   params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('arp_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('arp_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  
   
   --MIDI params
   params:add_separator ('MIDI')
@@ -166,7 +172,7 @@ function init()
   params:add_option("midi_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
     params:set_action("midi_tr_env",function() menu_update() end)
   params:add_number('midi_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('midi_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('midi_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
   params:add_number('midi_octave','Octave',-2, 4, 0)
   params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   -- params:add_option("midi_", "Crow out 2", {'Trigger','AR env.'},1)
@@ -202,7 +208,7 @@ function init()
   params:add_option("crow_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
     params:set_action("crow_tr_env",function() menu_update() end)
   params:add_number('crow_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('crow_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('crow_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
   params:add_number('crow_octave','Octave',-2, 4, 0)
   params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   
@@ -234,7 +240,6 @@ function init()
   pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
   pattern = 1
   steps_remaining_in_pattern = pattern_length[pattern]
-  -- pattern_queue = pattern
   pattern_queue = false
   pattern_copy_performed = false
   pattern_seq_retrig = false
@@ -274,10 +279,10 @@ function init()
   arp_pattern = 1
   arp_seq_position = 0
   arp_seq_note = 8
-  midi_note_off_queue = {}
-  engine_note_off_queue = {}
-  crow_note_off_queue = {}
-  jf_note_off_queue = {}
+  midi_note_history = {}
+  engine_note_history = {}
+  crow_note_history = {}
+  jf_note_history = {}
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   get_next_chord() -- Placeholder for when table loading from file is implemented
@@ -288,8 +293,11 @@ end
 
 function menu_update()
   --Global menu
-  menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'crow_pullup'}
-  
+  if params:string('repeat_notes') == 'Retrigger' then
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'crow_pullup'}
+  else
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'crow_pullup'}
+  end
   -- Arrange menu
   menus[2] = {'arranger_enabled', 'playback', 'crow_assignment'}
   
@@ -312,8 +320,11 @@ function menu_update()
   elseif params:string('arp_dest') == 'MIDI' then
     menus[4] = {'arp_dest', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
-    menus[4] = {'arp_dest', 'arp_duration', 'arp_tr_env', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
-    -- menus[4] = {'arp_dest', 'arp_div', 'arp_chord_type', 'arp_octave'}
+    if params:string('arp_tr_env') == 'Trigger' then
+      menus[4] = {'arp_dest', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+    else
+      menus[4] = {'arp_dest', 'arp_tr_env', 'arp_duration', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+    end
   elseif params:string('arp_dest') == 'ii-JF' then
     menus[4] = {'arp_dest', 'arp_div', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
   end
@@ -330,8 +341,11 @@ function menu_update()
       menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
-    menus[5] = {'midi_dest', 'midi_duration', 'midi_tr_env', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
-    --{'midi_dest', 'midi_chord_type', 'midi_octave'}
+    if params:string('midi_tr_env') == 'Trigger' then
+      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+    else
+      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+    end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
   end
@@ -344,7 +358,11 @@ function menu_update()
   elseif params:string('crow_dest') == 'MIDI' then
     menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_duration', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
-    menus[6] = {'crow_dest', 'crow_duration', 'crow_tr_env', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+    if params:string('crow_tr_env') == 'Trigger' then
+      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+    else
+      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_duration', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+    end
   elseif params:string('crow_dest') == 'ii-JF' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
   end  
@@ -418,10 +436,10 @@ function chord_type(x)
   return(x == 3 and 'Triad' or '7th')
 end
 
--- Establishes the threshold in seconds for considering duplicate notes
+-- Establishes the threshold in seconds for considering duplicate notes as well as providing an integer for placeholder duration
 function dedupe_threshold()
--- 63 is used rather than 60(seconds) to allow a 5% margin of error.
-   dedupe_threshold_s = clock.get_tempo() / params:string('dedupe_threshold') / 63
+  dedupe_threshold_s = duration_sec(params:get('dedupe_threshold')) * .95
+  dedupe_threshold_int = duration_int(params:get('dedupe_threshold'))
 end  
   
   
@@ -557,7 +575,6 @@ function sequence_clock(rate)
 end
 
 
-
 --Clock used to redraw screen every second for arranger countdown timer
 function seconds_clock()
   while true do
@@ -572,32 +589,32 @@ function timing_clock()
   while true do
     clock.sync(1/64)
 
-    for i = #midi_note_off_queue, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
-      midi_note_off_queue[i][1] = midi_note_off_queue[i][1] - 1
-      if midi_note_off_queue[i][1] == 0 then
-        out_midi:note_off(midi_note_off_queue[i][2], 0, midi_note_off_queue[i][3]) -- note, vel, ch.
-        table.remove(midi_note_off_queue, i)
+    for i = #midi_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
+      midi_note_history[i][1] = midi_note_history[i][1] - 1
+      if midi_note_history[i][1] == 0 then
+        out_midi:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- note, vel, ch.
+        table.remove(midi_note_history, i)
       end
     end
     
-    for i = #engine_note_off_queue, 1, -1 do
-      engine_note_off_queue[i][1] = engine_note_off_queue[i][1] - 1
-      if engine_note_off_queue[i][1] == 0 then
-        table.remove(engine_note_off_queue, i)
+    for i = #engine_note_history, 1, -1 do
+      engine_note_history[i][1] = engine_note_history[i][1] - 1
+      if engine_note_history[i][1] == 0 then
+        table.remove(engine_note_history, i)
       end
     end
     
-    for i = #crow_note_off_queue, 1, -1 do
-      crow_note_off_queue[i][1] = crow_note_off_queue[i][1] - 1
-      if crow_note_off_queue[i][1] == 0 then
-        table.remove(crow_note_off_queue, i)
+    for i = #crow_note_history, 1, -1 do
+      crow_note_history[i][1] = crow_note_history[i][1] - 1
+      if crow_note_history[i][1] == 0 then
+        table.remove(crow_note_history, i)
       end
     end
     
-    for i = #jf_note_off_queue, 1, -1 do
-      jf_note_off_queue[i][1] = jf_note_off_queue[i][1] - 1
-      if jf_note_off_queue[i][1] == 0 then
-        table.remove(jf_note_off_queue, i)
+    for i = #jf_note_history, 1, -1 do
+      jf_note_history[i][1] = jf_note_history[i][1] - 1
+      if jf_note_history[i][1] == 0 then
+        table.remove(jf_note_history, i)
       end
     end
     -- clock.sync(1/64)
@@ -886,50 +903,31 @@ end
 
 function to_engine(source, note)
   local note_on_time = util.time()
-  local amp = params:get(source..'_pp_amp')
-  local cutoff = params:get(source..'_pp_cutoff')
-  local gain = params:get(source..'_pp_gain')
-  local pw = params:get(source..'_pp_pw')
-  local release = duration_sec(params:get(source..'_duration'))
-  local duration = duration_int(params:get(source..'_duration'))
-    
--- Default note handling where repeat notes retrigger and use the longer duration value
-  if params:string('repeat_notes') == 'Retrigger' then
-    engine.amp(amp / 100)
-    engine.cutoff(cutoff)
-    engine.release(release)
-    engine.gain(gain / 100)
-    engine.pw(pw / 100)
-    engine.hz(music.note_num_to_freq(note + 36))    
-    engine_note_off_insert = true
-    for i = 1, #engine_note_off_queue do
-      if engine_note_off_queue[i][2] == note then
-        engine_note_off_insert = false
+  engine_play_note = true
+  engine_note_history_insert = true  
+  
+  -- Check for duplicate notes and process according to repeat_notes setting
+  for i = 1, #engine_note_history do
+    if engine_note_history[i][2] == note then
+      engine_note_history_insert = false -- Don't insert or update note record since one is already there
+      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - engine_note_history[i][3]) < dedupe_threshold_s then
+        engine_play_note = false
       end
     end
-    if engine_note_off_insert == true then
-      table.insert(engine_note_off_queue, {duration, note, note_on_time})
-    end
-
--- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
-  elseif params:string('repeat_notes') == 'Dedupe' then
-    engine_play_note = true
-    for i = 1, #engine_note_off_queue do
-      if engine_note_off_queue[i][2] == note then
-        if (note_on_time - engine_note_off_queue[i][3]) < dedupe_threshold_s then
-          engine_play_note = false
-        end
-      end
-    end
-    if engine_play_note == true then
-      engine.amp(amp / 100)
-      engine.cutoff(cutoff)
-      engine.release(release)
-      engine.gain(gain / 100)
-      engine.pw(pw / 100)
-      engine.hz(music.note_num_to_freq(note + 36))
-      table.insert(engine_note_off_queue, {duration, note, note_on_time})
-    end
+  end
+  
+  if engine_play_note == true then
+    engine.amp(params:get(source..'_pp_amp') / 100)
+    engine.cutoff(params:get(source..'_pp_cutoff'))
+    engine.release(duration_sec(params:get(source..'_duration')))
+    engine.gain(params:get(source..'_pp_gain') / 100)
+    engine.pw(params:get(source..'_pp_pw') / 100)
+    engine.hz(music.note_num_to_freq(note + 36))
+  end
+  
+  if engine_note_history_insert == true then
+    -- Subbing dedupe_threshold_int for duration for engine out. Only used to make sure record is kept long enough to do a dedupe check.
+    table.insert(engine_note_history, {dedupe_threshold_int, note, note_on_time})    
   end
 end
 
@@ -937,68 +935,45 @@ end
 function to_midi(note, velocity, channel, duration)
   local midi_note = note + 36
   local note_on_time = util.time()
+  midi_play_note = true
+  midi_note_history_insert = true
   
--- Default note handling where repeat notes retrigger and use the longer duration value
-  if params:string('repeat_notes') == 'Retrigger' then
-    midi_note_off_insert = true
+  -- Check for duplicate notes and process according to repeat_notes setting
+  for i = 1, #midi_note_history do
+    if midi_note_history[i][2] == midi_note and midi_note_history[i][3] == channel then
+      midi_note_history[i][1] = math.max(duration, midi_note_history[i][1]) -- Preserves longer note-off duration
+      midi_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
+      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - midi_note_history[i][4]) < dedupe_threshold_s then
+        midi_play_note = false -- Prevent duplicate note from playing
+      end
+    end
+  end
+  
+  -- Play note and insert new note-on record if appropriate
+  if midi_play_note == true then
     out_midi:note_on((midi_note), velocity, channel)
-    for i = 1, #midi_note_off_queue do    -- Fix: this would prob be faster if we just indexed the table with channel + note
-      if midi_note_off_queue[i][2] == midi_note and midi_note_off_queue[i][3] == channel then
-        midi_note_off_queue[i][1] = math.max(duration, midi_note_off_queue[i][1]) -- Preserves longer note-off.
-        midi_note_off_insert = false
-      end
-    end
-    if midi_note_off_insert == true then
-      table.insert(midi_note_off_queue, {duration, midi_note, channel, note_on_time})
-    end
-  
--- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
-  elseif params:string('repeat_notes') == 'Dedupe' then
-    midi_play_note = true
-    for i = 1, #midi_note_off_queue do
-      if midi_note_off_queue[i][2] == midi_note and midi_note_off_queue[i][3] == channel then
-        if (note_on_time - midi_note_off_queue[i][4]) < dedupe_threshold_s then
-          midi_note_off_queue[i][1] = math.max(duration, midi_note_off_queue[i][1]) -- Preserves longer note-off.
-          midi_play_note = false
-        end
-      end
-    end
-    if midi_play_note == true then
-      out_midi:note_on((midi_note), velocity, channel)
-      table.insert(midi_note_off_queue, {duration, midi_note, channel, note_on_time})
-    end
+  end
+  if midi_note_history_insert == true then
+    table.insert(midi_note_history, {duration, midi_note, channel, note_on_time})
   end
 end
 
 
 function to_crow(source, note)
-    local note_on_time = util.time()
-    crow_play_note = true
-    crow_note_off_insert = true
-    local duration = duration_int(params:get(source..'_duration'))
-    
--- Default note handling where repeat notes retrigger and use the longer duration value
-  if params:string('repeat_notes') == 'Retrigger' then
-    for i = 1, #crow_note_off_queue do
-      if crow_note_off_queue[i][2] == note then
-        -- crow_note_off_queue[i][1] = math.max(duration, crow_note_off_queue[i][1])
-        crow_note_off_insert = false
-      end
-    end
+  local note_on_time = util.time()
+  crow_play_note = true
+  crow_note_history_insert = true
 
--- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
-  elseif params:string('repeat_notes') == 'Dedupe' then
-    -- crow_play_note = true
-    for i = 1, #crow_note_off_queue do
-      if crow_note_off_queue[i][2] == note then
-        if (note_on_time - crow_note_off_queue[i][3]) < dedupe_threshold_s then
-          crow_play_note = false
-          crow_note_off_insert = false
-        end
+  -- Check for duplicate notes and process according to repeat_notes setting
+  for i = 1, #crow_note_history do
+    if crow_note_history[i][2] == note then
+      crow_note_history_insert = false -- Don't insert or update note record since one is already there
+      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - crow_note_history[i][3]) < dedupe_threshold_s then
+        crow_play_note = false
       end
     end
   end
-  
+
   --Play the note
   if crow_play_note == true then
     crow.output[1].volts = (note) / 12
@@ -1008,19 +983,20 @@ function to_crow(source, note)
     else -- envelope
       local crow_attack = duration_sec(params:get(source..'_duration')) * params:get(source..'_ar_skew') / 100
       local crow_release = duration_sec(params:get(source..'_duration')) * (100 - params:get(source..'_ar_skew')) / 100
-      crow.output[2].action = 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)'  -- (attack,release,shape) SHAPE == VOLTS?
+      crow.output[2].action = 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)'  -- (attack,release,shape) SHAPE is bugged?
     end
-    crow.output[2]() --pulse defined in init    
+    crow.output[2]()
   end
   
   -- Insert note-off into the queue
-  if crow_note_off_insert == true then
-    table.insert(crow_note_off_queue, {duration, note, note_on_time})
+  if crow_note_history_insert == true then
+    -- Subbing dedupe_threshold_int for duration for crow out. Only used to make sure record is kept long enough to do a dedupe check.
+    table.insert(crow_note_history, {dedupe_threshold_int, note, note_on_time})
   end
 end
 
 
---WIP for estimating JF's envelope time using regression.
+--WIP for estimating JF's envelope time using regression. Doesn't update on call though because of an issue with crow.ii.jf.event?
 -- crow.ii.jf.event = function( e, value )
 --   if e.name == 'time' then
 --     jf_time_v = value
@@ -1036,36 +1012,26 @@ end
 
 function to_jf(source, note, amp)
   local note_on_time = util.time()
-  local duration = duration_int(params:get(source..'_duration'))
-  
--- Default note handling where repeat notes retrigger and use the longer duration value
-  if params:string('repeat_notes') == 'Retrigger' then
-    crow.ii.jf.play_note((note - 24)/12, amp)
-    jf_note_off_insert = true
-    for i = 1, #jf_note_off_queue do
-      if jf_note_off_queue[i][2] == note then
-        -- jf_note_off_queue[i][1] = math.max(duration, jf_note_off_queue[i][1])
-        jf_note_off_insert = false
-      end
-    end
-    if jf_note_off_insert == true then
-      table.insert(jf_note_off_queue, {duration, note, note_on_time})
-    end
+  jf_play_note = true
+  jf_note_history_insert = true 
 
--- Dedupe note handling prevents the same note from being retriggered if it occurs within the dedupe_threshold (currently tempo based)
-  elseif params:string('repeat_notes') == 'Dedupe' then
-    jf_play_note = true
-    for i = 1, #jf_note_off_queue do
-      if jf_note_off_queue[i][2] == note then
-        if (note_on_time - jf_note_off_queue[i][3]) < dedupe_threshold_s then
-          jf_play_note = false
-        end
+  -- Check for duplicate notes and process according to repeat_notes setting
+  for i = 1, #jf_note_history do
+    if jf_note_history[i][2] == note then
+      jf_note_history_insert = false -- Don't insert or update note record since one is already there
+      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - jf_note_history[i][3]) < dedupe_threshold_s then
+        jf_play_note = false
       end
     end
-    if jf_play_note == true then
-      crow.ii.jf.play_note((note - 24)/12, amp)
-      table.insert(jf_note_off_queue, {duration, note, note_on_time})
-    end
+  end
+  
+  if jf_play_note == true then
+    crow.ii.jf.play_note((note - 24)/12, amp)
+  end
+  
+  if jf_note_history_insert == true then
+    -- Subbing dedupe_threshold_int for duration for engine out. Only used to make sure record is kept long enough to do a dedupe check.
+  table.insert(jf_note_history, {dedupe_threshold_int, note, note_on_time})    
   end
 end
 
