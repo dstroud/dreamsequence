@@ -166,7 +166,7 @@ function init()
   params:add_option("midi_tr_env", "Crow out 2", {'Trigger','AR env.'},1)
     params:set_action("midi_tr_env",function() menu_update() end)
   params:add_number('midi_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('midi_duration', 'Duration', 0, 6, 3, function(param) return duration_string(param:get()) end)
+  params:add_number('midi_duration', 'Duration', 1, 6, 3, function(param) return duration_string(param:get()) end)
   params:add_number('midi_octave','Octave',-2, 4, 0)
   params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   -- params:add_option("midi_", "Crow out 2", {'Trigger','AR env.'},1)
@@ -840,52 +840,14 @@ end
 
 
 function sample_crow(volts)
-  local note = round(volts * 12,0) + 1
+  local note = quantize_note(round(volts * 12, 0) + 1, 'crow')
   
-  -- -- Crow-specific dedupe logic here. To-do pending re-work of note handler
-  --   if 
-  -- source ~= 'crow'   -- Logic for auto-rest
-  -- or chord_seq_retrig == true 
-  -- or params:get('do_crow_auto_rest') == 0 
-  -- or (params:get('do_crow_auto_rest') == 1 and (prev_harmonizer_note ~= harmonizer_note)) then
-  --     if destination == 'Engine' then
-  --       engine.amp(amp / 100)
-  --       engine.cutoff(cutoff)
-  --       engine.release(release)
-  --       engine.gain(gain / 100)
-  --       engine.pw(pw / 100)
-  --       engine.hz(music.note_num_to_freq(harmonizer_note + 36))
-  --     elseif destination == 'Crow' then
-  --       crow.output[1].volts = (harmonizer_note) / 12
-  --       --pulse this
-  --       crow.output[2].slew = 0
-  --       crow.output[2]() --pulse defined in init
-  --       -- crow.output[2].volts = 8
-  --       -- crow.output[2].slew = 0.005
-  --       -- crow.output[2].volts = 0
-  --     elseif destination == 'MIDI' then
-  --       harmonizer_note_off_insert = true
-  --       out_midi:note_on((harmonizer_note + 36), velocity, channel)
-  --       for i = 1, #midi_note_off_queue do
-  --         if midi_note_off_queue[i][2] == harmonizer_note + 36 and midi_note_off_queue[i][3] == channel then
-  --           midi_note_off_queue[i][1] = duration
-  --           harmonizer_note_off_insert = false
-  --         end
-  --       end
-  --       if harmonizer_note_off_insert == true then
-  --         table.insert(midi_note_off_queue, {duration, harmonizer_note + 36, channel})
-  --       end
-  --     end
-  --   end
-  -- if source == 'crow' then
-  --   if chord_seq_trig == true then -- Check if this is used for anything other than auto-rest
-  --     chord_seq_retrig = false
-  --   end
-  --   prev_harmonizer_note = harmonizer_note
-  -- end
-
-  
-  local note = quantize_note(note, 'crow')
+  -- Blocks duplicate notes within a chord step so rests can be added to simple CV sources
+  if chord_seq_retrig == true
+  or params:get('do_crow_auto_rest') == 0 
+  or (params:get('do_crow_auto_rest') == 1 and (prev_note ~= note)) then
+    
+    -- Play the note
     local destination = params:string('crow_dest')
     if destination == 'Engine' then
       to_engine('crow', note)
@@ -896,8 +858,10 @@ function sample_crow(volts)
     elseif destination =='ii-JF' then
       to_jf('crow',note, params:get('crow_jf_amp')/10)
     end
+  end
   
-  chord_seq_retrig = false -- Check this to make sure it's working correct
+  prev_note = note
+  chord_seq_retrig = false -- Resets at chord advance
 end
 
 
