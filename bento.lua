@@ -27,8 +27,91 @@ out_midi = midi.connect(1) -- To-do: multiple MIDI in/out
 
 function init()
   crow.ii.jf.mode(1)
+  
+  --These need to be banged out from param but I get errors
+  chord_div = 192
+  arp_div = 24
+  
   params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with Bento's clock
 
+
+  -- Clock divisions
+  -- divisions =
+  -- {2,3,4,6,8,12,16,24,32,48,64,96,128,144,192,240,256,288,320,336,384,432,448,480,512,528,576,624,640,672,704,720,768,816,832,864,896,912,960,1008,1024,1056,1088,1104,1152,1200,1216,1248,1280,1296,1344,1392,1408,1440,1472,1488,1536}
+  
+  
+
+  -- Used for clock modulo (maybe durations too?)
+    -- standard_divisions =  {
+    division_names =  {
+                          {2, '1/64T'},
+                          {3, '1/64'},
+                          {4, '1/32T'},
+                          {6, '1/32'},
+                          {8, '1/16T'},
+                          {12, '1/16'},
+                          {16, '1/8T'},
+                          {24, '1/8'},
+                          {32, '1/4T'},
+                          {48, '1/4'},
+                          {64, '1/3'},
+                          {96, '1/2'},
+                          {128, '2/3'},
+                          {144, '3/4'},
+                          {192, '1'},
+                          {240, '1 1/4'},
+                          {256, '1 1/3'},
+                          {288, '1 1/2'},
+                          {320, '1 2/3'},
+                          {336, '1 3/4'},
+                          {384, '2'},
+                          {432, '2 1/4'},
+                          {448, '2 1/3'},
+                          {480, '2 1/2'},
+                          {512, '2 2/3'},
+                          {528, '2 3/4'},
+                          {576, '3'},
+                          {624, '3 1/4'},
+                          {640, '3 1/3'},
+                          {672, '3 1/2'},
+                          {704, '3 2/3'},
+                          {720, '3 3/4'},
+                          {768, '4'},
+                          {816, '4 1/4'},
+                          {832, '4 1/3'},
+                          {864, '4 1/2'},
+                          {896, '4 2/3'},
+                          {912, '4 3/4'},
+                          {960, '5'},
+                          {1008, '5 1/4'},
+                          {1024, '5 1/3'},
+                          {1056, '5 1/2'},
+                          {1088, '5 2/3'},
+                          {1104, '5 3/4'},
+                          {1152, '6'},
+                          {1200, '6 1/4'},
+                          {1216, '6 1/3'},
+                          {1248, '6 1/2'},
+                          {1280, '6 2/3'},
+                          {1296, '6 3/4'},
+                          {1344, '7'},
+                          {1392, '7 1/4'},
+                          {1408, '7 1/3'},
+                          {1440, '7 1/2'},
+                          {1472, '7 2/3'},
+                          {1488, '7 3/4'},
+                          {1536, '8'}}
+    
+  -- If we want access to all the timing divisors to get weird
+  -- divisions = {}
+  -- for i = 1,1536 do
+  --   divisions[i] = i
+  -- end
+    
+  -- for i = 1,#standard_divisions do
+  -- divisions[standard_divisions[i][1]] = standard_divisions[i][2] 
+  -- end
+    
   -- Duration name, clock tics, beat multiplier. Triplet vals? To-do: assign calculation of seconds to clock_tempo action.
   durations = {
     {'1/64', 4, .0625, 64},
@@ -81,7 +164,11 @@ function init()
   
   --Chord params
   params:add_separator ('Chord')
-  params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,64,96,128,192,256
+
+  -- params:add_number('chord_div_index', 'Division', 2, 1536, 4, function(param) return divisions_string(param:get()) end)
+  params:add_number('chord_div_index', 'Division', 1, 57, 15, function(param) return divisions_string(param:get()) end)
+    params:set_action('chord_div_index',function() set_div('chord') end)
+
   params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
     params:set_action("chord_dest",function() menu_update() end)
   params:add{
@@ -117,7 +204,11 @@ function init()
 
   --Arp params
   params:add_separator ('Arp')
-  params:add_number('arp_div', 'Division', 1, 256, 4) --most useful {1,2,4,8,16,24,32}
+  
+  params:add_number('arp_div_index', 'Division', 1, 57, 8, function(param) return divisions_string(param:get()) end)
+    params:set_action('arp_div_index',function() set_div('arp') end)
+    
+  -- params:add_number('arp_div', 'Division', 2, 1536, 4)--, function(param) return divisions_string(param:get()) end)
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
@@ -212,6 +303,10 @@ function init()
   params:add_number('crow_octave','Octave',-2, 4, 0)
   params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   
+  -- menu_update()    
+  -- params:bang()  -- Why the hell doesn't this work?
+
+
   glyphs = {
     {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}}, --repeat glyph     
     {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}},} --one-shot glyph
@@ -258,7 +353,7 @@ function init()
   view_key_count = 0
   keys = {}
   key_count = 0
-  global_clock_div = 8
+  global_clock_div = 48
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
     for i = 1,8 do
@@ -286,7 +381,8 @@ function init()
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   get_next_chord() -- Placeholder for when table loading from file is implemented
-  grid_dirty = true
+  -- grid_dirty = true
+  params:bang()
   grid_redraw()
   redraw()
 end
@@ -303,22 +399,22 @@ function menu_update()
   
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[3] = {'chord_dest', 'chord_div', 'chord_type', 'chord_octave'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[3] = {'chord_dest', 'chord_div', 'chord_duration', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_duration', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div', 'chord_duration', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
+    menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[3] = {'chord_dest', 'chord_div', 'chord_type', 'chord_octave', 'chord_jf_amp'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
   end
   
   --arp menus
   if params:string('arp_dest') == 'None' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_chord_type', 'arp_octave'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
       menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
@@ -326,7 +422,7 @@ function menu_update()
       menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
   end
   
     --MIDI menus
@@ -376,6 +472,15 @@ end
 
 function first_to_upper(str)
     return (str:gsub("^%l", string.upper))
+end
+
+function divisions_string(index)
+    return(division_names[index][2])
+end
+
+--Creates a variable for each source's div. consolidate with formatter function but I think this is called less frequently?
+function set_div(source)
+  _G[source .. '_div'] = division_names[params:get(source .. '_div_index')][1]
 end
 
 function duration_string(index)
@@ -527,29 +632,59 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
   return(chord_type)
 end
 
-
+ -- To-do: evaluate efficiency of having separate clocks, one for tuplets and one for standard meter
  --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
-function sequence_clock(rate)
+function sequence_clock()
   while transport_active do
-    clock.sync(1/8)
+ 
+-- divisions =    
+--     {2,'1/64T'},
+--     {3,'1/64'},
+--     {4,'1/32T'},
+--     {6,'1/32'},
+--     {8,'1/16T'},
+--     {12,'1/16'},
+--     {16,'1/8T'},
+--     {24,'1/8'},
+--     {32,'1/4T'},
+--     {48,'1/4'},
+--     {72,'1/2T'},
+--     {96,'1/2'},
+--     {192,'Whole'}
+--     --{,''}
+    
+    -- Option 1: 
+    -- 1 measure = 4 beats * 24 steps = 96 steps per measure.
+    -- Lowest mod divisor used is 2 or 1/32T
+    -- clock.sync(1/24)
 
+    -- Option 2: 
+    -- 1 measure = 4 beats * 48 steps = 192 steps per measure.
+    -- Lowest mod divisor used is 2 or 1/64T
+    clock.sync(1/48)
+    
+    
     -- clock_step is tied to chord_div which means arp rate can't ever be slower than chord. Hmm....
-    -- clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
+    -- clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div_index') - 1)
     
     -- Modifying so arp can be slower than chord. #seemsfine
-    clock_step = util.wrap(clock_step + 1, 0, 31)
-    -- print(clock_step)
+    -- clock_step = util.wrap(clock_step + 1, 0, 63)
+    clock_step = clock_step + 1
+  
+
+  
+    if util.wrap(clock_step + 1, 0, chord_div - 1) % chord_div == 0 then
     
-    if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
+    -- if util.wrap(clock_step + 1, 0, params:get('chord_div_index') - 1) % params:get('chord_div_index') == 0 then
       get_next_chord()
     end
-    if clock_step % params:get('chord_div') == 0 then
+    if clock_step % chord_div == 0 then
       advance_chord_seq()
       grid_dirty = true
       redraw() -- Update chord readout
     end
-    
-    if clock_step % params:get('arp_div') == 0 then
+
+    if clock_step % arp_div == 0 then
       if params:string('arp_mode') == 'Loop' or play_arp then
         advance_arp_seq()
         grid_dirty = true      
@@ -564,6 +699,7 @@ function sequence_clock(rate)
       grid_redraw()
       grid_dirty = false
     end
+
   end
 end
 
@@ -627,7 +763,7 @@ function clock.transport.start()
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
   
   -- Clock for chord/arp/arranger sequences
-  sequence_clock_id = clock.run(sequence_clock, global_clock_div) --8 == global clock at 32nd notes
+  sequence_clock_id = clock.run(sequence_clock)-- , global_clock_div) --8 == global clock at 32nd notes
   
   
   --Clock used to refresh screen once a second for the arranger countdown timer
@@ -1360,18 +1496,19 @@ end
 
    
 function chord_steps_to_seconds(steps)
-  return(steps * 60 / params:get('clock_tempo') / global_clock_div * params:get('chord_div'))
+  return(steps * 60 / params:get('clock_tempo') / global_clock_div * chord_div) -- switched to var
 end
 
+-- TEMP DISABLED
 -- Truncates hours. Requires integer.
 function s_to_min_sec(s)
-  local m = math.floor(s/60)
-  -- local h = math.floor(m/60)
-  m = m%60
-  s = s%60
-  return string.format("%02d",m) ..":".. string.format("%02d",s)
+--   local m = math.floor(s/60)
+--   -- local h = math.floor(m/60)
+--   m = m%60
+--   s = s%60
+--   return string.format("%02d",m) ..":".. string.format("%02d",s)
+return(1)
 end
-
 
 function param_formatter(param)
   if param == 'source' then
@@ -1466,8 +1603,8 @@ function redraw()
 
   for i = pattern_pos, pattern_seq_length do
     steps_elapsed = (i == pattern_pos and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
-    percent_step_elapsed = (math.max(clock_step,0) % params:get('chord_div') / (params:get('chord_div')-1)) -- % of current chord step elapsed
-    -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div') / (params:get('chord_div')-1)) -- % of current chord step remaining
+    percent_step_elapsed = (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
+    -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1)) -- % of current chord step remaining
     steps_remaining_in_pattern = pattern_length[pattern_seq[i]] - steps_elapsed  --rect_w
     steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
     seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
@@ -1554,7 +1691,7 @@ function randomize()
 
   
   --CHORD PROGRESSION ALGOS
-  chord_algo = 7 --math.random(1,6)
+  chord_algo =  math.random(1,4)
   
   if chord_algo == 1 then
     -- I-V-vi-IV based progression ****
@@ -1605,82 +1742,9 @@ function randomize()
       --   chord_seq[pattern][1].o = 1 --octave 
       -- end
     end
-  
- 
-  elseif chord_algo == 3 then
-    -- ii-iii-IV-V based progression ***
-    print('Chord algo: ii-iii-IV-V based progression')
-    local modes = {1,5,8,9} --Preferred but kinda optional
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {2,3,4,5}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-    
-
-  elseif chord_algo == 4 then
-    -- I-ii-iii-IV based progression ***
-    print('Chord algo: I-ii-iii-IV based progression')
-    local modes = {1,5,6,7,9} --Preferred but kinda optional
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {1,2,3,4}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
     
     
-  elseif chord_algo == 5 then  
-    -- Andalusian cadence **
-    local mode = percent_chance(50) and 6 or 2 --Phyrigian or natural minor
-    params:set('mode', mode)
-    print('Chord algo: Andalusian cadence, ' .. params:string('mode'))
-    local progression = {4,3,2,1}
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i] + (params:string('mode') == 'Natural Minor' and 4 or 0)
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-  
-  
-    elseif chord_algo == 6 then
-    -- I-ii-iii-IV-V based progression ***
-    print('Chord algo: I-ii-iii-IV-V based progression')
-    local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {1,2,3,4,5}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-    
- 
-     elseif chord_algo == 7 then
+     elseif chord_algo == 3 then
     -- I-vi based major progression ***
     print('Chord algo: I-vi based major progression')
     -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
@@ -1696,10 +1760,10 @@ function randomize()
       chord_seq[pattern][i].o = math.floor(x / 8) --octave
     end  
     rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-    
-    
-  elseif chord_algo == 8 then  
+    transpose_pattern(math.random() >= .5 and 7 or 0)    
+  
+ 
+    elseif chord_algo == 4 then  
     -- Some weird mostly random stuff
     print('Chord algo: Weird random chords')
     random_pattern_lengths = {3,4,6,8}
@@ -1732,6 +1796,80 @@ function randomize()
       chord_seq[pattern][random_pattern_length].o = math.floor(random_1_14 / 8) --octave
     end
   end
+  
+  -- elseif chord_algo == 3 then
+  --   -- ii-iii-IV-V based progression ***
+  --   print('Chord algo: ii-iii-IV-V based progression')
+  --   local modes = {1,5,8,9} --Preferred but kinda optional
+  --   params:set('mode', modes[math.random(1,4)])
+  --   local progression = {2,3,4,5}
+  --   local progression = shuffle(progression)
+  --   pattern_length[pattern] = 4
+  --   clear_chord_pattern()
+  --   for i = 1, pattern_length[pattern] do
+  --     local x = progression[i]
+  --     chord_seq[pattern][i].x = x --raw key x coordinate
+  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
+  --   end  
+  --   rotate_pattern(math.random(0, 3))
+  --   transpose_pattern(math.random() >= .5 and 7 or 0)
+
+  
+  
+    -- elseif chord_algo == 4 then
+    -- -- I-ii-iii-IV-V based progression ***
+    -- print('Chord algo: I-ii-iii-IV-V based progression')
+    -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
+    -- params:set('mode', modes[math.random(1,4)])
+    -- local progression = {1,2,3,4,5}
+    -- local progression = shuffle(progression)
+    -- pattern_length[pattern] = 4
+    -- clear_chord_pattern()
+    -- for i = 1, pattern_length[pattern] do
+    --   local x = progression[i]
+    --   chord_seq[pattern][i].x = x --raw key x coordinate
+    --   chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+    --   chord_seq[pattern][i].o = math.floor(x / 8) --octave
+    -- end  
+    -- rotate_pattern(math.random(0, 3))
+    -- transpose_pattern(math.random() >= .5 and 7 or 0)
+    
+    
+      -- elseif chord_algo == 4 then
+  --   -- I-ii-iii-IV based progression ***
+  --   print('Chord algo: I-ii-iii-IV based progression')
+  --   local modes = {1,5,6,7,9} --Preferred but kinda optional
+  --   params:set('mode', modes[math.random(1,4)])
+  --   local progression = {1,2,3,4}
+  --   local progression = shuffle(progression)
+  --   pattern_length[pattern] = 4
+  --   clear_chord_pattern()
+  --   for i = 1, pattern_length[pattern] do
+  --     local x = progression[i]
+  --     chord_seq[pattern][i].x = x --raw key x coordinate
+  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
+  --   end  
+  --   rotate_pattern(math.random(0, 3))
+  --   transpose_pattern(math.random() >= .5 and 7 or 0)
+  
+  --   elseif chord_algo == 5 then  
+  --   -- Andalusian cadence *
+  --   local mode = percent_chance(50) and 6 or 2 --Phyrigian or natural minor
+  --   params:set('mode', mode)
+  --   print('Chord algo: Andalusian cadence, ' .. params:string('mode'))
+  --   local progression = {4,3,2,1}
+  --   pattern_length[pattern] = 4
+  --   clear_chord_pattern()
+  --   for i = 1, pattern_length[pattern] do
+  --     local x = progression[i] + (params:string('mode') == 'Natural Minor' and 4 or 0)
+  --     chord_seq[pattern][i].x = x --raw key x coordinate
+  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
+  --   end  
+    
+    
                   
   
   --ARP
@@ -1834,13 +1972,13 @@ function randomize()
 
 
   params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
-  local random_divisions = {16,24,32} --{12,16,20,24,28,32}
-  params:set('chord_div', random_divisions[math.random(1,3)] - (percent_chance(20) and 4 or 0)) -- Mostly standard
+  local random_divisions = {16,32,12,20,24,28,32}
+  params:set('chord_div_index', random_divisions[math.random(1,2) + (percent_chance(10) and math.random(1,5) or 0)]) -- Mostly standard
   params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
   -- tie arp modulo to chord?
   -- local random_divisions = {1,2,3,4,6,8,12,16,20,24,28,32} 
   local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
-  params:set('arp_div', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
+  params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
   
   --ENGINE BASED RANDOMIZATIONS
   params:set('chord_pp_amp', 50)
