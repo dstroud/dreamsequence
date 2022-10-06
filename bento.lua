@@ -27,22 +27,9 @@ out_midi = midi.connect(1) -- To-do: multiple MIDI in/out
 
 function init()
   crow.ii.jf.mode(1)
-  
-  --These need to be banged out from param but I get errors
-  chord_div = 192
-  arp_div = 24
-  
   params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with Bento's clock
 
-
-  -- Clock divisions
-  -- divisions =
-  -- {2,3,4,6,8,12,16,24,32,48,64,96,128,144,192,240,256,288,320,336,384,432,448,480,512,528,576,624,640,672,704,720,768,816,832,864,896,912,960,1008,1024,1056,1088,1104,1152,1200,1216,1248,1280,1296,1344,1392,1408,1440,1472,1488,1536}
-  
-  
-
   -- Used for clock modulo (maybe durations too?)
-    -- standard_divisions =  {
     division_names =  {
                           {2, '1/64T'},
                           {3, '1/64'},
@@ -102,15 +89,6 @@ function init()
                           {1488, '7 3/4'},
                           {1536, '8'}}
     
-  -- If we want access to all the timing divisors to get weird
-  -- divisions = {}
-  -- for i = 1,1536 do
-  --   divisions[i] = i
-  -- end
-    
-  -- for i = 1,#standard_divisions do
-  -- divisions[standard_divisions[i][1]] = standard_divisions[i][2] 
-  -- end
     
   -- Duration name, clock tics, beat multiplier. Triplet vals? To-do: assign calculation of seconds to clock_tempo action.
   durations = {
@@ -1496,18 +1474,16 @@ end
 
    
 function chord_steps_to_seconds(steps)
-  return(steps * 60 / params:get('clock_tempo') / global_clock_div * chord_div) -- switched to var
+  return(steps * 60 / params:get('clock_tempo') / global_clock_div * chord_div) -- switched to var Fix: timing
 end
 
--- TEMP DISABLED
 -- Truncates hours. Requires integer.
 function s_to_min_sec(s)
---   local m = math.floor(s/60)
---   -- local h = math.floor(m/60)
---   m = m%60
---   s = s%60
---   return string.format("%02d",m) ..":".. string.format("%02d",s)
-return(1)
+  local m = math.floor(s/60)
+  -- local h = math.floor(m/60)
+  m = m%60
+  s = s%60
+  return string.format("%02d",m) ..":".. string.format("%02d",s)
 end
 
 function param_formatter(param)
@@ -1678,6 +1654,21 @@ end
     
 function randomize()
   
+  params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
+  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
+    
+    
+  -- These can be overwritten by individual algorithms
+  -- local random_divisions = {16,32,12,20,24,28,32}
+  -- params:set('chord_div_index', random_divisions[math.random(1,2) + (percent_chance(10) and math.random(1,5) or 0)]) -- Mostly standard
+
+  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
+  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
+  arp_pattern_length[1] = math.random(3,4) * (percent_chance(70) and 2 or 1)
+  tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
+  params:set('arp_div_index', (math.random(3,6) * 2) - tuplet_shift)
+
+  
   --SEQUENCE RANDOMIZATION
   
   params:set('transpose', math.random(-12,12))
@@ -1689,6 +1680,19 @@ function randomize()
   end
   params:set('mode', math.random(1,9))
 
+  
+  --ENGINE BASED RANDOMIZATIONS
+  -- May be overwritten depending on algo type
+  params:set('chord_pp_amp', 50)
+  params:set('chord_pp_gain', math.random(0,350))
+  params:set('chord_pp_pw', math.random(10,90))
+  params:set('chord_duration', 7) -- Whole note just works better for PolyPerc math.random(5,6))
+  params:set('arp_pp_amp', 70)
+  params:set('arp_pp_gain', math.random(0,350))
+  params:set('arp_pp_pw', math.random(10,90))
+  params:set('arp_duration', math.random(4,6))
+  params:set('arp_mode', 1) -- Disabling unless enabled by specific algos, math.random(1,2))
+  
   
   --CHORD PROGRESSION ALGOS
   chord_algo =  math.random(1,4)
@@ -1881,7 +1885,7 @@ function randomize()
   local random_4_11 = math.random(4,11)   --arp note distribution center
   local random_1_14 = math.random(1,14)  
   
-  arp_pattern_length[1] = (math.random(1,4) * 2) + (percent_chance(20) and math.random(-1,1) or 0) -- Mostly even lengths
+  -- arp_pattern_length[1] = (math.random(1,4) * 2) + (percent_chance(20) and math.random(-1,1) or 0) -- Mostly even lengths
   random_note_offset = math.random (0,7)
   for i = 1,8 do --Wipe
     arp_seq[1][i] = 0
@@ -1902,7 +1906,7 @@ function randomize()
   until (arp_root ~= arp_offset)
 
 
-  random_arp_algo = math.random(1,6)
+  random_arp_algo = math.random(1,7)
 
   if random_arp_algo == 1 then
     -- ER 1-note + rests ****
@@ -1950,14 +1954,38 @@ function randomize()
       arp_seq[1][i] = arp_min - 1 + i
     end
 
-  elseif random_arp_algo == 5 then       
+
+    
+  elseif random_arp_algo == 5 then   
+    -- Strum up
+    print('Arp algo: Strum up')
+    
+    params:set('arp_mode', 2)
+    params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
+    params:set('arp_duration',7) -- To-do: fix once durations are updated
+    arp_pattern_length[1] = math.random(3,4) * 2
+
+    -- Strum speed from 1/64T to 1/32T
+    params:set('arp_div_index', math.random(1,5))
+    
+    for i = 1, arp_pattern_length[1] do
+      arp_seq[1][i] = arp_min - 1 + i
+    end   
+
+  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
+  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
+  
+  
+  
+
+  elseif random_arp_algo == 6 then       
     -- Sequential down
     print('Arp algo: Sequential down')
     for i = 1, arp_pattern_length[1] do
       arp_seq[1][i] = arp_max + 1 - i
     end
   
-  elseif random_arp_algo == 6 then       
+  elseif random_arp_algo == 7 then       
     -- Random with chance of ER mask
     print('Arp algo: Random with ER mask')
     for i = 1, arp_pattern_length[1] do
@@ -1970,26 +1998,26 @@ function randomize()
     end
   end
 
-
-  params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
-  local random_divisions = {16,32,12,20,24,28,32}
-  params:set('chord_div_index', random_divisions[math.random(1,2) + (percent_chance(10) and math.random(1,5) or 0)]) -- Mostly standard
-  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
-  -- tie arp modulo to chord?
-  -- local random_divisions = {1,2,3,4,6,8,12,16,20,24,28,32} 
-  local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
-  params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
+  -- Moving up
+  -- params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
+  -- local random_divisions = {16,32,12,20,24,28,32}
+  -- params:set('chord_div_index', random_divisions[math.random(1,2) + (percent_chance(10) and math.random(1,5) or 0)]) -- Mostly standard
+  -- params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
+  -- -- tie arp modulo to chord?
+  -- -- local random_divisions = {1,2,3,4,6,8,12,16,20,24,28,32} 
+  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
+  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
   
-  --ENGINE BASED RANDOMIZATIONS
-  params:set('chord_pp_amp', 50)
-  params:set('chord_pp_gain', math.random(0,350))
-  params:set('chord_pp_pw', math.random(10,90))
-  params:set('chord_duration', 7) -- Whole note just works better for PolyPerc math.random(5,6))
-  params:set('arp_pp_amp', 70)
-  params:set('arp_pp_gain', math.random(0,350))
-  params:set('arp_pp_pw', math.random(10,90))
-  params:set('arp_duration', math.random(4,6))
-  params:set('arp_mode', math.random(1,2))
+  -- --ENGINE BASED RANDOMIZATIONS
+  -- params:set('chord_pp_amp', 50)
+  -- params:set('chord_pp_gain', math.random(0,350))
+  -- params:set('chord_pp_pw', math.random(10,90))
+  -- params:set('chord_duration', 7) -- Whole note just works better for PolyPerc math.random(5,6))
+  -- params:set('arp_pp_amp', 70)
+  -- params:set('arp_pp_gain', math.random(0,350))
+  -- params:set('arp_pp_pw', math.random(10,90))
+  -- params:set('arp_duration', math.random(4,6))
+  -- params:set('arp_mode', math.random(1,2))
 
 
 
