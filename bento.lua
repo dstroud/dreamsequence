@@ -21,9 +21,13 @@ engine.name = "PolyPerc"
 music = require 'musicutil'
 ER = require("er")
 
+-- To-do, add options for selecting MIDI in/out ports
 in_midi = midi.connect(1)
 out_midi = midi.connect(1) -- To-do: multiple MIDI in/out
 
+-- Sends midi transport messages on the same 'midi out' port used for system clock
+-- If Off in system clock params, it will send to port 1
+transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
 
 function init()
   crow.ii.jf.mode(1)
@@ -614,32 +618,22 @@ end
  --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
   while transport_active do
- 
--- divisions =    
---     {2,'1/64T'},
---     {3,'1/64'},
---     {4,'1/32T'},
---     {6,'1/32'},
---     {8,'1/16T'},
---     {12,'1/16'},
---     {16,'1/8T'},
---     {24,'1/8'},
---     {32,'1/4T'},
---     {48,'1/4'},
---     {72,'1/2T'},
---     {96,'1/2'},
---     {192,'Whole'}
---     --{,''}
     
-    -- Option 1: 
-    -- 1 measure = 4 beats * 24 steps = 96 steps per measure.
-    -- Lowest mod divisor used is 2 or 1/32T
-    -- clock.sync(1/24)
-
-    -- Option 2: 
-    -- 1 measure = 4 beats * 48 steps = 192 steps per measure.
-    -- Lowest mod divisor used is 2 or 1/64T
-    clock.sync(1/48)
+    clock.sync(1/48)    -- To-do: set to global var
+    
+    if start == true then
+      -- Send out MIDI start/continue messages
+      if params:get('clock_midi_out') ~= 1 then 
+        if clock_start_method == 'start' then
+          transport_midi:start()
+        else
+          transport_midi:continue()
+        end
+      end
+      clock_start_method = 'continue'
+      print("Clock "..sequence_clock_id.. " started")
+      start = false
+    end
     
     
     -- clock_step is tied to chord_div which means arp rate can't ever be slower than chord. Hmm....
@@ -647,7 +641,8 @@ function sequence_clock()
     
     -- Modifying so arp can be slower than chord. #seemsfine
     -- clock_step = util.wrap(clock_step + 1, 0, 63)
-    clock_step = clock_step + 1
+    
+    clock_step = util.wrap(clock_step + 1,0, 1535) -- Wrap prob not needed? 192 (1 measure) * 8, 0-indexed. 
   
 
   
@@ -748,16 +743,20 @@ function clock.transport.start()
   clock.cancel(seconds_clock_id or 0) 
   seconds_clock_id = clock.run(seconds_clock)
   
-  -- Send out MIDI start/continue messages
-  if params:get('clock_midi_out') ~= 1 then 
-    if clock_start_method == 'start' then
-      out_midi:start()
-    else
-      out_midi:continue()
-    end
-  end
-  clock_start_method = 'continue'
-  print("Clock "..sequence_clock_id.. " started")
+  -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+  start = true
+  
+-- Moving this to inside the sequence_clock do while loop so start doesn't come before clock sync  
+--   -- Send out MIDI start/continue messages
+--   if params:get('clock_midi_out') ~= 1 then 
+--     if clock_start_method == 'start' then
+--       transport_midi:start()
+--     else
+--       transport_midi:continue()
+--     end
+--   end
+--   clock_start_method = 'continue'
+--   print("Clock "..sequence_clock_id.. " started")
 end
 
 
@@ -765,7 +764,7 @@ function clock.transport.stop()
   print('Transport stopping')
   transport_active = false
   if params:get('clock_midi_out') ~= 1 then
-    out_midi:stop() --Stop vs continue?
+    transport_midi:stop() --Stop vs continue?
   end
   if params:get('clock_source') ~= 1 then -- External clock
     if params:get('arranger_enabled') == 1 then -- When following an external clock, reset arranegement.
