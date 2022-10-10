@@ -4,7 +4,7 @@
 -- KEY 2: Play/pause
 -- KEY 3: Toggle Arranger
 --
--- ENC 1: 
+-- ENC 1: Pages
 -- ENC 2: Scroll
 -- ENC 3: Edit value 
 --
@@ -17,27 +17,18 @@
 
 
 g = grid.connect()
-engine.name = "PolyPerc"
-music = require 'musicutil'
-ER = require("er")
+include("dreamsequence/lib/includes")
 
+
+-- To-do, add options for selecting MIDI in/out ports
 in_midi = midi.connect(1)
 out_midi = midi.connect(1) -- To-do: multiple MIDI in/out
-
+transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
 
 function init()
   crow.ii.jf.mode(1)
   params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with Bento's clock
 
-  -- Duration name, clock tics, beat multiplier. Triplet vals? To-do: assign calculation of seconds to clock_tempo action.
-  durations = {
-    {'1/64', 4, .0625, 64},
-    {'1/32', 8, .125, 32},
-    {'1/16', 16, .25, 16},
-    {'1/8', 32, .5, 8},
-    {'1/4', 64, 1, 4}, --clock.get_beat_sec() 
-    {'1/2', 128, 2, 2},
-    {'Whole', 256, 4, 1}}
 
   --Global params
   params:add_separator ('Global')
@@ -52,11 +43,11 @@ function init()
     formatter = function(param) return mode_index_to_name(param:get()) end,}
     params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
       params:set_action('repeat_notes',function() menu_update() end)
-    params:add_number('dedupe_threshold', ' Threshold', 1, 3, 2, function(param) return duration_string(param:get()) end)
-      params:set_action('dedupe_threshold', function() dedupe_threshold() end)
-      params:set_action('clock_tempo', function() dedupe_threshold() end)
-
-
+  params:add_number('dedupe_threshold', 'Threshold', 1, 10, division_to_index('1/32'), function(param) return divisions_string(param:get()) end)
+    params:set_action('dedupe_threshold', function(x) dedupe_threshold(x) end)
+  params:add_number('chord_preload', 'Chord preload', 1, 10, division_to_index('1/64'), function(param) return divisions_string(param:get()) end)
+    params:set_action('chord_preload', function(x) chord_preload(x) end)      
+      
   --Arrange params
   params:add_separator ('Arranger')
   params:add{
@@ -81,7 +72,9 @@ function init()
   
   --Chord params
   params:add_separator ('Chord')
-  params:add_number('chord_div', 'Division', 4, 128, 32) -- most useful {4,8,12,16,24,32,64,96,128,192,256
+  params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
+    params:set_action('chord_div_index',function() set_div('chord') end)
+
   params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
     params:set_action("chord_dest",function() menu_update() end)
   params:add{
@@ -110,14 +103,19 @@ function init()
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
     params:set_action("crow_pullup",function() crow_pullup() end)
-  params:add_number('chord_duration', 'Duration', 2, 7, 7, function(param) return duration_string(param:get()) end)
+    
+  params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
+    params:set_action('chord_duration_index',function() set_duration('chord') end)
+  
   params:add_number('chord_octave','Octave',-2, 4, 0)
   params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
 
 
   --Arp params
   params:add_separator ('Arp')
-  params:add_number('arp_div', 'Division', 1, 256, 4) --most useful {1,2,4,8,16,24,32}
+  
+  params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
+    params:set_action('arp_div_index',function() set_div('arp') end)
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
@@ -137,7 +135,9 @@ function init()
   params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
   params:set_action("arp_tr_env",function() menu_update() end)
   params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('arp_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
+  params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
+    params:set_action('arp_duration_index',function() set_duration('arp') end)
+    
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   params:add_option("arp_mode", "Mode", {'Loop','One-shot'},2)
@@ -173,7 +173,9 @@ function init()
   params:add_option("midi_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("midi_tr_env",function() menu_update() end)
   params:add_number('midi_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('midi_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
+  params:add_number('midi_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
+    params:set_action('midi_duration_index',function() set_duration('midi') end)
+    
   params:add_number('midi_octave','Octave',-2, 4, 0)
   params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
 
@@ -208,10 +210,16 @@ function init()
   params:add_option("crow_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("crow_tr_env",function() menu_update() end)
   params:add_number('crow_ar_skew','AR env. skew',0, 100, 0)
-  params:add_number('crow_duration', 'Duration', 2, 7, 4, function(param) return duration_string(param:get()) end)
+  params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
+    params:set_action('crow_duration_index',function() set_duration('crow') end)
+    
   params:add_number('crow_octave','Octave',-2, 4, 0)
   params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   
+  -- menu_update()    
+  -- params:bang()  -- Why the hell doesn't this work?
+
+
   glyphs = {
     {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}}, --repeat glyph     
     {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}},} --one-shot glyph
@@ -223,6 +231,9 @@ function init()
   crow.input[2].change = crow_trigger
   crow.output[2].action = "pulse(.001,5,1)" -- Need to test this more vs. roll-your-own pulse
   crow.output[3].action = "pulse(.001,5,1)" 
+  screen_views = {'Generator','Session','Arranger'}
+  screen_view_index = 2
+  screen_view_name = screen_views[screen_view_index]
   grid_dirty = true
   grid_views = {'Arranger','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
   grid_view_index = 2
@@ -237,6 +248,7 @@ function init()
   menu_index = 0
   selected_menu = menus[page_index][menu_index]
   transport_active = false
+  automator_events = {}
   pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
   pattern = 1
   steps_remaining_in_pattern = pattern_length[pattern]
@@ -258,7 +270,7 @@ function init()
   view_key_count = 0
   keys = {}
   key_count = 0
-  global_clock_div = 8
+  global_clock_div = 48
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
     for i = 1,8 do
@@ -269,7 +281,7 @@ function init()
   end
   chord_seq_position = 0
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
-  chord = music.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
+  chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
   arp_seq = {{0,0,0,0,0,0,0,0},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8},
@@ -286,7 +298,8 @@ function init()
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   get_next_chord() -- Placeholder for when table loading from file is implemented
-  grid_dirty = true
+  -- grid_dirty = true
+  params:bang()
   grid_redraw()
   redraw()
 end
@@ -294,57 +307,57 @@ end
 function menu_update()
   --Global menu
   if params:string('repeat_notes') == 'Retrigger' then
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'crow_pullup'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'chord_preload', 'crow_pullup'}
   else
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'crow_pullup'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   end
   -- Arrange menu
   menus[2] = {'arranger_enabled', 'playback', 'crow_assignment'}
   
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[3] = {'chord_dest', 'chord_div', 'chord_type', 'chord_octave'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[3] = {'chord_dest', 'chord_div', 'chord_duration', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div', 'chord_duration', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
+    menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[3] = {'chord_dest', 'chord_div', 'chord_type', 'chord_octave', 'chord_jf_amp'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
   end
   
   --arp menus
   if params:string('arp_dest') == 'None' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_chord_type', 'arp_octave'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div', 'arp_duration', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
       menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     else
-      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
   end
   
     --MIDI menus
   if params:string('midi_dest') == 'None' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[5] = {'midi_dest', 'midi_duration', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[5] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
+      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
     else
-      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
       menus[5] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
     else
-      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
@@ -354,14 +367,14 @@ function menu_update()
   if params:string('crow_dest') == 'None' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[6] = {'crow_dest', 'crow_duration', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[6] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_duration', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
+    menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
       menus[6] = {'crow_dest', 'crow_tr_env', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
     else
-      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_duration', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_duration_index', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('crow_dest') == 'ii-JF' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
@@ -369,25 +382,52 @@ function menu_update()
 end
 
 
+
+function division_to_index(string)
+  for i = 1,#division_names do
+    if tab.key(division_names[i],string) == 2 then
+      return(i)
+    end
+  end
+end
+
+
+-- Sends midi transport messages on the same 'midi out' port used for system clock
+-- If Off in system clock params, it will default to port 1
+function transport_midi_update()
+  transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
+end
+
+function print_this(msg)
+  -- print(msg)
+  print(clock.get_tempo() .. ' ' .. params:get('clock_tempo'))
+end
+
 function crow_pullup()
-    crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
-    print('crow pullup: ' .. t_f_string(params:get('crow_pullup')))
+  crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
+  print('crow pullup: ' .. t_f_string(params:get('crow_pullup')))
 end
 
 function first_to_upper(str)
     return (str:gsub("^%l", string.upper))
 end
 
-function duration_string(index)
-  return(durations[index][1])  
+function divisions_string(index)
+    return(division_names[index][2])
 end
 
-function duration_int(index)
-  return(durations[index][2])  
+--Creates a variable for each source's div.
+function set_div(source)
+  _G[source .. '_div'] = division_names[params:get(source .. '_div_index')][1]
 end
 
-function duration_sec(index)
-  return(durations[index][3] * clock.get_beat_sec())  
+--Creates a variable for each source's duration
+function set_duration(source)
+  _G[source .. '_duration'] = division_names[params:get(source .. '_duration_index')][1]
+end
+
+function duration_sec(dur_mod)
+  return(dur_mod/global_clock_div * clock.get_beat_sec())
 end
 
 function param_id_to_name(id)
@@ -395,7 +435,7 @@ function param_id_to_name(id)
 end
 
 function mode_index_to_name(index)
-  return(music.SCALES[index].name)
+  return(musicutil.SCALES[index].name)
 end
   
 function round(num, numDecimalPlaces)
@@ -438,11 +478,21 @@ end
 
 -- Establishes the threshold in seconds for considering duplicate notes as well as providing an integer for placeholder duration
 function dedupe_threshold()
-  dedupe_threshold_s = duration_sec(params:get('dedupe_threshold')) * .95
-  dedupe_threshold_int = duration_int(params:get('dedupe_threshold'))
+  dedupe_threshold_int = division_names[params:get('dedupe_threshold')][1]
+  dedupe_threshold_s = duration_sec(dedupe_threshold_int) * .95
 end  
-  
-  
+
+
+function chord_preload(index)
+  chord_preload_tics = division_names[index][1]
+end  
+
+
+-- Callback function when system tempo changes
+function clock.tempo_change_handler(bpm)  
+  dedupe_threshold(bpm)
+end  
+
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
 -- @treturn chord_type
 function get_chord_name(root_num, scale_type, roman_chord_type)
@@ -528,28 +578,44 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
 end
 
 
- --Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
-function sequence_clock(rate)
+ -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
+ -- To-do: evaluate efficiency of having separate clocks, one for tuplets and one for standard meter
+function sequence_clock()
   while transport_active do
-    clock.sync(1/8)
-
-    -- clock_step is tied to chord_div which means arp rate can't ever be slower than chord. Hmm....
-    -- clock_step = util.wrap(clock_step + 1, 0, params:get('chord_div') - 1)
+    -- To-do: add option for initial delay when syncing to external MIDI/Link
+    clock.sync(1/global_clock_div)    -- To-do: Add offset param usable for Link delay compensation
     
-    -- Modifying so arp can be slower than chord. #seemsfine
-    clock_step = util.wrap(clock_step + 1, 0, 31)
-    -- print(clock_step)
+    if start == true then
+      -- Send out MIDI start/continue messages
+      transport_midi_update()
+      if params:get('clock_midi_out') ~= 1 then 
+        if clock_start_method == 'start' then
+          transport_midi:start()
+        else
+          transport_midi:continue()
+        end
+      end
+      clock_start_method = 'continue'
+      print("Clock "..sequence_clock_id.. " started")
+      start = false
+    end
     
-    if util.wrap(clock_step + 1, 0, params:get('chord_div') - 1) % params:get('chord_div') == 0 then
+    -- Wrap prob not needed and could actually be used to count arranger position? 
+    -- 192 tics per measure * 8 (max a step can be, 0-indexed. 
+    clock_step = util.wrap(clock_step + 1,0, 1535)
+  
+    -- pre-loads next chord to allow early notes to be quantized according to the upcoming chord
+    if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
       get_next_chord()
     end
-    if clock_step % params:get('chord_div') == 0 then
+    
+    if clock_step % chord_div == 0 then
       advance_chord_seq()
       grid_dirty = true
       redraw() -- Update chord readout
     end
-    
-    if clock_step % params:get('arp_div') == 0 then
+
+    if clock_step % arp_div == 0 then
       if params:string('arp_mode') == 'Loop' or play_arp then
         advance_arp_seq()
         grid_dirty = true      
@@ -564,6 +630,7 @@ function sequence_clock(rate)
       grid_redraw()
       grid_dirty = false
     end
+
   end
 end
 
@@ -580,11 +647,12 @@ end
 -- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic
 function timing_clock()
   while true do
-    clock.sync(1/64)
+    clock.sync(1/global_clock_div)
 
     for i = #midi_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       midi_note_history[i][1] = midi_note_history[i][1] - 1
       if midi_note_history[i][1] == 0 then
+        -- print('note_off')
         out_midi:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- note, vel, ch.
         table.remove(midi_note_history, i)
       end
@@ -610,7 +678,6 @@ function timing_clock()
         table.remove(jf_note_history, i)
       end
     end
-    -- clock.sync(1/64)
   end
 end
     
@@ -627,31 +694,24 @@ function clock.transport.start()
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
   
   -- Clock for chord/arp/arranger sequences
-  sequence_clock_id = clock.run(sequence_clock, global_clock_div) --8 == global clock at 32nd notes
+  sequence_clock_id = clock.run(sequence_clock)
   
   
   --Clock used to refresh screen once a second for the arranger countdown timer
   clock.cancel(seconds_clock_id or 0) 
   seconds_clock_id = clock.run(seconds_clock)
   
-  -- Send out MIDI start/continue messages
-  if params:get('clock_midi_out') ~= 1 then 
-    if clock_start_method == 'start' then
-      out_midi:start()
-    else
-      out_midi:continue()
-    end
-  end
-  clock_start_method = 'continue'
-  print("Clock "..sequence_clock_id.. " started")
+  -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+  start = true
 end
 
 
 function clock.transport.stop()
   print('Transport stopping')
   transport_active = false
+  transport_midi_update()
   if params:get('clock_midi_out') ~= 1 then
-    out_midi:stop() --Stop vs continue?
+    transport_midi:stop() --Stop vs continue?
   end
   if params:get('clock_source') ~= 1 then -- External clock
     if params:get('arranger_enabled') == 1 then -- When following an external clock, reset arranegement.
@@ -707,7 +767,8 @@ function advance_chord_seq()
     -- If it's post-reset or at the end of chord sequence
     if (pattern_seq_position == 0 and chord_seq_position == 0) or chord_seq_position >= pattern_length[pattern] then
       
-      --Check if it's the last pattern in the arrangement.
+      -- Check if it's the last pattern in the arrangement.
+      -- This also needs to be run after firing chord so we can catch last-minute changes to arranger_one_shot_last_pattern
       if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
         arrangement_reset = true
         reset_arrangement()
@@ -724,7 +785,6 @@ function advance_chord_seq()
           -- Let arp play through to completion (even if multiple chords play), then pause until the next chord retriggers (current one-shot)
           -- Force arp reset each time a new chord is played
       -- pattern_seq_retrig = true -- Disabling to see what breaks
-      
     end
     
     -- Flag if arranger is on the last pattern of a 1-shot sequence
@@ -744,6 +804,12 @@ function advance_chord_seq()
       chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
     end
     
+    -- Arranger automation step
+    -- if params:get('arranger_enabled') == 1 then
+    --   automator()
+    -- end
+    
+    -- Play the chord
     if chord_seq[pattern][chord_seq_position].c > 0 then
   -- if chord_seq_position > 0 then --Turning this off to see if it breaks something. Not sure why it's needed.
       play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
@@ -757,18 +823,64 @@ function advance_chord_seq()
 end
 
 
+function automator()
+  --pattern_seq_position, chord_seq_position, event_no
+  
+  -- need to hardcode max # of vars here once known, or generate somehow. Also needs to set # of top level indices based on arranger length 
+  automator_events = {
+                    {{},{},{},{},{},{},{},{},},
+                    {{},{},{},{},{},{},{},{},},
+                    {{},{},{},{},{},{},{},{},},
+                    {{},{},{},{},{},{},{},{},},
+                    {{},{},{},{},{},{},{},{},},
+                    {{},{},{},{},{},{},{},{},},
+                    {{},{},{},{},{},{},{},{},},
+                    {{},{},{},{},{},{},{},{},},
+                    }
+  -- Arranger pattern_seq_position, chord_seq_position, automation event index
+  automator_events[1][2][1] = {'rotate_pattern', 'Arp', 1} --event name, var 1, var 2
+  automator_events[1][1][1] = {'transpose', 0} --event name, var 1, var 2
+  automator_events[1][5][1] = {'transpose', 2} --event name, var 1, var 2
+  -- automator_events[1][2][2] = {'shuffle_arp'}
+
+  if pattern_seq_position ~= 0 and chord_seq_position ~= 0 then
+    -- if automator_events[pattern_seq_position][chord_seq_position] ~= nil then
+    if automator_events[pattern_seq_position][chord_seq_position][1] then -- only checks for first event. insert and remove to preserve something in index 1
+      -- print(pattern_seq_position .. ' ' .. chord_seq_position .. ' ' ..automator_events[pattern_seq_position][chord_seq_position][1][1])
+      
+      for i = 1, #automator_events[pattern_seq_position][chord_seq_position] do
+        local do_event = automator_events[pattern_seq_position][chord_seq_position][i][1]
+        -- Sub for do loop for dynamic # of vars being stored
+        local var_1 = automator_events[pattern_seq_position][chord_seq_position][i][2]
+        local var_2 = automator_events[pattern_seq_position][chord_seq_position][i][3]
+        -- local var_3 = automator_events[pattern_seq_position][chord_seq_position][i][1]
+        
+        print(pattern_seq_position .. ' ' .. chord_seq_position .. ' ' .. do_event)
+        if do_event == 'rotate_pattern' then
+          rotate_pattern(var_1, var_2)
+        elseif do_event == 'transpose' then
+          params:set('transpose',var_1)
+        elseif do_event == 'shuffle_arp' then
+          local shuffled_arp_seq = shuffle(arp_seq[arp_pattern])
+          arp_seq[arp_pattern] = shuffled_arp_seq
+        end
+      end
+    end
+  end
+end
+  
 function generate_chord_names()
   if chord_no > 0 then
-    chord_degree = music.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
+    chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
     --To-do: more thoughful selection of sharps or flats depending on the key.
-    chord_name = music.NOTE_NAMES[util.wrap((music.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
+    chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
     chord_name_modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- transpose root?
   end
 end  
 
 
 function play_chord(destination, channel)
-  chord = music.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, true)
+  chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, true)
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
@@ -778,7 +890,7 @@ function play_chord(destination, channel)
   elseif destination == 'MIDI' then
     for i = 1, params:get('chord_type') do
       local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), duration_int(params:get('chord_duration')))
+      to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), chord_duration)
     end
   elseif destination == 'Crow' then
     for i = 1, params:get('chord_type') do
@@ -832,7 +944,7 @@ function get_next_chord()
   
   
   if chord_seq[temp_pattern][temp_chord_seq_position].c > 0 then
-    chord = music.generate_chord_scale_degree(chord_seq[temp_pattern][temp_chord_seq_position].o * 12, params:get('mode'), chord_seq[temp_pattern][temp_chord_seq_position].c, true)
+    chord = musicutil.generate_chord_scale_degree(chord_seq[temp_pattern][temp_chord_seq_position].o * 12, params:get('mode'), chord_seq[temp_pattern][temp_chord_seq_position].c, true)
   end
 end
 
@@ -859,7 +971,7 @@ function advance_arp_seq()
     if destination == 'Engine' then
       to_engine('arp', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), duration_int(params:get('arp_duration')))
+      to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), arp_duration)
     elseif destination == 'Crow' then
       to_crow('arp',note)
     elseif destination =='ii-JF' then
@@ -893,7 +1005,7 @@ function sample_crow(volts)
     if destination == 'Engine' then
       to_engine('crow', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('crow_midi_velocity'), params:get('crow_midi_ch'), duration_int(params:get('crow_duration')))
+      to_midi(note, params:get('crow_midi_velocity'), params:get('crow_midi_ch'), crow_duration)
     elseif destination == 'Crow' then
       to_crow('crow', note)
     elseif destination =='ii-JF' then
@@ -915,7 +1027,7 @@ in_midi.event = function(data)
     if destination == 'Engine' then
       to_engine('midi', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), duration_int(params:get('midi_duration')))
+      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), midi_duration)
     elseif destination == 'Crow' then
       to_crow('midi', note)
     elseif destination =='ii-JF' then
@@ -943,10 +1055,12 @@ function to_engine(source, note)
   if engine_play_note == true then
     engine.amp(params:get(source..'_pp_amp') / 100)
     engine.cutoff(params:get(source..'_pp_cutoff'))
-    engine.release(duration_sec(params:get(source..'_duration')))
+    -- engine.release(duration_sec(source.._duration))
+    engine.release(duration_sec(_G[source .. '_duration']))
+
     engine.gain(params:get(source..'_pp_gain') / 100)
     engine.pw(params:get(source..'_pp_pw') / 100)
-    engine.hz(music.note_num_to_freq(note + 36))
+    engine.hz(musicutil.note_num_to_freq(note + 36))
   end
   
   if engine_note_history_insert == true then
@@ -965,11 +1079,21 @@ function to_midi(note, velocity, channel, duration)
   -- Check for duplicate notes and process according to repeat_notes setting
   for i = 1, #midi_note_history do
     if midi_note_history[i][2] == midi_note and midi_note_history[i][3] == channel then
-      midi_note_history[i][1] = math.max(duration, midi_note_history[i][1]) -- Preserves longer note-off duration
+
+      -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below which is not present in other destinations.
+      
+      midi_note_history[i][1] = math.max(duration, midi_note_history[i][1])
       midi_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
+
       if params:string('repeat_notes') == 'Dedupe' and (note_on_time - midi_note_history[i][4]) < dedupe_threshold_s then
+        -- print(('Deduped ' .. note_on_time - midi_note_history[i][4]) .. ' | ' .. dedupe_threshold_s)
         midi_play_note = false -- Prevent duplicate note from playing
       end
+    
+      -- Always update any existing note_on_time, even if a note wasn't played. 
+      -- Otherwise the note duration may be extended but the gap between note_on_time and current time grows indefinitely and no dedupe occurs.
+      -- Alternative is to not extend the duration when 'repeat_notes' == 'Dedupe' and a duplicate is found
+      midi_note_history[i][4] = note_on_time
     end
   end
   
@@ -1005,8 +1129,8 @@ function to_crow(source, note)
     if params:get(source..'_tr_env') == 1 then  -- Trigger
       crow.output[2].action = 'pulse(.001,10,1)' -- (time,level,polarity)
     else -- envelope
-      local crow_attack = duration_sec(params:get(source..'_duration')) * params:get(source..'_ar_skew') / 100
-      local crow_release = duration_sec(params:get(source..'_duration')) * (100 - params:get(source..'_ar_skew')) / 100
+      local crow_attack = duration_sec(_G[source .. '_duration']) * params:get(source..'_ar_skew') / 100
+      local crow_release = duration_sec(_G[source .. '_duration']) * (100 - params:get(source..'_ar_skew')) / 100
       crow.output[2].action = 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)'  -- (attack,release,shape) SHAPE is bugged?
     end
     crow.output[2]()
@@ -1280,8 +1404,8 @@ end
 
 
 -- Rotate looping portion of pattern
-function rotate_pattern(direction)
-  if grid_view_name == 'Chord' then
+function rotate_pattern(view, direction)
+  if view == 'Chord' then
     local length = pattern_length[pattern]
     local temp_chord_seq = {}
     for i = 1, length do
@@ -1294,7 +1418,7 @@ function rotate_pattern(direction)
       chord_seq[pattern][i]['c'] = temp_chord_seq[util.wrap(i - direction,1,length)].c
       chord_seq[pattern][i]['o'] = temp_chord_seq[util.wrap(i - direction,1,length)].o
     end
-  elseif grid_view_name == 'Arp' then
+  elseif view == 'Arp' then
     local length = arp_pattern_length[arp_pattern]
     local temp_arp_seq = {}
     for i = 1, length do
@@ -1330,17 +1454,19 @@ end
 function enc(n,d)
   if keys[1] == 1 then -- function key (KEY1) held down mode
     if n == 2 then
-      rotate_pattern(d)
+      rotate_pattern(grid_view_name, d)
     elseif n == 3 then
       transpose_pattern(d)
     end
     grid_redraw()
   else
       if n == 1 then
-      menu_index = 0
-      page_index = util.clamp(page_index + d, 1, #pages)
-      page_name = pages[page_index]
-      selected_menu = menus[page_index][menu_index]
+      -- menu_index = 0
+      -- page_index = util.clamp(page_index + d, 1, #pages)
+      -- page_name = pages[page_index]
+      -- selected_menu = menus[page_index][menu_index]
+      
+      screen_view_index = util.clamp(screen_view_index + d, 1, 3)
     elseif n == 2 then
       menu_index = util.clamp(menu_index + d, 0, #menus[page_index])
       selected_menu = menus[page_index][menu_index]
@@ -1358,9 +1484,9 @@ function enc(n,d)
   redraw()
 end
 
-   
+
 function chord_steps_to_seconds(steps)
-  return(steps * 60 / params:get('clock_tempo') / global_clock_div * params:get('chord_div'))
+  return(steps * 60 / params:get('clock_tempo') / global_clock_div * chord_div) -- switched to var Fix: timing
 end
 
 -- Truncates hours. Requires integer.
@@ -1371,7 +1497,6 @@ function s_to_min_sec(s)
   s = s%60
   return string.format("%02d",m) ..":".. string.format("%02d",s)
 end
-
 
 function param_formatter(param)
   if param == 'source' then
@@ -1397,6 +1522,9 @@ end
 function redraw()
   screen.clear()
   screen.aa(0)
+  
+  -- if screen_view_name == 'Generator'
+  
   if view_key_count > 0 then
     screen.level(7)
     screen.move(64,32)
@@ -1446,7 +1574,7 @@ function redraw()
     for i = 1,#menus[page_index] do
       screen.move(2, line * 10 + 8 - menu_offset)    --exp
       screen.level(menu_index == i and 15 or 3)
-      screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. params:string(menus[page_index][i]))
+      screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
       line = line + 1
     end
  
@@ -1466,8 +1594,8 @@ function redraw()
 
   for i = pattern_pos, pattern_seq_length do
     steps_elapsed = (i == pattern_pos and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
-    percent_step_elapsed = (math.max(clock_step,0) % params:get('chord_div') / (params:get('chord_div')-1)) -- % of current chord step elapsed
-    -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div') / (params:get('chord_div')-1)) -- % of current chord step remaining
+    percent_step_elapsed = (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
+    -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1)) -- % of current chord step remaining
     steps_remaining_in_pattern = pattern_length[pattern_seq[i]] - steps_elapsed  --rect_w
     steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
     seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
@@ -1541,6 +1669,22 @@ end
     
 function randomize()
   
+  params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
+  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
+    
+    
+  -- These can be overwritten by individual algorithms
+  -- local random_divisions = {16,32,12,20,24,28,32}
+  -- params:set('chord_div_index', random_divisions[math.random(1,2) + (percent_chance(10) and math.random(1,5) or 0)]) -- Mostly standard
+
+  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
+  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
+  arp_pattern_length[1] = math.random(3,4) * (percent_chance(70) and 2 or 1)
+  tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
+  params:set('arp_div_index', (math.random(3,6) * 2) - tuplet_shift)
+  params:set('arp_duration_index',params:get('arp_div_index'))  -- Testing out setting these to the same val
+
+  
   --SEQUENCE RANDOMIZATION
   
   params:set('transpose', math.random(-12,12))
@@ -1553,8 +1697,22 @@ function randomize()
   params:set('mode', math.random(1,9))
 
   
+  --ENGINE BASED RANDOMIZATIONS
+  -- May be overwritten depending on algo type
+  params:set('chord_pp_amp', 50)
+  params:set('chord_pp_gain', math.random(0,350))
+  params:set('chord_pp_pw', math.random(10,90))
+  params:set('chord_div_index', 15)
+  params:set('chord_duration_index', params:get('chord_div_index'))
+  
+  params:set('arp_pp_amp', 70)
+  params:set('arp_pp_gain', math.random(0,350))
+  params:set('arp_pp_pw', math.random(10,90))
+  params:set('arp_mode', 1) -- Disabling unless enabled by specific algos, math.random(1,2))
+  
+  
   --CHORD PROGRESSION ALGOS
-  chord_algo = 7 --math.random(1,6)
+  chord_algo =  math.random(1,4)
   
   if chord_algo == 1 then
     -- I-V-vi-IV based progression ****
@@ -1571,7 +1729,7 @@ function randomize()
       chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
       chord_seq[pattern][i].o = math.floor(x / 8) --octave
     end  
-    rotate_pattern(math.random(0, 3))
+    rotate_pattern('Chord', math.random(0, 3))
     transpose_pattern(math.random() >= .5 and 7 or 0)
     
   elseif chord_algo == 2 then  
@@ -1597,7 +1755,7 @@ function randomize()
     end  
     -- 50% chance of rotating to end on I−vi−ii−V turnaround
     if percent_chance(50) then
-      rotate_pattern(math.random() >= .5 and 1 or 0)
+      rotate_pattern('Chord', math.random() >= .5 and 1 or 0)
       -- optional octave shift of first chord. Doesn't really sound better IMO.
       -- if chord_seq[pattern][1].x == 1 then
       --   chord_seq[pattern][1].x = 8 --raw key x coordinate
@@ -1605,82 +1763,9 @@ function randomize()
       --   chord_seq[pattern][1].o = 1 --octave 
       -- end
     end
-  
- 
-  elseif chord_algo == 3 then
-    -- ii-iii-IV-V based progression ***
-    print('Chord algo: ii-iii-IV-V based progression')
-    local modes = {1,5,8,9} --Preferred but kinda optional
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {2,3,4,5}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-    
-
-  elseif chord_algo == 4 then
-    -- I-ii-iii-IV based progression ***
-    print('Chord algo: I-ii-iii-IV based progression')
-    local modes = {1,5,6,7,9} --Preferred but kinda optional
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {1,2,3,4}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
     
     
-  elseif chord_algo == 5 then  
-    -- Andalusian cadence **
-    local mode = percent_chance(50) and 6 or 2 --Phyrigian or natural minor
-    params:set('mode', mode)
-    print('Chord algo: Andalusian cadence, ' .. params:string('mode'))
-    local progression = {4,3,2,1}
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i] + (params:string('mode') == 'Natural Minor' and 4 or 0)
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-  
-  
-    elseif chord_algo == 6 then
-    -- I-ii-iii-IV-V based progression ***
-    print('Chord algo: I-ii-iii-IV-V based progression')
-    local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {1,2,3,4,5}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-    
- 
-     elseif chord_algo == 7 then
+     elseif chord_algo == 3 then
     -- I-vi based major progression ***
     print('Chord algo: I-vi based major progression')
     -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
@@ -1695,11 +1780,11 @@ function randomize()
       chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
       chord_seq[pattern][i].o = math.floor(x / 8) --octave
     end  
-    rotate_pattern(math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-    
-    
-  elseif chord_algo == 8 then  
+    rotate_pattern('Chord', math.random(0, 3))
+    transpose_pattern(math.random() >= .5 and 7 or 0)    
+  
+ 
+    elseif chord_algo == 4 then  
     -- Some weird mostly random stuff
     print('Chord algo: Weird random chords')
     random_pattern_lengths = {3,4,6,8}
@@ -1732,6 +1817,80 @@ function randomize()
       chord_seq[pattern][random_pattern_length].o = math.floor(random_1_14 / 8) --octave
     end
   end
+  
+  -- elseif chord_algo == 3 then
+  --   -- ii-iii-IV-V based progression ***
+  --   print('Chord algo: ii-iii-IV-V based progression')
+  --   local modes = {1,5,8,9} --Preferred but kinda optional
+  --   params:set('mode', modes[math.random(1,4)])
+  --   local progression = {2,3,4,5}
+  --   local progression = shuffle(progression)
+  --   pattern_length[pattern] = 4
+  --   clear_chord_pattern()
+  --   for i = 1, pattern_length[pattern] do
+  --     local x = progression[i]
+  --     chord_seq[pattern][i].x = x --raw key x coordinate
+  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
+  --   end  
+  --   rotate_pattern('Chord', math.random(0, 3))
+  --   transpose_pattern(math.random() >= .5 and 7 or 0)
+
+  
+  
+    -- elseif chord_algo == 4 then
+    -- -- I-ii-iii-IV-V based progression ***
+    -- print('Chord algo: I-ii-iii-IV-V based progression')
+    -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
+    -- params:set('mode', modes[math.random(1,4)])
+    -- local progression = {1,2,3,4,5}
+    -- local progression = shuffle(progression)
+    -- pattern_length[pattern] = 4
+    -- clear_chord_pattern()
+    -- for i = 1, pattern_length[pattern] do
+    --   local x = progression[i]
+    --   chord_seq[pattern][i].x = x --raw key x coordinate
+    --   chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+    --   chord_seq[pattern][i].o = math.floor(x / 8) --octave
+    -- end  
+    -- rotate_pattern('Chord', math.random(0, 3))
+    -- transpose_pattern(math.random() >= .5 and 7 or 0)
+    
+    
+      -- elseif chord_algo == 4 then
+  --   -- I-ii-iii-IV based progression ***
+  --   print('Chord algo: I-ii-iii-IV based progression')
+  --   local modes = {1,5,6,7,9} --Preferred but kinda optional
+  --   params:set('mode', modes[math.random(1,4)])
+  --   local progression = {1,2,3,4}
+  --   local progression = shuffle(progression)
+  --   pattern_length[pattern] = 4
+  --   clear_chord_pattern()
+  --   for i = 1, pattern_length[pattern] do
+  --     local x = progression[i]
+  --     chord_seq[pattern][i].x = x --raw key x coordinate
+  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
+  --   end  
+  --   rotate_pattern('Chord', math.random(0, 3))
+  --   transpose_pattern(math.random() >= .5 and 7 or 0)
+  
+  --   elseif chord_algo == 5 then  
+  --   -- Andalusian cadence *
+  --   local mode = percent_chance(50) and 6 or 2 --Phyrigian or natural minor
+  --   params:set('mode', mode)
+  --   print('Chord algo: Andalusian cadence, ' .. params:string('mode'))
+  --   local progression = {4,3,2,1}
+  --   pattern_length[pattern] = 4
+  --   clear_chord_pattern()
+  --   for i = 1, pattern_length[pattern] do
+  --     local x = progression[i] + (params:string('mode') == 'Natural Minor' and 4 or 0)
+  --     chord_seq[pattern][i].x = x --raw key x coordinate
+  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
+  --   end  
+    
+    
                   
   
   --ARP
@@ -1743,7 +1902,7 @@ function randomize()
   local random_4_11 = math.random(4,11)   --arp note distribution center
   local random_1_14 = math.random(1,14)  
   
-  arp_pattern_length[1] = (math.random(1,4) * 2) + (percent_chance(20) and math.random(-1,1) or 0) -- Mostly even lengths
+  -- arp_pattern_length[1] = (math.random(1,4) * 2) + (percent_chance(20) and math.random(-1,1) or 0) -- Mostly even lengths
   random_note_offset = math.random (0,7)
   for i = 1,8 do --Wipe
     arp_seq[1][i] = 0
@@ -1764,7 +1923,7 @@ function randomize()
   until (arp_root ~= arp_offset)
 
 
-  random_arp_algo = math.random(1,6)
+  random_arp_algo = math.random(1,7)
 
   if random_arp_algo == 1 then
     -- ER 1-note + rests ****
@@ -1812,14 +1971,38 @@ function randomize()
       arp_seq[1][i] = arp_min - 1 + i
     end
 
-  elseif random_arp_algo == 5 then       
+
+    
+  elseif random_arp_algo == 5 then   
+    -- Strum up
+    print('Arp algo: Strum up')
+    
+    params:set('arp_mode', 2)
+    params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
+    params:set('arp_duration_index',15)
+    arp_pattern_length[1] = math.random(3,4) * 2
+
+    -- Strum speed from 1/64T to 1/32T
+    params:set('arp_div_index', math.random(1,5))
+    
+    for i = 1, arp_pattern_length[1] do
+      arp_seq[1][i] = arp_min - 1 + i
+    end   
+
+  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
+  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
+  
+  
+  
+
+  elseif random_arp_algo == 6 then       
     -- Sequential down
     print('Arp algo: Sequential down')
     for i = 1, arp_pattern_length[1] do
       arp_seq[1][i] = arp_max + 1 - i
     end
   
-  elseif random_arp_algo == 6 then       
+  elseif random_arp_algo == 7 then       
     -- Random with chance of ER mask
     print('Arp algo: Random with ER mask')
     for i = 1, arp_pattern_length[1] do
@@ -1831,28 +2014,6 @@ function randomize()
       end
     end
   end
-
-
-  params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
-  local random_divisions = {16,24,32} --{12,16,20,24,28,32}
-  params:set('chord_div', random_divisions[math.random(1,3)] - (percent_chance(20) and 4 or 0)) -- Mostly standard
-  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
-  -- tie arp modulo to chord?
-  -- local random_divisions = {1,2,3,4,6,8,12,16,20,24,28,32} 
-  local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
-  params:set('arp_div', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
-  
-  --ENGINE BASED RANDOMIZATIONS
-  params:set('chord_pp_amp', 50)
-  params:set('chord_pp_gain', math.random(0,350))
-  params:set('chord_pp_pw', math.random(10,90))
-  params:set('chord_duration', 7) -- Whole note just works better for PolyPerc math.random(5,6))
-  params:set('arp_pp_amp', 70)
-  params:set('arp_pp_gain', math.random(0,350))
-  params:set('arp_pp_pw', math.random(10,90))
-  params:set('arp_duration', math.random(4,6))
-  params:set('arp_mode', math.random(1,2))
-
 
 
   -- This is all about setting the engine cutoff values to something reasonable for the pitch of the chord and arp  
