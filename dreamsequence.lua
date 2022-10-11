@@ -44,7 +44,7 @@ function init()
     params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
       params:set_action('repeat_notes',function() menu_update() end)
   params:add_number('dedupe_threshold', 'Threshold', 1, 10, division_to_index('1/32'), function(param) return divisions_string(param:get()) end)
-    params:set_action('dedupe_threshold', function(x) dedupe_threshold(x) end)
+    params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 1, 10, division_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)      
       
@@ -489,8 +489,8 @@ end
 
 
 -- Callback function when system tempo changes
-function clock.tempo_change_handler(bpm)  
-  dedupe_threshold(bpm)
+function clock.tempo_change_handler()  
+  dedupe_threshold()
 end  
 
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
