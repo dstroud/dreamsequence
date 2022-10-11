@@ -215,9 +215,6 @@ function init()
     
   params:add_number('crow_octave','Octave',-2, 4, 0)
   params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
-  
-  -- menu_update()    
-  -- params:bang()  -- Why the hell doesn't this work?
 
 
   glyphs = {
@@ -239,14 +236,17 @@ function init()
   grid_view_index = 2
   grid_view_name = grid_views[grid_view_index]
   -- flicker = 3
-  pages = {'GLOBAL', 'ARRANGER', 'CHORD', 'ARP', 'MIDI IN', 'CROW IN'}
-  -- pages = {'Global', 'Arranger', 'Chord', 'Arp', 'MIDI in', 'Crow in'}
+  pages = {'GLOBAL', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
   page_index = 1
   page_name = pages[page_index]
   menus = {}
   menu_update()
   menu_index = 0
   selected_menu = menus[page_index][menu_index]
+  arranger_menus = {}
+  arranger_menu_index = 1 -- No top level option (yet)
+  selected_arranger_menu = arranger_menus[arranger_menu_index]
+    print(selected_arranger_menu)
   transport_active = false
   automator_events = {}
   pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
@@ -304,80 +304,84 @@ function init()
   redraw()
 end
 
+
 function menu_update()
+  
+  -- Arranger menu. TBD if this should be here or in a separate function
+  arranger_menus = {'arranger_enabled', 'playback', 'crow_assignment'}
+  
+  
   --Global menu
   if params:string('repeat_notes') == 'Retrigger' then
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'chord_preload', 'crow_pullup'}
   else
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   end
-  -- Arrange menu
-  menus[2] = {'arranger_enabled', 'playback', 'crow_assignment'}
   
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
+    menus[2] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[3] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
   end
   
   --arp menus
   if params:string('arp_dest') == 'None' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
+    menus[3] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
+    menus[3] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
+    menus[3] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[3] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     else
-      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[3] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
+    menus[3] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
   end
   
     --MIDI menus
   if params:string('midi_dest') == 'None' then
-    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[5] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[4] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
     else
-      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+      menus[4] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
     else
-      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+      menus[4] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('midi_dest') == 'ii-JF' then
-    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
   end
   
     --Crow menus
   if params:string('crow_dest') == 'None' then
-    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[6] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[5] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
+    menus[5] = {'crow_dest', 'crow_midi_ch', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+      menus[5] = {'crow_dest', 'crow_tr_env', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
     else
-      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_duration_index', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+      menus[5] = {'crow_dest', 'crow_tr_env', 'crow_duration_index', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('crow_dest') == 'ii-JF' then
-    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
   end  
 end
 
@@ -583,6 +587,7 @@ end
 function sequence_clock()
   while transport_active do
     -- To-do: add option for initial delay when syncing to external MIDI/Link
+    
     clock.sync(1/global_clock_div)    -- To-do: Add offset param usable for Link delay compensation
     
     if start == true then
@@ -600,7 +605,7 @@ function sequence_clock()
       start = false
     end
     
-    -- Wrap prob not needed and could actually be used to count arranger position? 
+    -- Wrap not strictly needed and could actually be used to count arranger position? 
     -- 192 tics per measure * 8 (max a step can be, 0-indexed. 
     clock_step = util.wrap(clock_step + 1,0, 1535)
   
@@ -705,14 +710,16 @@ function clock.transport.start()
   start = true
 end
 
-
 function clock.transport.stop()
-  print('Transport stopping')
-  transport_active = false
   transport_midi_update()
   if params:get('clock_midi_out') ~= 1 then
     transport_midi:stop() --Stop vs continue?
   end
+  print('Transport stopping. clock_start_method: '.. clock_start_method)
+  print('Canceling clock_id ' .. (sequence_clock_id or 0))
+  clock.cancel(sequence_clock_id)-- or 0)
+  transport_active = false
+
   if params:get('clock_source') ~= 1 then -- External clock
     if params:get('arranger_enabled') == 1 then -- When following an external clock, reset arranegement.
       reset_arrangement()
@@ -721,9 +728,27 @@ function clock.transport.stop()
     end
   end
   get_next_chord()
-  print('Canceling clock_id ' .. (sequence_clock_id or 0))
-  clock.cancel(sequence_clock_id or 0)
 end
+
+-- function clock.transport.stop()
+--   transport_midi_update()
+--   if params:get('clock_midi_out') ~= 1 then
+--     transport_midi:stop() --Stop vs continue?
+--   end
+--   print('Transport stopping. clock_start_method: '.. clock_start_method)
+--   print('Canceling clock_id ' .. (sequence_clock_id or 0))
+--   clock.cancel(sequence_clock_id)-- or 0)
+--   transport_active = false
+
+--   if params:get('clock_source') ~= 1 then -- External clock
+--     if params:get('arranger_enabled') == 1 then -- When following an external clock, reset arranegement.
+--       reset_arrangement()
+--     else
+--       reset_pattern()
+--     end
+--   end
+--   get_next_chord()
+-- end
    
 
 function reset_pattern() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
@@ -1374,9 +1399,9 @@ function key(n,z)
     if n == 1 then
       -- Fn menu is displayed since keys[1] == 1
     elseif n == 2 then
-      if keys[1] == 1 then 
+      if keys[1] == 1 then
         randomize()
-      elseif params:get('clock_source') == 1 then --Internal clock only
+      elseif params:string('clock_source') == 'internal' then
         if transport_active then
           clock.transport.stop()
         else
@@ -1384,16 +1409,47 @@ function key(n,z)
         end
       end
     elseif n == 3 then
-      if params:get('arranger_enabled') == 1 then  -- If follow is on, turn off
-        params:set('arranger_enabled', 0)
-      elseif transport_active == true then  -- If follow is off but we're playing, pick up arrangement
-        print('Resuming arrangement on next pattern advance')
-        params:set('arranger_enabled', 1)
-      else 
-        print('Transport stopped; resetting arrangement')
-        params:set('arranger_enabled', 1)  -- If follow is off and transport is stopped, reset arrangement
-        reset_arrangement()
+      -- K3 in Generator immediately randomizes and resets, other views just reset
+      if screen_view_name == 'Generator' then
+        randomize()
       end
+      
+        
+      if params:get('clock_midi_out') ~= 1 then
+        if transport_active then
+          transport_midi:stop()
+          transport_midi:start()
+        else
+          transport_midi:stop()
+        end
+      end
+    
+      if params:get('arranger_enabled') == 1 then
+        reset_arrangement()
+      else
+        reset_pattern()       
+      end
+      
+
+      
+      
+      -- if params:get('arranger_enabled') == 1 then
+      --   reset_arrangement()
+      -- else
+      --   reset_pattern()
+
+      -- Enable/disable Arranger. Switching out with Reset key.
+      -- if params:get('arranger_enabled') == 1 then  -- If follow is on, turn off
+      --   params:set('arranger_enabled', 0)
+      -- elseif transport_active == true then  -- If follow is off but we're playing, pick up arrangement
+      --   print('Resuming arrangement on next pattern advance')
+      --   params:set('arranger_enabled', 1)
+      -- else 
+      --   print('Transport stopped; resetting arrangement')
+      --   params:set('arranger_enabled', 1)  -- If follow is off and transport is stopped, reset arrangement
+      --   reset_arrangement()
+      -- end
+      
     end
   elseif z == 0 then
     keys[n] = nil
@@ -1467,17 +1523,30 @@ function enc(n,d)
       -- selected_menu = menus[page_index][menu_index]
       
       screen_view_index = util.clamp(screen_view_index + d, 1, 3)
-    elseif n == 2 then
-      menu_index = util.clamp(menu_index + d, 0, #menus[page_index])
-      selected_menu = menus[page_index][menu_index]
-    else
-      if menu_index == 0 then
-        menu_index = 0
-        page_index = util.clamp(page_index + d, 1, #pages)
-        page_name = pages[page_index]
-        selected_menu = menus[page_index][menu_index]
-      else
-        params:delta(selected_menu, d)
+      screen_view_name = screen_views[screen_view_index]
+      elseif n == 2 then
+        if screen_view_name == 'Arranger' then
+          arranger_menu_index = util.clamp(arranger_menu_index + d, 1, #arranger_menus)
+          print(arranger_menu_index)
+          selected_arranger_menu = arranger_menus[arranger_menu_index]
+          -- print(selected_arranger_menu)
+        else
+          menu_index = util.clamp(menu_index + d, 0, #menus[page_index])
+          selected_menu = menus[page_index][menu_index]
+        end
+    else -- n== 3
+      if screen_view_name == 'Arranger' then      
+        selected_arranger_menu = arranger_menus[arranger_menu_index]
+        params:delta(selected_arranger_menu, d)
+      elseif screen_view_name == 'Session' then
+        if menu_index == 0 then
+          menu_index = 0
+          page_index = util.clamp(page_index + d, 1, #pages)
+          page_name = pages[page_index]
+          selected_menu = menus[page_index][menu_index]
+        else
+          params:delta(selected_menu, d)
+        end
       end
     end
   end
@@ -1523,71 +1592,32 @@ function redraw()
   screen.clear()
   screen.aa(0)
   
-  -- if screen_view_name == 'Generator'
-  
-  if view_key_count > 0 then
-    screen.level(7)
-    screen.move(64,32)
-    screen.font_size(16)
-    screen.text_center(grid_view_name)
-    screen.font_size(8)
-  elseif keys[1] == 1 then
+  --Arranger time rect
+  screen.level(7)
+  screen.rect(94,0,34,11)
+  screen.fill()
+  screen.level(0)
+  screen.rect(95,1,32,9)
+  screen.fill()
+
+  -- Chord readout rect
+  screen.level(4)
+  screen.rect(94,13,34,20)
+  screen.fill()
+  screen.level(0)
+  screen.rect(95,14,32,18)
+  screen.fill()
+
+  -- Chord degree and name
+  if chord_no > 0 then
+    screen.move(111,21)
     screen.level(15)
-    screen.move(2,8)
-    screen.text('FN KEY +')
-    screen.move(2,28)
-    screen.text('KEY 2: Randomize')
-    screen.move(2,48)
-    screen.text('ENC 2: Rotate seq ↑↓')
-    screen.move(2,58)
-    screen.text('ENC 3: Transpose seq ←→')
-  else
-    
-    --Arranger time rect
-    screen.level(7)
-    screen.rect(94,0,34,11)
-    screen.fill()
-    screen.level(0)
-    screen.rect(95,1,32,9)
-    screen.fill()
- 
-    -- Chord readout rect
-    screen.level(4)
-    screen.rect(94,13,34,20)
-    screen.fill()
-    screen.level(0)
-    screen.rect(95,14,32,18)
-    screen.fill()
+    screen.text_center(chord_degree or '') -- Chord degree
+    screen.move(111,29)
+    screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
+  end
   
-    -- Chord degree and name
-    if chord_no > 0 then
-      screen.move(111,21)
-      screen.level(15)
-      screen.text_center(chord_degree or '') -- Chord degree
-      screen.move(111,29)
-      screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
-    end
-    
-    -- Scrolling menus
-    local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
-    line = 1
-    for i = 1,#menus[page_index] do
-      screen.move(2, line * 10 + 8 - menu_offset)    --exp
-      screen.level(menu_index == i and 15 or 3)
-      screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
-      line = line + 1
-    end
- 
-    --Sticky header
-    screen.level(menu_index == 0 and 15 or 4)
-    screen.rect(0,0,92,11)
-    screen.fill()
-    screen.move(2,8)
-    screen.level(0)
-    screen.text(page_index .. '-' .. page_name)
-    
-    
-  --Calculate what we need to display arrangement time remaining and draw the arranger mini-chart
+   --Calculate what we need to display arrangement time remaining and draw the arranger mini-chart
   local rect_x = pattern_seq_position == 0 and 1 or 0 -- If arranger is reset, add an initial gap to the x position
   pattern_pos = pattern_seq_position == 0 and 1 or pattern_seq_position --same as max 1
   steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
@@ -1595,12 +1625,16 @@ function redraw()
   for i = pattern_pos, pattern_seq_length do
     steps_elapsed = (i == pattern_pos and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
     percent_step_elapsed = (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
-    -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1)) -- % of current chord step remaining
+    
+    -- % of current chord step remaining
+    -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
+    
     steps_remaining_in_pattern = pattern_length[pattern_seq[i]] - steps_elapsed  --rect_w
     steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
     seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
     
-    if page_name == 'ARRANGER' then
+    -- Draw timeline. Needs to be run in this loop rather than in Arranger view section
+    if screen_view_name == 'Arranger' then
       rect_h = 2
       rect_y = 50 + (pattern_seq[i]* 2) + pattern_seq[i]
       rect_gap_adj = pattern_pos - 1
@@ -1611,18 +1645,7 @@ function redraw()
     end
   end
     
-  -- Draw the arranger sequence and countdown timer
-  if page_name == 'ARRANGER' then
-
-    -- Axis reference marks so it's easier to distinguish the pattern position
-    for i = 1,4 do
-      screen.level(i == pattern_seq[pattern_seq_position] and 15 or 2)
-      screen.rect(0,50 + i * 3, 1, 2)
-      screen.fill()
-    end  
-  end
-
-  --Draw arranger time and glyphs
+  -- For all screen views, draw arranger time and glyphs
   screen.move(97,8)
   screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
   screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
@@ -1639,11 +1662,87 @@ function redraw()
       end
     end
   end
-  screen.fill()
+  
+  -- Draw the arranger Y axis reference marks
+  if screen_view_name == 'Arranger' then
+
+    -- Axis reference marks so it's easier to distinguish the pattern position
+    for i = 1,4 do
+      screen.level(i == pattern_seq[pattern_seq_position] and 15 or 2)
+      screen.rect(0,50 + i * 3, 1, 2)
+      screen.fill()
+    end  
+    
+  -- Arranger menu
+    local menu_offset = scroll_offset(arranger_menu_index,#arranger_menus, 5, 10)  -- To-do: edit values to reflect Arranger screen space
+    line = 1
+    for i = 1,#arranger_menus do
+      screen.move(2, line * 10 + 8 - menu_offset)    --exp
+      screen.level(arranger_menu_index == i and 15 or 3)
+      screen.text(first_to_upper(param_formatter(param_id_to_name(arranger_menus[i]))) .. string.sub(params:string(arranger_menus[i]), 1, 16))
+      line = line + 1
+    end
+ 
+    -- Arranger sticky header
+    screen.level(arranger_menu_index == 0 and 15 or 4)
+    screen.rect(0,0,92,11)
+    screen.fill()
+    screen.move(2,8)
+    screen.level(0)
+    screen.text('ARRANGER')
+      
+  elseif screen_view_name == 'Generator' then
+    -- Arranger sticky header
+    screen.level(4)
+    screen.rect(0,0,92,11)
+    screen.fill()
+    screen.move(2,8)
+    screen.level(0)
+    screen.text('GENERATOR')
+    
+  else -- SESSION
+    -- print('Session')
+    if view_key_count > 0 then
+      screen.level(7)
+      screen.move(64,32)
+      screen.font_size(16)
+      screen.text_center(grid_view_name)
+      screen.font_size(8)
+    elseif keys[1] == 1 then
+      screen.level(15)
+      screen.move(2,8)
+      screen.text('FN KEY +')
+      screen.move(2,28)
+      screen.text('KEY 2: Randomize')
+      screen.move(2,48)
+      screen.text('ENC 2: Rotate seq ↑↓')
+      screen.move(2,58)
+      screen.text('ENC 3: Transpose seq ←→')
+    else
+      
+      -- Scrolling menus
+      local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
+      line = 1
+      for i = 1,#menus[page_index] do
+        screen.move(2, line * 10 + 8 - menu_offset)    --exp
+        screen.level(menu_index == i and 15 or 3)
+        screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
+        line = line + 1
+      end
+   
+      --Sticky header
+      screen.level(menu_index == 0 and 15 or 4)
+      screen.rect(0,0,92,11)
+      screen.fill()
+      screen.move(2,8)
+      screen.level(0)
+      screen.text('SESSION-'.. page_name)
+      
+    screen.fill()
+    end
   end
   screen.update()
 end
-
 
 function percent_chance (percent)
   return percent >= math.random(1, 100) 
