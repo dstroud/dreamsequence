@@ -2,7 +2,7 @@
 --
 -- KEY 1: Fn (hold)
 -- KEY 2: Play/pause
--- KEY 3: Toggle Arranger
+-- KEY 3: Reset/Generate
 --
 -- ENC 1: Pages
 -- ENC 2: Scroll
@@ -411,10 +411,6 @@ function transport_midi_update()
   transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
 end
 
-function print_this(msg)
-  -- print(msg)
-  print(clock.get_tempo() .. ' ' .. params:get('clock_tempo'))
-end
 
 function crow_pullup()
   crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
@@ -1847,7 +1843,7 @@ function randomize()
   -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
   arp_pattern_length[1] = math.random(3,4) * (percent_chance(70) and 2 or 1)
   tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
-  params:set('arp_div_index', (math.random(3,6) * 2) - tuplet_shift)
+  params:set('arp_div_index', (math.random(2,6) * 2) - tuplet_shift)
   params:set('arp_duration_index',params:get('arp_div_index'))  -- Testing out setting these to the same val
 
   
@@ -1878,7 +1874,7 @@ function randomize()
   
   
   --CHORD PROGRESSION ALGOS
-  chord_algo =  math.random(1,4)
+  chord_algo = math.random(1,4)
   
   if chord_algo == 1 then
     -- I-V-vi-IV based progression ****
@@ -1898,40 +1894,8 @@ function randomize()
     rotate_pattern('Chord', math.random(0, 3))
     transpose_pattern(math.random() >= .5 and 7 or 0)
     
-  elseif chord_algo == 2 then  
-    -- vi-ii-V-I based circle progression ***
-    -- keeps ii–V–I turnaround at the end with random pattern length
-    print('Chord algo: vi-ii-V-I based circle progression')
-    local progression = {1,5,6,4}
-    local progression = {8,4,7,3,6,2,5,1}
-    local swappable_index_iii = {1,2,6,7,8} --Spots we might swap in a iii (avoiding repeat iii chords)
-    local swappable_index_v = {1,2,3,4,5}   --Spots we might swap in a V (avoiding repeat V chords)
-    -- Chance of adding a iii and V
-    local chord_index = swappable_index_iii[math.random(1,4)]
-    progression[chord_index] = percent_chance(50) and 3 or progression[chord_index]
-    local chord_index = swappable_index_v[math.random(1,4)]
-    progression[chord_index] = percent_chance(50) and 5 or progression[chord_index]
-    pattern_length[pattern] = math.random(2,4) * 2
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i + (8 - pattern_length[pattern])]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    -- 50% chance of rotating to end on I−vi−ii−V turnaround
-    if percent_chance(50) then
-      rotate_pattern('Chord', math.random() >= .5 and 1 or 0)
-      -- optional octave shift of first chord. Doesn't really sound better IMO.
-      -- if chord_seq[pattern][1].x == 1 then
-      --   chord_seq[pattern][1].x = 8 --raw key x coordinate
-      --   chord_seq[pattern][1].c = 1 --chord 1-7 (no octave)
-      --   chord_seq[pattern][1].o = 1 --octave 
-      -- end
-    end
     
-    
-     elseif chord_algo == 3 then
+  elseif chord_algo == 2 then
     -- I-vi based major progression ***
     print('Chord algo: I-vi based major progression')
     -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
@@ -1950,7 +1914,7 @@ function randomize()
     transpose_pattern(math.random() >= .5 and 7 or 0)    
   
  
-    elseif chord_algo == 4 then  
+  elseif chord_algo == 3 then
     -- Some weird mostly random stuff
     print('Chord algo: Weird random chords')
     random_pattern_lengths = {3,4,6,8}
@@ -1982,8 +1946,65 @@ function randomize()
       chord_seq[pattern][random_pattern_length].c = util.wrap(random_1_14, 1, 7) --chord 1-7 (no octave)
       chord_seq[pattern][random_pattern_length].o = math.floor(random_1_14 / 8) --octave
     end
-  end
   
+  elseif chord_algo == 4 then
+    -- I-vi based 2-chord progression ****
+    print('Chord algo: I-vi based 2-chord progression')
+    local modes = {1}
+    params:set('mode', modes[math.random(1,#modes)])
+    local progression = {1,2,3,4,5,6}
+    local progression = shuffle(progression)
+    if progression[1] - progression[2] > 3 then
+      progression[2] = progression[2] + 7
+    elseif progression[2] - progression[1] > 3 then
+      progression[1] = progression[1] + 7
+    end
+    pattern_length[pattern] = 2
+    clear_chord_pattern()
+    for i = 1, pattern_length[pattern] do
+      local x = progression[i]
+      chord_seq[pattern][i].x = x --raw key x coordinate
+      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][i].o = math.floor(x / 8) --octave
+    end
+    
+    
+    
+elseif chord_algo == 5 then
+    -- vi-ii-V-I based circle progression ***
+    -- keeps ii–V–I turnaround at the end with random pattern length
+    print('Chord algo: vi-ii-V-I based circle progression')
+    local progression = {1,5,6,4}
+    local progression = {8,4,7,3,6,2,5,1}
+    local swappable_index_iii = {1,2,6,7,8} --Spots we might swap in a iii (avoiding repeat iii chords)
+    local swappable_index_v = {1,2,3,4,5}   --Spots we might swap in a V (avoiding repeat V chords)
+    -- Chance of adding a iii and V
+    local chord_index = swappable_index_iii[math.random(1,4)]
+    progression[chord_index] = percent_chance(50) and 3 or progression[chord_index]
+    local chord_index = swappable_index_v[math.random(1,4)]
+    progression[chord_index] = percent_chance(50) and 5 or progression[chord_index]
+    pattern_length[pattern] = math.random(2,4) * 2
+    clear_chord_pattern()
+    for i = 1, pattern_length[pattern] do
+      local x = progression[i + (8 - pattern_length[pattern])]
+      chord_seq[pattern][i].x = x --raw key x coordinate
+      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][i].o = math.floor(x / 8) --octave
+    end  
+    -- 50% chance of rotating to end on I−vi−ii−V turnaround
+    if percent_chance(50) then
+      rotate_pattern('Chord', math.random() >= .5 and 1 or 0)
+      -- optional octave shift of first chord. Doesn't really sound better IMO.
+      -- if chord_seq[pattern][1].x == 1 then
+      --   chord_seq[pattern][1].x = 8 --raw key x coordinate
+      --   chord_seq[pattern][1].c = 1 --chord 1-7 (no octave)
+      --   chord_seq[pattern][1].o = 1 --octave 
+      -- end
+    end
+  end
+
+    
+    
   -- elseif chord_algo == 3 then
   --   -- ii-iii-IV-V based progression ***
   --   print('Chord algo: ii-iii-IV-V based progression')
@@ -2089,17 +2110,19 @@ function randomize()
   until (arp_root ~= arp_offset)
 
 
-  random_arp_algo = math.random(1,7)
+  random_arp_algo = math.random(1,10)
 
+  -- ER 1-note + rests ****
   if random_arp_algo == 1 then
-    -- ER 1-note + rests ****
     print('Arp algo: ER 1-note + rests ****')
     for i = 1, #er_table[1] do
       arp_seq[1][i] = er_table[1][i] and arp_root or 0
     end
+    rotate_pattern('Arp', math.random(0,percent_chance(50) and 7 or 0)) 
     
+    
+  -- ER sequential + rests ****
   elseif random_arp_algo == 2 then    -- To-do: simplify once there is a universal check for out-of-range values
-    -- ER sequential + rests ****
     print('Arp algo: ER sequential + rests ****')
     local note_shift = 0
     if arp_root - er_note_on_count < 1 then
@@ -2120,8 +2143,9 @@ function randomize()
       end
     end
 
-  elseif random_arp_algo == 3 then
+
   -- ER drunk + rests ***  -- no check for out of bounds x
+  elseif random_arp_algo == 3 then
     print('Arp algo: ER drunk + rests ***')
     local note_shift = 0
     for i = 1, #er_table[1] do
@@ -2129,6 +2153,7 @@ function randomize()
       direction = math.random() > .5 and 1 or -1
       note_shift = note_shift + (er_table[1][i] and direction or 0)
     end
+  
   
   elseif random_arp_algo == 4 then   
     -- Sequential up
@@ -2138,10 +2163,32 @@ function randomize()
     end
 
 
-    
-  elseif random_arp_algo == 5 then   
+  elseif random_arp_algo == 5 then       
+    -- Sequential down
+    print('Arp algo: Sequential down')
+    for i = 1, arp_pattern_length[1] do
+      arp_seq[1][i] = arp_max + 1 - i
+    end
+  
+  
+  elseif random_arp_algo == 6 then       
+    -- Random with chance of ER mask
+    print('Arp algo: Random with ER mask')
+    for i = 1, arp_pattern_length[1] do
+      arp_seq[1][i] = math.random(1,7) + random_note_offset
+    end
+    if percent_chance(60) then --add some rests to the arp
+      for i = 1, arp_pattern_length[1] do
+        arp_seq[1][i] = er_table[1][i] and arp_seq[1][i] or 0
+      end
+    end
+  
+  elseif random_arp_algo == 7 then 
     -- Strum up
     print('Arp algo: Strum up')
+    
+    -- Pretty fast arps here so no shifting octave down
+    -- params:set('arp_octave', math.max(params:get('arp_octave'), 0))
     
     params:set('arp_mode', 2)
     params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
@@ -2153,33 +2200,85 @@ function randomize()
     
     for i = 1, arp_pattern_length[1] do
       arp_seq[1][i] = arp_min - 1 + i
-    end   
+    end 
 
-  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
-  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
-  
-  
+
+  elseif random_arp_algo == 8 then
+    -- Strum down
+    print('Arp algo: Strum down')
+    
+    -- Pretty fast arps here so no shifting octave down
+    -- params:set('arp_octave', math.max(params:get('arp_octave'), 0))
+    
+    params:set('arp_mode', 2)
+    params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
+    params:set('arp_duration_index',15)
+    arp_pattern_length[1] = math.random(3,4) * 2
+
+    -- Strum speed from 1/64T to 1/32T
+    params:set('arp_div_index', math.random(1,5))
+    
+    for i = 1, arp_pattern_length[1] do
+      arp_seq[1][i] = arp_max - 1 - i
+    end
+    
+    
+  -- Sequential up-down  
+  elseif random_arp_algo == 9 then 
+    print('Arp algo: Sequential up-down')
+      
+    -- Pretty fast arps here so no shifting octave down
+    params:set('arp_octave', math.max(params:get('arp_octave'), 0))
+
+    -- Prefer longer and faster sequence    
+    arp_pattern_length[1] = math.random(3,4) * 2 -- 6 (tuplet) or 8 length
+    tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
+    
+    -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
+    params:set('arp_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
+    
+    -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
+    params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
+    print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
+    local peak = math.random(2, arp_pattern_length[1] - 1)
+    for i = 1, peak do
+      arp_seq[1][i] = arp_min - 1 + i
+    end
+    for i = 1, arp_pattern_length[1] - peak do
+      arp_seq[1][i + peak] = arp_seq[1][peak] - i
+    end  
+ 
+
+  -- Sequential down-up  
+  elseif random_arp_algo == 10 then 
+    print('Arp algo: Sequential down-up')
+      
+    -- Pretty fast arps here so no shifting octave down
+    params:set('arp_octave', math.max(params:get('arp_octave'), 0))
+
+    -- Prefer longer and faster sequence    
+    arp_pattern_length[1] = math.random(3,4) * 2 -- 6 (tuplet) or 8 length
+    tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
+    
+    -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
+    params:set('arp_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
+    
+    -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
+    params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
+    -- print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
+    local peak = math.random(2, arp_pattern_length[1] - 1)
+    for i = 1, peak do
+      arp_seq[1][i] = arp_max - 1 - i
+    end
+    for i = 1, arp_pattern_length[1] - peak do
+      arp_seq[1][i + peak] = arp_seq[1][peak] + i
+    end  
+    
+    
+  end -- end of arp selection
   
 
-  elseif random_arp_algo == 6 then       
-    -- Sequential down
-    print('Arp algo: Sequential down')
-    for i = 1, arp_pattern_length[1] do
-      arp_seq[1][i] = arp_max + 1 - i
-    end
-  
-  elseif random_arp_algo == 7 then       
-    -- Random with chance of ER mask
-    print('Arp algo: Random with ER mask')
-    for i = 1, arp_pattern_length[1] do
-      arp_seq[1][i] = math.random(1,7) + random_note_offset
-    end
-    if percent_chance(60) then --add some rests to the arp
-      for i = 1, arp_pattern_length[1] do
-        arp_seq[1][i] = er_table[1][i] and arp_seq[1][i] or 0
-      end
-    end
-  end
+
 
 
   -- This is all about setting the engine cutoff values to something reasonable for the pitch of the chord and arp  
