@@ -75,7 +75,7 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
 
-  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
+  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},3)
     params:set_action("chord_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -590,7 +590,7 @@ function sequence_clock()
     
     clock.sync(1/global_clock_div)    -- To-do: Add offset param usable for Link delay compensation
     
-    if start == true then
+    if start == true and stop ~= true then
       -- Send out MIDI start/continue messages
       transport_midi_update()
       if params:get('clock_midi_out') ~= 1 then 
@@ -634,6 +634,38 @@ function sequence_clock()
     if grid_dirty == true then
       grid_redraw()
       grid_dirty = false
+    end
+
+
+    -- Stop quantized to occur at last step of 24ppqn division (MIDI beat clock)
+    if stop == true then
+      -- Stop is quantized to occur at the end of the beat (x4 to stop at end of measure)
+      if (clock_step + 1) % global_clock_div == 0 then  --stops at the end of the beat.
+        
+        -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
+        clock_step = util.wrap(clock_step - 1, 0, 1535)  
+          
+        transport_midi_update() 
+        if params:get('clock_midi_out') ~= 1 then
+          transport_midi:stop()
+        end
+        
+        print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+        print('Canceling clock_id ' .. (sequence_clock_id or 0))
+        
+        clock.cancel(sequence_clock_id)-- or 0)
+      
+        -- If syncing to an external clock source
+        if params:get('clock_source') ~= 1 then -- External clock
+          if params:get('arranger_enabled') == 1 then 
+            reset_arrangement()
+          else
+            reset_pattern()
+          end
+        end
+        transport_active = false
+        stop = false
+      end
     end
 
   end
@@ -710,47 +742,55 @@ function clock.transport.start()
   start = true
 end
 
-function clock.transport.stop()
-  transport_midi_update()
-  if params:get('clock_midi_out') ~= 1 then
-    transport_midi:stop() --Stop vs continue?
-  end
-  print('Transport stopping. clock_start_method: '.. clock_start_method)
-  print('Canceling clock_id ' .. (sequence_clock_id or 0))
-  clock.cancel(sequence_clock_id)-- or 0)
-  transport_active = false
 
-  if params:get('clock_source') ~= 1 then -- External clock
-    if params:get('arranger_enabled') == 1 then -- When following an external clock, reset arranegement.
-      reset_arrangement()
-    else
-      reset_pattern()
-    end
-  end
-  -- get_next_chord()
+function clock.transport.stop()
+  stop = true
+  -- transport_active = false  -- Move inside sequence_clock
+  
+  -- transport_midi_update()   -- Move inside sequence_clock
+  -- if params:get('clock_midi_out') ~= 1 then
+  --   transport_midi:stop()
+  -- end
+  
+  -- print('Transport stopping. clock_start_method: '.. clock_start_method)
+  -- print('Canceling clock_id ' .. (sequence_clock_id or 0))
+  
+  -- clock.cancel(sequence_clock_id)-- or 0) -- Move inside sequence_clock
+
+  -- -- If syncing to an external clock source
+  -- if params:get('clock_source') ~= 1 then -- External clock
+  --   if params:get('arranger_enabled') == 1 then 
+  --     reset_arrangement()
+  --   else
+  --     reset_pattern()
+  --   end
+  -- end
 end
 
+
 -- function clock.transport.stop()
+--   transport_active = false
 --   transport_midi_update()
 --   if params:get('clock_midi_out') ~= 1 then
---     transport_midi:stop() --Stop vs continue?
+--     transport_midi:stop()
 --   end
 --   print('Transport stopping. clock_start_method: '.. clock_start_method)
 --   print('Canceling clock_id ' .. (sequence_clock_id or 0))
 --   clock.cancel(sequence_clock_id)-- or 0)
---   transport_active = false
 
+--   -- If syncing to an external clock source
 --   if params:get('clock_source') ~= 1 then -- External clock
---     if params:get('arranger_enabled') == 1 then -- When following an external clock, reset arranegement.
+--     if params:get('arranger_enabled') == 1 then 
 --       reset_arrangement()
 --     else
 --       reset_pattern()
 --     end
 --   end
---   get_next_chord()
 -- end
-   
 
+
+
+-- Does not set start = true since this can be called by clock.transport.stop() when pausing
 function reset_pattern() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
   pattern_queue = false
   arp_seq_position = 0
@@ -761,7 +801,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   redraw()
 end
 
-
+-- Does not set start = true since this can be called by clock.transport.stop() when pausing
 function reset_arrangement() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
   arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
   pattern_queue = false
@@ -778,7 +818,7 @@ end
 
 function reset_clock()
   clock_step = -1 -- clock_step rewrite
-  clock_start_method = 'start'
+  -- clock_start_method = 'start'    -- This could be causing a start when we want continue
 end
 
 
@@ -1405,6 +1445,8 @@ function key(n,z)
       elseif params:string('clock_source') == 'internal' then
         if transport_active then
           clock.transport.stop()
+          clock_start_method = 'continue'
+          start = true  -- Test!
         else
           clock.transport.start()
         end
@@ -1417,13 +1459,13 @@ function key(n,z)
       
       
       -- If we're sending MIDI clock out, send a stop msg
-      -- Tell the transport to start on the next sync of sequence_clock
-      -- Might make more sense to move start = true to inside the reset_x functions
+      -- Tell the transport to Start on the next sync of sequence_clock
       if params:get('clock_midi_out') ~= 1 then
         if transport_active then
           transport_midi:stop()
         end
         -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+        clock_start_method = 'start'
         start = true
       end    
 
