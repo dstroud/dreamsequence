@@ -270,7 +270,7 @@ function init()
   view_key_count = 0
   keys = {}
   key_count = 0
-  global_clock_div = 48
+  global_clock_div = 24
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
     for i = 1,8 do
@@ -727,7 +727,7 @@ function clock.transport.stop()
       reset_pattern()
     end
   end
-  get_next_chord()
+  -- get_next_chord()
 end
 
 -- function clock.transport.stop()
@@ -756,6 +756,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   arp_seq_position = 0
   chord_seq_position = 0
   reset_clock()
+  get_next_chord()
   grid_redraw()
   redraw()
 end
@@ -1414,16 +1415,19 @@ function key(n,z)
         randomize()
       end
       
-        
+      
+      -- If we're sending MIDI clock out, send a stop msg
+      -- Tell the transport to start on the next sync of sequence_clock
+      -- Might make more sense to move start = true to inside the reset_x functions
       if params:get('clock_midi_out') ~= 1 then
         if transport_active then
           transport_midi:stop()
-          transport_midi:start()
-        else
-          transport_midi:stop()
         end
-      end
-    
+        -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+        start = true
+      end    
+
+  
       if params:get('arranger_enabled') == 1 then
         reset_arrangement()
       else
@@ -1432,7 +1436,7 @@ function key(n,z)
       
 
       
-      
+      -- -- KEEP THIS AROUND: Logic for resetting arranger
       -- if params:get('arranger_enabled') == 1 then
       --   reset_arrangement()
       -- else
