@@ -220,7 +220,16 @@ function init()
   glyphs = {
     {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}}, --repeat glyph     
     {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}},} --one-shot glyph
-          
+  
+  
+  clock_start_method = 'start'
+  
+  -- Send out MIDI stop on launch
+  transport_midi_update() 
+  if params:get('clock_midi_out') ~= 1 then
+    transport_midi:stop()
+  end
+        
   chord_seq_retrig = true
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
@@ -270,7 +279,7 @@ function init()
   view_key_count = 0
   keys = {}
   key_count = 0
-  global_clock_div = 24
+  global_clock_div = 48
   chord_seq = {{},{},{},{}} 
   for p = 1,4 do
     for i = 1,8 do
@@ -588,8 +597,11 @@ function sequence_clock()
   while transport_active do
     -- To-do: add option for initial delay when syncing to external MIDI/Link
     
-    clock.sync(1/global_clock_div)    -- To-do: Add offset param usable for Link delay compensation
     
+    clock.sync(1/global_clock_div)    -- To-do: Add offset param usable for Link delay compensation
+
+
+    -- START
     if start == true and stop ~= true then
       -- Send out MIDI start/continue messages
       transport_midi_update()
@@ -605,42 +617,19 @@ function sequence_clock()
       start = false
     end
     
+    
+    -- ADVANCE CLOCK_STEP
     -- Wrap not strictly needed and could actually be used to count arranger position? 
     -- 192 tics per measure * 8 (max a step can be, 0-indexed. 
     clock_step = util.wrap(clock_step + 1,0, 1535)
-  
-    -- pre-loads next chord to allow early notes to be quantized according to the upcoming chord
-    if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
-      get_next_chord()
-    end
     
-    if clock_step % chord_div == 0 then
-      advance_chord_seq()
-      grid_dirty = true
-      redraw() -- Update chord readout
-    end
-
-    if clock_step % arp_div == 0 then
-      if params:string('arp_mode') == 'Loop' or play_arp then
-        advance_arp_seq()
-        grid_dirty = true      
-      end
-    end
     
-    if clock_step % params:get('crow_div') == 0 then
-      crow.output[3]() --pulse defined in init
-    end
     
-    if grid_dirty == true then
-      grid_redraw()
-      grid_dirty = false
-    end
-
-
-    -- Stop quantized to occur at last step of 24ppqn division (MIDI beat clock)
+    -- STOP beat-quantized
     if stop == true then
-      -- Stop is quantized to occur at the end of the beat (x4 to stop at end of measure)
-      if (clock_step + 1) % global_clock_div == 0 then  --stops at the end of the beat.
+      
+      -- Stop is quantized to occur at the end of the beat ( trying out x4 to stop at end of measure) To-do: add param for this?
+      if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the beat.
         
         -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
         clock_step = util.wrap(clock_step - 1, 0, 1535)  
@@ -665,7 +654,39 @@ function sequence_clock()
         end
         transport_active = false
         stop = false
+          -- transport_active = false
       end
+    end
+  
+  
+    -- Checking transport state again in case transport was just set to 'false' by Stop
+    if transport_active then
+      -- pre-loads next chord to allow early notes to be quantized according to the upcoming chord
+      if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
+        get_next_chord()
+      end
+      
+      if clock_step % chord_div == 0 then
+        advance_chord_seq()
+        grid_dirty = true
+        redraw() -- Update chord readout
+      end
+  
+      if clock_step % arp_div == 0 then
+        if params:string('arp_mode') == 'Loop' or play_arp then
+          advance_arp_seq()
+          grid_dirty = true      
+        end
+      end
+      
+      if clock_step % params:get('crow_div') == 0 then
+        crow.output[3]() --pulse defined in init
+      end
+    end
+    
+    if grid_dirty == true then
+      grid_redraw()
+      grid_dirty = false
     end
 
   end
