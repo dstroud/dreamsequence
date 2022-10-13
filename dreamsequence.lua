@@ -26,10 +26,11 @@ out_midi = midi.connect(1) -- To-do: multiple MIDI in/out
 transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
 
 function init()
+  init_generator()
   crow.ii.jf.mode(1)
   params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with Bento's clock
 
-
+  
   --Global params
   params:add_separator ('Global')
   params:add_number("transpose","Key",-12, 12, 0, function(param) return transpose_string(param:get()) end)
@@ -113,7 +114,8 @@ function init()
 
   --Arp params
   params:add_separator ('Arp')
-  
+  params:add_option('arp_generator', 'Arp', arp_algos['name'], 1)
+  -- params:add_number('arp_generator', 'Generator Algo', 0, #arp_algos['name'], 0)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
@@ -252,10 +254,12 @@ function init()
   menu_update()
   menu_index = 0
   selected_menu = menus[page_index][menu_index]
+  generator_menus = {}
+  generator_menu_index = 1 -- No top level option (yet)
+  selected_generator_menu = generator_menus[generator_menu_index]
   arranger_menus = {}
   arranger_menu_index = 1 -- No top level option (yet)
   selected_arranger_menu = arranger_menus[arranger_menu_index]
-    print(selected_arranger_menu)
   transport_active = false
   automator_events = {}
   pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
@@ -315,6 +319,9 @@ end
 
 
 function menu_update()
+ 
+  -- Generator menu. TBD if this should be here or in a separate function
+  generator_menus = {'arp_generator'}
   
   -- Arranger menu. TBD if this should be here or in a separate function
   arranger_menus = {'arranger_enabled', 'playback', 'crow_assignment'}
@@ -762,49 +769,7 @@ end
 
 function clock.transport.stop()
   stop = true
-  -- transport_active = false  -- Move inside sequence_clock
-  
-  -- transport_midi_update()   -- Move inside sequence_clock
-  -- if params:get('clock_midi_out') ~= 1 then
-  --   transport_midi:stop()
-  -- end
-  
-  -- print('Transport stopping. clock_start_method: '.. clock_start_method)
-  -- print('Canceling clock_id ' .. (sequence_clock_id or 0))
-  
-  -- clock.cancel(sequence_clock_id)-- or 0) -- Move inside sequence_clock
-
-  -- -- If syncing to an external clock source
-  -- if params:get('clock_source') ~= 1 then -- External clock
-  --   if params:get('arranger_enabled') == 1 then 
-  --     reset_arrangement()
-  --   else
-  --     reset_pattern()
-  --   end
-  -- end
 end
-
-
--- function clock.transport.stop()
---   transport_active = false
---   transport_midi_update()
---   if params:get('clock_midi_out') ~= 1 then
---     transport_midi:stop()
---   end
---   print('Transport stopping. clock_start_method: '.. clock_start_method)
---   print('Canceling clock_id ' .. (sequence_clock_id or 0))
---   clock.cancel(sequence_clock_id)-- or 0)
-
---   -- If syncing to an external clock source
---   if params:get('clock_source') ~= 1 then -- External clock
---     if params:get('arranger_enabled') == 1 then 
---       reset_arrangement()
---     else
---       reset_pattern()
---     end
---   end
--- end
-
 
 
 -- Does not set start = true since this can be called by clock.transport.stop() when pausing
@@ -1458,7 +1423,7 @@ function key(n,z)
       -- Fn menu is displayed since keys[1] == 1
     elseif n == 2 then
       if keys[1] == 1 then
-        randomize()
+        generator()
       elseif params:string('clock_source') == 'internal' then
         if transport_active then
           clock.transport.stop()
@@ -1471,7 +1436,7 @@ function key(n,z)
     elseif n == 3 then
       -- K3 in Generator immediately randomizes and resets, other views just reset
       if screen_view_name == 'Generator' then
-        randomize()
+        generator()
       end
       
       
@@ -1590,9 +1555,10 @@ function enc(n,d)
       elseif n == 2 then
         if screen_view_name == 'Arranger' then
           arranger_menu_index = util.clamp(arranger_menu_index + d, 1, #arranger_menus)
-          print(arranger_menu_index)
           selected_arranger_menu = arranger_menus[arranger_menu_index]
-          -- print(selected_arranger_menu)
+        elseif screen_view_name == 'Generator' then
+          generator_menu_index = util.clamp(generator_menu_index + d, 1, #generator_menus)
+          selected_generator_menu = generator_menus[generator_menu_index]
         else
           menu_index = util.clamp(menu_index + d, 0, #menus[page_index])
           selected_menu = menus[page_index][menu_index]
@@ -1601,6 +1567,9 @@ function enc(n,d)
       if screen_view_name == 'Arranger' then      
         selected_arranger_menu = arranger_menus[arranger_menu_index]
         params:delta(selected_arranger_menu, d)
+      elseif screen_view_name == 'Generator' then      
+        selected_generator_menu = generator_menus[generator_menu_index]
+        params:delta(selected_generator_menu, d)
       elseif screen_view_name == 'Session' then
         if menu_index == 0 then
           menu_index = 0
@@ -1755,7 +1724,16 @@ function redraw()
     screen.text('ARRANGER')
       
   elseif screen_view_name == 'Generator' then
-    -- Arranger sticky header
+    local menu_offset = scroll_offset(arranger_menu_index,#arranger_menus, 5, 10)  -- To-do: edit values to reflect Generator screen space
+    line = 1
+    for i = 1,#generator_menus do
+      screen.move(2, line * 10 + 8 - menu_offset)    --exp
+      screen.level(generator_menu_index == i and 15 or 3)
+      screen.text(first_to_upper(param_formatter(param_id_to_name(generator_menus[i]))) .. string.sub(params:string(generator_menus[i]), 1, 16))
+      line = line + 1
+    end
+    
+    -- Generator sticky header
     screen.level(4)
     screen.rect(0,0,92,11)
     screen.fill()
@@ -1826,480 +1804,4 @@ function shuffle(tbl)
     tbl[i], tbl[j] = tbl[j], tbl[i]
   end
   return tbl
-end
-
-    
-function randomize()
-  
-  params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
-  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
-    
-    
-  -- These can be overwritten by individual algorithms
-  -- local random_divisions = {16,32,12,20,24,28,32}
-  -- params:set('chord_div_index', random_divisions[math.random(1,2) + (percent_chance(10) and math.random(1,5) or 0)]) -- Mostly standard
-
-  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
-  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
-  arp_pattern_length[1] = math.random(3,4) * (percent_chance(70) and 2 or 1)
-  tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
-  params:set('arp_div_index', (math.random(2,6) * 2) - tuplet_shift)
-  params:set('arp_duration_index',params:get('arp_div_index'))  -- Testing out setting these to the same val
-
-  
-  --SEQUENCE RANDOMIZATION
-  
-  params:set('transpose', math.random(-12,12))
-  params:set('chord_type', percent_chance(20) and 4 or 3)
-  params:set('arp_chord_type', percent_chance(40) and 4 or 3)
-  
-  if params:get('clock_source') == 1 then 
-    params:set('clock_tempo', math.random(70,130))
-  end
-  params:set('mode', math.random(1,9))
-
-  
-  --ENGINE BASED RANDOMIZATIONS
-  -- May be overwritten depending on algo type
-  params:set('chord_pp_amp', 50)
-  params:set('chord_pp_gain', math.random(0,350))
-  params:set('chord_pp_pw', math.random(10,90))
-  params:set('chord_div_index', 15)
-  params:set('chord_duration_index', params:get('chord_div_index'))
-  
-  params:set('arp_pp_amp', 70)
-  params:set('arp_pp_gain', math.random(0,350))
-  params:set('arp_pp_pw', math.random(10,90))
-  params:set('arp_mode', 1) -- Disabling unless enabled by specific algos, math.random(1,2))
-  
-  
-  --CHORD PROGRESSION ALGOS
-  chord_algo = math.random(1,4)
-  
-  if chord_algo == 1 then
-    -- I-V-vi-IV based progression ****
-    -- To-do: logic for 7th
-    print('Chord algo: I-V-vi-IV-based progression')
-    local modes = {1,2,3,8}
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {1,5,6,4}
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern('Chord', math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-    
-    
-  elseif chord_algo == 2 then
-    -- I-vi based major progression ***
-    print('Chord algo: I-vi based major progression')
-    -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
-    params:set('mode', 1) -- modes[math.random(1,4)])
-    local progression = {1,2,3,4,5,6}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern('Chord', math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)    
-  
- 
-  elseif chord_algo == 3 then
-    -- Some weird mostly random stuff
-    print('Chord algo: Weird random chords')
-    random_pattern_lengths = {3,4,6,8}
-    random_pattern_length = random_pattern_lengths[2 + (percent_chance(20) and math.random(-1,2) or 0)] -- Mostly 4-chord patt, chance of others
-    pattern_length[pattern] = random_pattern_length
-    random_chord_offset = math.random (0,7)
-    for i = 1, 8 do
-      chord_seq[pattern][i].x = 0
-      chord_seq[pattern][i].c = 0
-      chord_seq[pattern][i].o = 0
-    end
-    for i = 1, pattern_length[pattern] do
-      local random_1_14 = math.random(1,7) + random_chord_offset
-      chord_seq[pattern][i].x = random_1_14 --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(random_1_14, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(random_1_14 / 8) --octave
-    end
-    
-    if random_pattern_length > 4 and percent_chance(90) then  --Repeat the first half of 6/8-chord patterns
-      local half_random_pattern_length = random_pattern_length / 2
-      for i = 1, random_pattern_length / 2 do
-        chord_seq[pattern][i + half_random_pattern_length].x = chord_seq[pattern][i].x
-        chord_seq[pattern][i + half_random_pattern_length].c = chord_seq[pattern][i].c
-        chord_seq[pattern][i + half_random_pattern_length].o = chord_seq[pattern][i].o
-      end
-      -- Modify the last chord of the pattern. Kinda cheesy.
-      local random_1_14 = math.random(0,7) + random_chord_offset
-      chord_seq[pattern][random_pattern_length].x = random_1_14 --raw key x coordinate
-      chord_seq[pattern][random_pattern_length].c = util.wrap(random_1_14, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][random_pattern_length].o = math.floor(random_1_14 / 8) --octave
-    end
-  
-  elseif chord_algo == 4 then
-    -- I-vi based 2-chord progression ****
-    print('Chord algo: I-vi based 2-chord progression')
-    local modes = {1}
-    params:set('mode', modes[math.random(1,#modes)])
-    local progression = {1,2,3,4,5,6}
-    local progression = shuffle(progression)
-    if progression[1] - progression[2] > 3 then
-      progression[2] = progression[2] + 7
-    elseif progression[2] - progression[1] > 3 then
-      progression[1] = progression[1] + 7
-    end
-    pattern_length[pattern] = 2
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end
-    
-    
-    
-elseif chord_algo == 5 then
-    -- vi-ii-V-I based circle progression ***
-    -- keeps ii–V–I turnaround at the end with random pattern length
-    print('Chord algo: vi-ii-V-I based circle progression')
-    local progression = {1,5,6,4}
-    local progression = {8,4,7,3,6,2,5,1}
-    local swappable_index_iii = {1,2,6,7,8} --Spots we might swap in a iii (avoiding repeat iii chords)
-    local swappable_index_v = {1,2,3,4,5}   --Spots we might swap in a V (avoiding repeat V chords)
-    -- Chance of adding a iii and V
-    local chord_index = swappable_index_iii[math.random(1,4)]
-    progression[chord_index] = percent_chance(50) and 3 or progression[chord_index]
-    local chord_index = swappable_index_v[math.random(1,4)]
-    progression[chord_index] = percent_chance(50) and 5 or progression[chord_index]
-    pattern_length[pattern] = math.random(2,4) * 2
-    clear_chord_pattern()
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i + (8 - pattern_length[pattern])]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    -- 50% chance of rotating to end on I−vi−ii−V turnaround
-    if percent_chance(50) then
-      rotate_pattern('Chord', math.random() >= .5 and 1 or 0)
-      -- optional octave shift of first chord. Doesn't really sound better IMO.
-      -- if chord_seq[pattern][1].x == 1 then
-      --   chord_seq[pattern][1].x = 8 --raw key x coordinate
-      --   chord_seq[pattern][1].c = 1 --chord 1-7 (no octave)
-      --   chord_seq[pattern][1].o = 1 --octave 
-      -- end
-    end
-  end
-
-    
-    
-  -- elseif chord_algo == 3 then
-  --   -- ii-iii-IV-V based progression ***
-  --   print('Chord algo: ii-iii-IV-V based progression')
-  --   local modes = {1,5,8,9} --Preferred but kinda optional
-  --   params:set('mode', modes[math.random(1,4)])
-  --   local progression = {2,3,4,5}
-  --   local progression = shuffle(progression)
-  --   pattern_length[pattern] = 4
-  --   clear_chord_pattern()
-  --   for i = 1, pattern_length[pattern] do
-  --     local x = progression[i]
-  --     chord_seq[pattern][i].x = x --raw key x coordinate
-  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
-  --   end  
-  --   rotate_pattern('Chord', math.random(0, 3))
-  --   transpose_pattern(math.random() >= .5 and 7 or 0)
-
-  
-  
-    -- elseif chord_algo == 4 then
-    -- -- I-ii-iii-IV-V based progression ***
-    -- print('Chord algo: I-ii-iii-IV-V based progression')
-    -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
-    -- params:set('mode', modes[math.random(1,4)])
-    -- local progression = {1,2,3,4,5}
-    -- local progression = shuffle(progression)
-    -- pattern_length[pattern] = 4
-    -- clear_chord_pattern()
-    -- for i = 1, pattern_length[pattern] do
-    --   local x = progression[i]
-    --   chord_seq[pattern][i].x = x --raw key x coordinate
-    --   chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-    --   chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    -- end  
-    -- rotate_pattern('Chord', math.random(0, 3))
-    -- transpose_pattern(math.random() >= .5 and 7 or 0)
-    
-    
-      -- elseif chord_algo == 4 then
-  --   -- I-ii-iii-IV based progression ***
-  --   print('Chord algo: I-ii-iii-IV based progression')
-  --   local modes = {1,5,6,7,9} --Preferred but kinda optional
-  --   params:set('mode', modes[math.random(1,4)])
-  --   local progression = {1,2,3,4}
-  --   local progression = shuffle(progression)
-  --   pattern_length[pattern] = 4
-  --   clear_chord_pattern()
-  --   for i = 1, pattern_length[pattern] do
-  --     local x = progression[i]
-  --     chord_seq[pattern][i].x = x --raw key x coordinate
-  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
-  --   end  
-  --   rotate_pattern('Chord', math.random(0, 3))
-  --   transpose_pattern(math.random() >= .5 and 7 or 0)
-  
-  --   elseif chord_algo == 5 then  
-  --   -- Andalusian cadence *
-  --   local mode = percent_chance(50) and 6 or 2 --Phyrigian or natural minor
-  --   params:set('mode', mode)
-  --   print('Chord algo: Andalusian cadence, ' .. params:string('mode'))
-  --   local progression = {4,3,2,1}
-  --   pattern_length[pattern] = 4
-  --   clear_chord_pattern()
-  --   for i = 1, pattern_length[pattern] do
-  --     local x = progression[i] + (params:string('mode') == 'Natural Minor' and 4 or 0)
-  --     chord_seq[pattern][i].x = x --raw key x coordinate
-  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
-  --   end  
-    
-    
-                  
-  
-  --ARP
-  
-  local arp_min = math.random(1,7)
-  local arp_max = math.random(8,14)
-  local random_1_3 = math.random(1,3) * math.random(0,1) and -1 or 1
-  local random_1_7 = math.random(1,7)
-  local random_4_11 = math.random(4,11)   --arp note distribution center
-  local random_1_14 = math.random(1,14)  
-  
-  -- arp_pattern_length[1] = (math.random(1,4) * 2) + (percent_chance(20) and math.random(-1,1) or 0) -- Mostly even lengths
-  random_note_offset = math.random (0,7)
-  for i = 1,8 do --Wipe
-    arp_seq[1][i] = 0
-  end
-  
-  er_table = {{},{}}
-  er_table[1] = ER.gen(math.random(1, math.max(1,arp_pattern_length[1] - 1)), arp_pattern_length[1], 0) --pulses, steps, shift  -- max pulses?
-  er_table[2] = ER.gen(math.random(1, math.max(1,arp_pattern_length[1] - 1)), arp_pattern_length[1], 0) --pulses, steps, shift  -- max pulses?
-  
-  er_note_on_count = 0
-  for i = 1, #er_table[1] do
-    er_note_on_count = er_note_on_count + (er_table[1][i] and 1 or 0)
-  end
-  
-  arp_root = math.random(arp_min, arp_max)
-  repeat
-    arp_offset = math.random(arp_min, arp_max)
-  until (arp_root ~= arp_offset)
-
-
-  random_arp_algo = math.random(1,10)
-
-  -- ER 1-note + rests ****
-  if random_arp_algo == 1 then
-    print('Arp algo: ER 1-note + rests ****')
-    for i = 1, #er_table[1] do
-      arp_seq[1][i] = er_table[1][i] and arp_root or 0
-    end
-    rotate_pattern('Arp', math.random(0,percent_chance(50) and 7 or 0)) 
-    
-    
-  -- ER sequential + rests ****
-  elseif random_arp_algo == 2 then    -- To-do: simplify once there is a universal check for out-of-range values
-    print('Arp algo: ER sequential + rests ****')
-    local note_shift = 0
-    if arp_root - er_note_on_count < 1 then
-      for i = 1, #er_table[1] do
-        arp_seq[1][i] = er_table[1][i] and (arp_root + note_shift) or 0
-        note_shift = note_shift + (er_table[1][i] and 1 or 0)
-      end
-    elseif arp_root + er_note_on_count > 14 then
-      for i = 1, #er_table[1] do
-        arp_seq[1][i] = er_table[1][i] and (arp_root + note_shift) or 0
-        note_shift = note_shift - (er_table[1][i] and 1 or 0)
-      end
-    else
-      local direction = (arp_root + math.random() > .5 and 1 or -1)
-      for i = 1, #er_table[1] do    -- I don't think this is firing?
-        arp_seq[1][i] = er_table[1][i] and (arp_root + note_shift) or 0
-        note_shift = note_shift + (er_table[1][i] and direction or 0)
-      end
-    end
-
-
-  -- ER drunk + rests ***  -- no check for out of bounds x
-  elseif random_arp_algo == 3 then
-    print('Arp algo: ER drunk + rests ***')
-    local note_shift = 0
-    for i = 1, #er_table[1] do
-      arp_seq[1][i] = er_table[1][i] and (arp_root + note_shift) or 0
-      direction = math.random() > .5 and 1 or -1
-      note_shift = note_shift + (er_table[1][i] and direction or 0)
-    end
-  
-  
-  elseif random_arp_algo == 4 then   
-    -- Sequential up
-    print('Arp algo: Sequential up')
-    for i = 1, arp_pattern_length[1] do
-      arp_seq[1][i] = arp_min - 1 + i
-    end
-
-
-  elseif random_arp_algo == 5 then       
-    -- Sequential down
-    print('Arp algo: Sequential down')
-    for i = 1, arp_pattern_length[1] do
-      arp_seq[1][i] = arp_max + 1 - i
-    end
-  
-  
-  elseif random_arp_algo == 6 then       
-    -- Random with chance of ER mask
-    print('Arp algo: Random with ER mask')
-    for i = 1, arp_pattern_length[1] do
-      arp_seq[1][i] = math.random(1,7) + random_note_offset
-    end
-    if percent_chance(60) then --add some rests to the arp
-      for i = 1, arp_pattern_length[1] do
-        arp_seq[1][i] = er_table[1][i] and arp_seq[1][i] or 0
-      end
-    end
-  
-  elseif random_arp_algo == 7 then 
-    -- Strum up
-    print('Arp algo: Strum up')
-    
-    -- Pretty fast arps here so no shifting octave down
-    -- params:set('arp_octave', math.max(params:get('arp_octave'), 0))
-    
-    params:set('arp_mode', 2)
-    params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
-    params:set('arp_duration_index',15)
-    arp_pattern_length[1] = math.random(3,4) * 2
-
-    -- Strum speed from 1/64T to 1/32T
-    params:set('arp_div_index', math.random(1,5))
-    
-    for i = 1, arp_pattern_length[1] do
-      arp_seq[1][i] = arp_min - 1 + i
-    end 
-
-
-  elseif random_arp_algo == 8 then
-    -- Strum down
-    print('Arp algo: Strum down')
-    
-    -- Pretty fast arps here so no shifting octave down
-    -- params:set('arp_octave', math.max(params:get('arp_octave'), 0))
-    
-    params:set('arp_mode', 2)
-    params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
-    params:set('arp_duration_index',15)
-    arp_pattern_length[1] = math.random(3,4) * 2
-
-    -- Strum speed from 1/64T to 1/32T
-    params:set('arp_div_index', math.random(1,5))
-    
-    for i = 1, arp_pattern_length[1] do
-      arp_seq[1][i] = arp_max - 1 - i
-    end
-    
-    
-  -- Sequential up-down  
-  elseif random_arp_algo == 9 then 
-    print('Arp algo: Sequential up-down')
-      
-    -- Pretty fast arps here so no shifting octave down
-    params:set('arp_octave', math.max(params:get('arp_octave'), 0))
-
-    -- Prefer longer and faster sequence    
-    arp_pattern_length[1] = math.random(3,4) * 2 -- 6 (tuplet) or 8 length
-    tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
-    
-    -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
-    params:set('arp_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
-    
-    -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-    params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
-    print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
-    local peak = math.random(2, arp_pattern_length[1] - 1)
-    for i = 1, peak do
-      arp_seq[1][i] = arp_min - 1 + i
-    end
-    for i = 1, arp_pattern_length[1] - peak do
-      arp_seq[1][i + peak] = arp_seq[1][peak] - i
-    end  
- 
-
-  -- Sequential down-up  
-  elseif random_arp_algo == 10 then 
-    print('Arp algo: Sequential down-up')
-      
-    -- Pretty fast arps here so no shifting octave down
-    params:set('arp_octave', math.max(params:get('arp_octave'), 0))
-
-    -- Prefer longer and faster sequence    
-    arp_pattern_length[1] = math.random(3,4) * 2 -- 6 (tuplet) or 8 length
-    tuplet_shift = (arp_pattern_length[1] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
-    
-    -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
-    params:set('arp_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
-    
-    -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-    params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
-    -- print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
-    local peak = math.random(2, arp_pattern_length[1] - 1)
-    for i = 1, peak do
-      arp_seq[1][i] = arp_max - 1 - i
-    end
-    for i = 1, arp_pattern_length[1] - peak do
-      arp_seq[1][i + peak] = arp_seq[1][peak] + i
-    end  
-    
-    
-  end -- end of arp selection
-  
-
-
-
-
-  -- This is all about setting the engine cutoff values to something reasonable for the pitch of the chord and arp  
-  local chord_octave_shift = (params:get('chord_octave') * 7 ) -- octave param effectively shifts chord x by this many colums 
-  local arp_octave_shift = (params:get('arp_octave') * params:get('arp_chord_type') ) -- octave param effectively shifts arp x by this many colums  
-
-  max_chord_x = 0
-  for i = 1,8 do
-    max_chord_x = chord_seq[pattern][i].x > max_chord_x and chord_seq[pattern][i].x or max_chord_x
-  end
-  max_chord_x = max_chord_x + chord_octave_shift + params:get('transpose')
-  
-  local max_arp_x = math.max(table.unpack(arp_seq[1])) + arp_octave_shift + (params:get('transpose') / params:get('arp_chord_type'))-- Max x + effective offset for arp octave
-  local arp_min_cutoff = util.round(math.exp(.09 * max_arp_x + 6.1)) -- Makes sure the cutoff is appropriate for the arp range
-  local arp_max_cutoff = util.round(52.8017 * max_arp_x  + 3294.61) -- Setting an upper limit on the cutoff so there is some adjustability after
-  local chord_min_cutoff = util.round(math.exp(0.03 * max_arp_x + 6.2)) -- Makes sure the cutoff is appropriate for the chord range
-  
-  -- To-do: update cutoff logic to consider pitch change from 4-note (7th chords as well as key/transposition)
-  params:set('arp_pp_cutoff', math.random(arp_min_cutoff, arp_min_cutoff + 1000)) -- testing with min first math.random(arp_min_cutoff, arp_max_cutoff))
-  params:set('chord_pp_cutoff', math.random(chord_min_cutoff, chord_min_cutoff + 1000)) -- testing with min first
-
-  grid_redraw()
-  redraw()
 end
