@@ -44,9 +44,9 @@ function init()
     formatter = function(param) return mode_index_to_name(param:get()) end,}
     params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
       params:set_action('repeat_notes',function() menu_update() end)
-  params:add_number('dedupe_threshold', 'Threshold', 1, 10, division_to_index('1/32'), function(param) return divisions_string(param:get()) end)
+  params:add_number('dedupe_threshold', 'Threshold', 1, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
-  params:add_number('chord_preload', 'Chord preload', 1, 10, division_to_index('1/64'), function(param) return divisions_string(param:get()) end)
+  params:add_number('chord_preload', 'Chord preload', 1, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)      
       
   --Arrange params
@@ -73,6 +73,7 @@ function init()
   
   --Chord params
   params:add_separator ('Chord')
+  params:add_option('chord_generator', 'Chord', chord_algos['name'], 1)
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
 
@@ -100,7 +101,7 @@ function init()
   params:add_control("chord_pp_gain","Gain", pp_gain)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
-  params:add_number('chord_midi_ch','Channel',1, 16, 1)
+  params:add_number('chord_midi_ch','Channel',1, 16, 8)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
     params:set_action("crow_pullup",function() crow_pullup() end)
@@ -115,10 +116,9 @@ function init()
   --Arp params
   params:add_separator ('Arp')
   params:add_option('arp_generator', 'Arp', arp_algos['name'], 1)
-  -- params:add_number('arp_generator', 'Generator Algo', 0, #arp_algos['name'], 0)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -131,7 +131,7 @@ function init()
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
   params:add_control("arp_pp_gain","Gain", pp_gain)
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
-  params:add_number('arp_midi_ch','Channel',1, 16, 1)
+  params:add_number('arp_midi_ch','Channel',1, 16, 2)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
@@ -240,7 +240,7 @@ function init()
   crow.output[2].action = "pulse(.001,5,1)" -- Need to test this more vs. roll-your-own pulse
   crow.output[3].action = "pulse(.001,5,1)" 
   screen_views = {'Generator','Session','Arranger'}
-  screen_view_index = 2
+  screen_view_index = 1
   screen_view_name = screen_views[screen_view_index]
   grid_dirty = true
   grid_views = {'Arranger','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
@@ -321,7 +321,7 @@ end
 function menu_update()
  
   -- Generator menu. TBD if this should be here or in a separate function
-  generator_menus = {'arp_generator'}
+  generator_menus = {'chord_generator', 'arp_generator'}
   
   -- Arranger menu. TBD if this should be here or in a separate function
   arranger_menus = {'arranger_enabled', 'playback', 'crow_assignment'}
@@ -403,7 +403,7 @@ end
 
 
 
-function division_to_index(string)
+function div_to_index(string)
   for i = 1,#division_names do
     if tab.key(division_names[i],string) == 2 then
       return(i)
