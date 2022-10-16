@@ -271,6 +271,23 @@ function init()
   pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
   pattern_seq_position = 0
   pattern_seq_length = 1
+  pattern_seq_extd = {
+    {1,1,1,1},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}}
   steps_remaining_in_arrangement = 0
   elapsed = 0
   pattern_pos = 1 -- Check
@@ -324,7 +341,7 @@ function menu_update()
   generator_menus = {'chord_generator', 'arp_generator'}
   
   -- Arranger menu. TBD if this should be here or in a separate function
-  arranger_menus = {'arranger_enabled', 'playback', 'crow_assignment'}
+  arranger_menus = {'arranger_enabled', 'playback'} --, 'crow_assignment'}
   
   
   --Global menu
@@ -1293,17 +1310,33 @@ function g.key(x,y,z)
       
     --ARRANGER KEYS
     elseif grid_view_name == 'Arranger' then
+      
+      -- Arranger step updated
       if y < 5 then
-        if y == pattern_seq[x] and x > 1 then 
+        if y == pattern_seq[x] and x > 1 then
           pattern_seq[x] = 0
-        else pattern_seq[x] = y  
+        else 
+          pattern_seq[x] = y
         end
         for i = 1,17 do
           if pattern_seq[i] == 0  or i == 17 then
             pattern_seq_length = i - 1
             break
           end
-        end 
+        end
+        
+        -- Set the pattern # for each step in the pattern_seq
+        for s = 1, pattern_length[y] do
+          pattern_seq_extd[x][s] = y
+        end
+        
+        -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
+        if #pattern_seq_extd[x] > pattern_length[y] then
+          for s = 1, #pattern_seq_extd[x] - pattern_length[y] do
+            table.remove(pattern_seq_extd[x], #pattern_seq_extd[x])
+          end
+        end
+        
         -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
         if params:get('arranger_enabled') == 1 and pattern_seq_position == 0 and chord_seq_position == 0 then  
           pattern = pattern_seq[1]
@@ -1312,6 +1345,7 @@ function g.key(x,y,z)
       if transport_active == false then -- Update chord for when play starts
         get_next_chord()
       end
+      
     --CHORD KEYS
     elseif grid_view_name == 'Chord' then
       if x < 15 then
@@ -1329,6 +1363,8 @@ function g.key(x,y,z)
         generate_chord_names()
       elseif x == 15 then
         pattern_length[pattern] = y
+        update_arranger_pattern_length(pattern)
+
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
         pattern_key_count = pattern_key_count + 1 -- Fix: issue with this not firing resulting in negative key count?
         pattern_keys[y] = 1
@@ -1343,6 +1379,7 @@ function g.key(x,y,z)
             chord_seq[y][i].o = chord_seq[pattern_copy_source][i].o
           end
           pattern_length[y] = pattern_length[pattern_copy_source]
+          update_arranger_pattern_length(y)
         end
       end
       if transport_active == false then -- Pre-load chord for when play starts
@@ -1412,6 +1449,28 @@ function g.key(x,y,z)
 end
 redraw()
 grid_redraw()
+end
+
+
+
+-- Update pattern_seq_extd to handle changes to loop length
+-- Update pattern_seq_extd which stores the extended arranger pattern
+-- If this pattern in the arranger is the same one what was just touched, check if the length grew or shrunk
+function update_arranger_pattern_length(pattern)      
+  for p = 1, 16 do
+    if pattern_seq_extd[p][1] == pattern then
+      -- Grew
+      if pattern_length[pattern] > #pattern_seq_extd[p] then
+        for s = 1, pattern_length[pattern] - #pattern_seq_extd[p] do
+          table.insert(pattern_seq_extd[p], pattern)
+        end
+      elseif pattern_length[pattern] < #pattern_seq_extd[p] then
+        for s = 1, #pattern_seq_extd[p] - pattern_length[pattern]  do
+          table.remove(pattern_seq_extd[p], #pattern_seq_extd[p])  -- not sure about this
+        end
+      end
+    end
+  end
 end
 
 
@@ -1554,8 +1613,12 @@ function enc(n,d)
       screen_view_name = screen_views[screen_view_index]
       elseif n == 2 then
         if screen_view_name == 'Arranger' then
-          arranger_menu_index = util.clamp(arranger_menu_index + d, 1, #arranger_menus)
-          selected_arranger_menu = arranger_menus[arranger_menu_index]
+          arranger_menu_index = util.clamp(arranger_menu_index + d, 1, #arranger_menus + 1)
+          if arranger_menu_index == #arranger_menus + 1 then
+            selected_arranger_menu = 'timeline'
+          else
+            selected_arranger_menu = arranger_menus[arranger_menu_index]
+          end
         elseif screen_view_name == 'Generator' then
           generator_menu_index = util.clamp(generator_menu_index + d, 1, #generator_menus)
           selected_generator_menu = generator_menus[generator_menu_index]
@@ -1564,9 +1627,40 @@ function enc(n,d)
           selected_menu = menus[page_index][menu_index]
         end
     else -- n== 3
-      if screen_view_name == 'Arranger' then      
-        selected_arranger_menu = arranger_menus[arranger_menu_index]
-        params:delta(selected_arranger_menu, d)
+      if screen_view_name == 'Arranger' then
+        if arranger_menu_index == #arranger_menus + 1 then
+          
+          
+          
+      
+      -- -- Check if it's the last pattern in the arrangement.
+      -- -- This also needs to be run after firing chord so we can catch last-minute changes to arranger_one_shot_last_pattern
+      -- if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
+      --   arrangement_reset = true
+      --   reset_arrangement()
+      --   clock.transport.stop()
+      -- else  -- If not the last pattern in the arrangement, update the arranger sequence position
+      --   pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
+      --   pattern = pattern_seq[pattern_seq_position]
+      -- end
+      --   end
+  
+  -- -- If not the last pattern in the arrangement, update the arranger sequence position
+  --       pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
+  --       pattern = pattern_seq[pattern_seq_position]
+  
+          -- arranger_edit_step = util.wrap(arranger_edit_step + d, 1, 
+          -- arranger_edit_pattern = arranger_edit_pattern  + d
+          
+          -- arranger_edit_step = 1
+          -- selected_arranger_menu = 'timeline'
+          -- arranger_menu_index = #arranger_menus + 1
+          -- selected_arranger_menu = arranger_menus[arranger_menu_index]
+        else
+          -- selected_arranger_menu = arranger_menus[arranger_menu_index]
+          params:delta(selected_arranger_menu, d)
+        end
+        -- print(selected_arranger_menu)
       elseif screen_view_name == 'Generator' then      
         selected_generator_menu = generator_menus[generator_menu_index]
         params:delta(selected_generator_menu, d)
@@ -1697,6 +1791,14 @@ function redraw()
   
   -- Draw the arranger Y axis reference marks
   if screen_view_name == 'Arranger' then
+    
+    if selected_arranger_menu == 'timeline' then
+      arranger_edit_pattern = 1
+      arranger_edit_step = 1
+      screen.level(15)
+      screen.rect(arranger_edit_pattern, 51, 1,1)
+      screen.fill()
+    end
 
     -- Axis reference marks so it's easier to distinguish the pattern position
     for i = 1,4 do
