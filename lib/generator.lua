@@ -1,4 +1,5 @@
 function init_generator()
+  chord_reroll_attempt = 0
   chord_generator('init')
   arp_generator('init')
 end
@@ -27,9 +28,11 @@ function generator()
   params:set('chord_type', percent_chance(20) and 4 or 3)
 
   if params:get('clock_source') == 1 then 
-    params:set('clock_tempo', math.random(70,130))
+    params:set('clock_tempo', math.random(50,140))
   end
+  
   params:set('mode', math.random(1,9))
+  -- params:set('mode', 1)
 
   
   --ENGINE BASED RANDOMIZATIONS
@@ -40,8 +43,52 @@ function generator()
   params:set('chord_div_index', 15)
   params:set('chord_duration_index', params:get('chord_div_index'))
   
+
+-- sketchy_chords = false  -- reset this once per generator
+chord_reroll_attempt = 0  -- same
+
+chord_generator('run')
+
+
+  if sketchy_chords == true then
+    
+    while (chord_reroll_attempt < 100) == true do
+    
+      chord_reroll_attempt = chord_reroll_attempt + 1
+      -- print('Sketchy chords. Reroll attempt ' .. chord_reroll_attempt .. ', Mode ' .. params:get('mode'))
+        chord_generator('run')
+        -- load(chord_algos['func'][chord_algo])
+        
+        
+      -- for i = 1, pattern_length[pattern] do
+      --   if chord_seq[pattern][i].c > 0 then
+      --     local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_seq[pattern][i].c]
+      --     -- chord_check[i] = get_chord_name(2, params:get('mode'), chord_degree)
+      --     if get_chord_name(2, params:get('mode'), chord_degree) == 'dim' then
+      --       sketchy_chords = true
+      --     end
+      --   end
+      -- end
+    
+    end
+    if chord_reroll_attempt <100 then
+      print('Mode ' .. params:get('mode') .. ' passed ' .. chord_algos['name'][chord_algo] .. ' after ' .. chord_reroll_attempt .. ' attempts')
+      chord_reroll_attempt = 0
+    else
+    print(chord_reroll_attempt .. ' reroll attempts. Exclude mode ' .. params:get('mode') .. ' from ' .. chord_algos['name'][chord_algo])
+      params:set('mode', math.random(1,9))
+      chord_reroll_attempt = 0
+      print('Trying with mode ' .. params:get('mode'))
+      -- chord_generator('run')
+      generator()
+
+    end
+  end
   
-chord_generator('run')  
+  print('Chord algo: ' .. chord_algos['name'][chord_algo])
+
+
+      
                   
 arp_generator('run')
 
@@ -76,7 +123,7 @@ function chord_generator(mode)
   local random_1_3 = math.random(1,3) * math.random(0,1) and -1 or 1
   local random_1_7 = math.random(1,7)
   local random_4_11 = math.random(4,11)
-  local random_1_14 = math.random(1,14)  
+  local random_1_14 = math.random(1,14)
   
   
   -- Table containing chord algos. This runs at init as well.
@@ -92,7 +139,7 @@ function chord_generator(mode)
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()  
     
-    local modes = {1,2,3,8}
+    local modes = {1,2,3,8}  -- Verified as modes not containing DIM
     params:set('mode', modes[math.random(1,4)])
     local progression = {1,5,6,4}
     pattern_length[pattern] = 4
@@ -112,9 +159,12 @@ function chord_generator(mode)
   local chord_algo_name = 'I-vi based'
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()      
-
+    
+    -- exclusions: 2, 3, 4, 6, 7, 8, 9
+    -- OK at least once: 1, 5, 9
+    
     -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
-    params:set('mode', 1) -- modes[math.random(1,4)])
+    -- params:set('mode', 1) -- modes[math.random(1,4)])
     local progression = {1,2,3,4,5,6}
     local progression = shuffle(progression)
     pattern_length[pattern] = 4
@@ -136,7 +186,7 @@ function chord_generator(mode)
   table.insert(chord_algos['func'], function()      
 
     -- All modes are pretty okay here but setting to triads only
-    params:set('mode', math.random(1, 9))
+    -- params:set('mode', math.random(1, 9))
     params:set('chord_type', 3)
     
     local first = math.random(1,6)
@@ -155,7 +205,7 @@ function chord_generator(mode)
       chord_seq[pattern][i].o = math.floor(x / 8) --octave
     end  
     
-    -- Reroll if it's repeating. To-do: add check for diminished chords which can be iffy.
+    -- Reroll if it's repeating.
     if second == third or first == third then
       load(chord_algos['func'][chord_algo])
     end
@@ -205,8 +255,8 @@ function chord_generator(mode)
     
     params:set('chord_div_index', div_to_index('1/4'))
     pattern_length[pattern] = 8
-    local modes = {1} -- to-do: see what other modes work well
-    params:set('mode', modes[math.random(1,#modes)])
+    -- local modes = {1} -- to-do: see what other modes work well
+    -- params:set('mode', modes[math.random(1,#modes)])
     local progression = {1,2,3,4,5,6}
     local progression = shuffle(progression)
     
@@ -270,10 +320,22 @@ function chord_generator(mode)
     clear_chord_pattern()
   -- chord_generator index 1 is reserved for Randomize, otherwise fire the selected algo. Non-local for rerolls.
     chord_algo = params:get('chord_generator') == 1 and math.random(2,#chord_algos['name']) or params:get('chord_generator')
-    print('Chord algo: ' .. chord_algos['name'][chord_algo])
     load(chord_algos['func'][chord_algo])
+
+    sketchy_chords = false  -- reset this
+
+    -- FLAGS sketchy_chords IF THERE IS A DIMINISHED CHORD BECAUSE THERE IS A HIGH PROBABILITY OF IT SOUNDING NASTY
+    -- This needs to be refactored with better chord name/degree/type lookup functions
+    for i = 1, pattern_length[pattern] do
+      if chord_seq[pattern][i].c > 0 then
+        local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_seq[pattern][i].c]
+        if get_chord_name(2, params:get('mode'), chord_degree) == 'dim' 
+        or get_chord_name(2, params:get('mode'), chord_degree) == 'aug' then
+          sketchy_chords = true
+        end
+      end
+    end
   end
-  
 end -- of chord_generator
 
 
@@ -281,10 +343,33 @@ end -- of chord_generator
 function arp_generator(mode)
 
   -- Base arp pattern length, division, duration
-  local length = math.random(3,4) * (percent_chance(70) and 2 or 1)
-  local tuplet_shift = (length / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
-  local div = (math.random(2,5) * 2) - tuplet_shift
+  -- local length = math.random(3,4) * (percent_chance(70) and 2 or 1)
+  -- local tuplet_shift = (length / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
 
+  -- Clock tempo is used to determine good arp_div_index
+  -- m*x+b: change b to set relative div
+  -- local base_div_index = math.min(math.max(util.round(0.05 * params:get('clock_tempo') + 2),2),5)
+  -- local base_div_index = math.min(math.max(util.round((.2/3 * params:get('clock_tempo') - 2)) * (percent_chance(70) and 2 or 1),3),12)
+  
+  -- local min_div_index = util.round(0.0375 * params:get('clock_tempo') + 0.75)
+  local min_div_index = util.round(0.025 * params:get('clock_tempo') + 1.5)
+  local max_div_index = util.round(0.0375 * params:get('clock_tempo') + 6.75)
+  local div = math.random(min_div_index, max_div_index)
+  local tuplet_shift = div % 2  -- even or odd(tuplets) arp pattern length
+  local length = (4 - tuplet_shift) * (percent_chance(70) and 2 or 1)
+
+
+  
+  -- if params:get('clock_tempo') < 80 then
+  -- local div = math.random(2,3) * 2 - tuplet_shift
+  -- elseif params:get('clock_tempo') < 100 then
+  -- local div =  math.random(3,4) * 2 - tuplet_shift
+  -- elseif params:get('clock_tempo') < 120 then
+  --   local div =  math.random(4,5) * 2 - tuplet_shift
+  -- else
+  --   local div =  math.random(5,6) * 2 - tuplet_shift
+  -- end
+    
   -- 30% chance of the arp quantizer including 7th notes
   local chord_type = percent_chance(30) and 4 or 3
 
@@ -317,7 +402,9 @@ function arp_generator(mode)
     -- Pattern/session randomizations
     arp_pattern_length[arp_pattern] = length
     params:set('arp_div_index', div)
-    params:set('arp_duration_index', div)
+    -- params:set('arp_duration_index', div)
+    -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
+    params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
     params:set('arp_chord_type', chord_type)
     params:set('arp_mode', 1)
   
@@ -372,7 +459,7 @@ function arp_generator(mode)
     -- Pretty fast arps here so no shifting octave down
     params:set('arp_octave', math.max(params:get('arp_octave'), 0))
 
-    -- Prefer longer and faster sequence    
+    -- Sequence length of 6(tuplet) or 8 steps
     arp_pattern_length[arp_pattern] = math.random(3,4) * 2 -- 6 (tuplet) or 8 length
     tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
@@ -486,8 +573,28 @@ function arp_generator(mode)
   local arp_algo_name = 'Sequential up'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()
+  
+    -- arp_pattern_length[arp_pattern] = math.random(3,4) * (percent_chance(30) and 2 or 1)
+    -- local tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
-    for i = 1, length do
+    -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
+    -- if params:get('clock_tempo') < 80 then
+    --   params:set('arp_div_index', math.random(2,3) * 2 - tuplet_shift)
+    -- elseif params:get('clock_tempo') < 100 then
+    --   params:set('arp_div_index', math.random(3,4) * 2 - tuplet_shift)
+    -- elseif params:get('clock_tempo') < 120 then
+    --   params:set('arp_div_index', math.random(4,5) * 2 - tuplet_shift)
+    -- else
+    --   params:set('arp_div_index', math.random(5,6) * 2 - tuplet_shift)
+    -- end
+    
+    
+    -- -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
+    -- params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
+    
+    -- print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
+    
+    for i = 1, arp_pattern_length[arp_pattern] do
       arp_seq[1][i] = arp_min - 1 + i
     end
     
@@ -497,8 +604,17 @@ function arp_generator(mode)
   local arp_algo_name = 'Sequential down'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()  
+  
+    -- arp_pattern_length[arp_pattern] = math.random(3,4) * (percent_chance(30) and 2 or 1)
+    -- tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
-    for i = 1, length do
+    -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
+    -- params:set('arp_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
+    
+    -- -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
+    -- params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
+    
+    for i = 1, arp_pattern_length[arp_pattern] do
       arp_seq[1][i] = arp_max + 1 - i
     end
     
@@ -564,6 +680,7 @@ function arp_generator(mode)
   -- arp_generator index 1 is reserved for Randomize, otherwise fire the selected algo.
     local arp_algo = params:get('arp_generator') == 1 and math.random(2,#arp_algos['name']) or params:get('arp_generator')
     print('Arp algo: ' .. arp_algos['name'][arp_algo])
+    print(params:get('clock_tempo') .. ' ' .. params:get('arp_div_index') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
     load(arp_algos['func'][arp_algo])
   end
 end
