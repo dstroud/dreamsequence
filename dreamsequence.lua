@@ -259,10 +259,11 @@ function init()
   selected_generator_menu = generator_menus[generator_menu_index]
   arranger_menus = {}
   arranger_menu_index = 1 -- No top level option (yet)
-  selected_arranger_menu = arranger_menus[arranger_menu_index]
+  -- since this starts with a menu selected and the menu hasn't been generated, hardcoding in the first menu option
+  selected_arranger_menu = 'arranger_enabled'
   transport_active = false
   automator_events = {}
-  pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
+  pattern_length = {4,2,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
   pattern = 1
   steps_remaining_in_pattern = pattern_length[pattern]
   pattern_queue = false
@@ -288,9 +289,10 @@ function init()
     {},
     {},
     {}}
+  arranger_edit_pattern = 1
+  arranger_edit_step = 1
   steps_remaining_in_arrangement = 0
   elapsed = 0
-  pattern_pos = 1 -- Check
   percent_step_elapsed = 0
   seconds_remaining_in_arrangement = 0
   chord_no = 0
@@ -817,7 +819,6 @@ end
 
 function reset_clock()
   clock_step = -1 -- clock_step rewrite
-  -- clock_start_method = 'start'    -- This could be causing a start when we want continue
 end
 
 
@@ -842,14 +843,8 @@ function advance_chord_seq()
         pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
         pattern = pattern_seq[pattern_seq_position]
       end
-      
-      -- According to my notes, pattern_seq_retrig "Prevents arp from extending beyond chord pattern length"
-      -- This isn't happenening even when disabled, so probably not needed
-      -- Might be interesting to have several arp modes
-          -- Loop (current Loop)
-          -- Let arp play through to completion (even if multiple chords play), then pause until the next chord retriggers (current one-shot)
-          -- Force arp reset each time a new chord is played
-      -- pattern_seq_retrig = true -- Disabling to see what breaks
+      -- Indicates arranger has moved to new pattern.
+      pattern_seq_retrig = true
     end
     
     -- Flag if arranger is on the last pattern of a 1-shot sequence
@@ -978,6 +973,7 @@ function get_next_chord()
   local temp_pattern_seq_retrig = false
 
   -- Rewriting this to see if it works without temp_pattern_seq_retrig
+  -- FIX: NOPE. pattern_seq_retrig is needed so we move to the right step after arranger advanced pattern. REDO THIS!!
   -- -- If arranger is enabled and it's the last step in the chord sequence, advance the arranger first and set temp_pattern_seq_retrig
   -- if params:get('arranger_enabled') == 1 and temp_chord_seq_position >= pattern_length[temp_pattern] then 
   --   temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
@@ -1628,39 +1624,66 @@ function enc(n,d)
         end
     else -- n== 3
       if screen_view_name == 'Arranger' then
+        
+        -- If the arranger timeline is selected
         if arranger_menu_index == #arranger_menus + 1 then
-          
-          
-          
+
+          -- Moves to the selected pattern and step for editing
+          repeat
+            local delta = d
+            local steps_to_next_pattern = (#pattern_seq_extd[arranger_edit_pattern] + 1) - arranger_edit_step
+            -- print (steps_to_next_pattern .. ' steps_to_next_pattern')
+            if delta < 0 then
+              -- Hard stop at sequence begin
+              -- If subtracting the delta from the current step position puts us into a preceeding pattern
+              if math.abs(delta) >= arranger_edit_step then
+                -- Subtract # of steps in current pattern from the delta (negative here)
+                delta = math.max(delta + arranger_edit_step, 0)
+                -- Bottom out
+                if arranger_edit_pattern == 1 then
+                  arranger_edit_step = 1
+                  delta = 0
+                else
+                -- Move to the last step of the preceeding pattern
+                  arranger_edit_pattern = math.max(arranger_edit_pattern - 1, 1)
+                  arranger_edit_step = #pattern_seq_extd[arranger_edit_pattern]
+                end
+              else
+                -- if arranger_edit_step =
+                arranger_edit_step = arranger_edit_step + delta
+                delta = delta + 1
+              end
+              elseif delta > 0 then
+              -- Hard stop at sequence end
+              -- If adding the delta to the current step puts us into the next pattern
+              if delta >= steps_to_next_pattern then
+                -- Subtract steps_to_next_pattern from delta as we move to the next pattern
+                delta = math.min(delta - steps_to_next_pattern, 0)
+                -- Max out  
+                if arranger_edit_pattern == pattern_seq_length then
+                  arranger_edit_step = #pattern_seq_extd[arranger_edit_pattern]
+                  delta = 0
+                else
+                  -- Move to the first step of the next pattern
+                  arranger_edit_pattern = math.min(arranger_edit_pattern + 1, pattern_seq_length)
+                  arranger_edit_step = 1
+                end
+              else
+                -- print('+' .. delta .. ' within pattern')
+                arranger_edit_step = arranger_edit_step + delta
+                delta = delta - 1
+              end
+            end
+          until delta == 0
+          print(arranger_edit_pattern .. '.' .. arranger_edit_step)
       
-      -- -- Check if it's the last pattern in the arrangement.
-      -- -- This also needs to be run after firing chord so we can catch last-minute changes to arranger_one_shot_last_pattern
-      -- if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
-      --   arrangement_reset = true
-      --   reset_arrangement()
-      --   clock.transport.stop()
-      -- else  -- If not the last pattern in the arrangement, update the arranger sequence position
-      --   pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
-      --   pattern = pattern_seq[pattern_seq_position]
-      -- end
-      --   end
-  
-  -- -- If not the last pattern in the arrangement, update the arranger sequence position
-  --       pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
-  --       pattern = pattern_seq[pattern_seq_position]
-  
-          -- arranger_edit_step = util.wrap(arranger_edit_step + d, 1, 
-          -- arranger_edit_pattern = arranger_edit_pattern  + d
-          
-          -- arranger_edit_step = 1
-          -- selected_arranger_menu = 'timeline'
-          -- arranger_menu_index = #arranger_menus + 1
-          -- selected_arranger_menu = arranger_menus[arranger_menu_index]
+        -- Standard Arranger menus just have their param updated  
         else
           -- selected_arranger_menu = arranger_menus[arranger_menu_index]
           params:delta(selected_arranger_menu, d)
         end
-        -- print(selected_arranger_menu)
+        
+        
       elseif screen_view_name == 'Generator' then      
         selected_generator_menu = generator_menus[generator_menu_index]
         params:delta(selected_generator_menu, d)
@@ -1745,13 +1768,16 @@ function redraw()
   
    --Calculate what we need to display arrangement time remaining and draw the arranger mini-chart
   local rect_x = pattern_seq_position == 0 and 1 or 0 -- If arranger is reset, add an initial gap to the x position
-  pattern_pos = pattern_seq_position == 0 and 1 or pattern_seq_position --same as max 1
   steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
 
-  for i = pattern_pos, pattern_seq_length do
-    steps_elapsed = (i == pattern_pos and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
-    percent_step_elapsed = (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
+  for i = math.max(pattern_seq_position, 1), pattern_seq_length do
+    steps_elapsed = (i == pattern_seq_position and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
     
+    -- little hack here to set to 1 if pattern_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
+    percent_step_elapsed = pattern_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
+    -- print('percent_step_elapsed =' .. percent_step_elapsed)
+    
+
     -- % of current chord step remaining
     -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
     
@@ -1763,11 +1789,25 @@ function redraw()
     if screen_view_name == 'Arranger' then
       rect_h = 2
       rect_y = 50 + (pattern_seq[i]* 2) + pattern_seq[i]
-      rect_gap_adj = pattern_pos - 1
+      
+      -- Cosmetic adjustment to gap if pattern_seq_position == 0 (reset)
+      rect_gap_adj = pattern_seq_position == 0 and 0 or pattern_seq_position - 1
       screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
       screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, rect_h)
       screen.fill()
       rect_x = rect_x + steps_remaining_in_pattern
+      
+      -- Add in arranger edit position indicator
+      if arranger_menu_index == #arranger_menus + 1 then
+        if arranger_edit_pattern == i then
+          screen.level(15)
+          screen.rect(rect_x + i - rect_gap_adj - (pattern_length[pattern_seq[i]] + 1 - arranger_edit_step), 53, 1, 11)
+          screen.move_rel(0,-1)
+          screen.text(arranger_edit_pattern .. '.' .. arranger_edit_step)
+          screen.fill()
+        end
+      end
+      
     end
   end
     
@@ -1791,14 +1831,6 @@ function redraw()
   
   -- Draw the arranger Y axis reference marks
   if screen_view_name == 'Arranger' then
-    
-    if selected_arranger_menu == 'timeline' then
-      arranger_edit_pattern = 1
-      arranger_edit_step = 1
-      screen.level(15)
-      screen.rect(arranger_edit_pattern, 51, 1,1)
-      screen.fill()
-    end
 
     -- Axis reference marks so it's easier to distinguish the pattern position
     for i = 1,4 do
