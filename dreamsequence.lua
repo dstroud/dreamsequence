@@ -28,7 +28,7 @@ transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
 function init()
   init_generator()
   crow.ii.jf.mode(1)
-  params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with Bento's clock
+  params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with ours
 
   
   --Global params
@@ -69,18 +69,19 @@ function init()
   default = 1,
   formatter = function(param) return playback_string(param:get()) end}
   params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
-  params:add_option('event_name', 'Event', {'Transpose', 'Rotate arp', 'Shuffle arp'}, 1)
-        params:set_action('event_name',function() menu_update() end)
-  params:add_option('event_type', 'Type', {'Set','Incremental'}, 1)
-  params:add_option('event_enable', 'Enable', {'True','False'}, 1) 
+
+  -- Events
+  event_display_names = {}
+  for i = 1, #events_lookup do
+    event_display_names[i] = events_lookup[i][3]
+  end
+  params:add_option('event_name', 'Event', event_display_names, 1)
+    params:set_action('event_name',function() menu_update() end)
+    
+  params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
+  params:add_option('event_enable', 'Enable', {'True','False'}, 1)  -- obsolete?
   params:add_number('event_value', 'Value', -999, 999, 0)
-  
-        -- valid events (so far)       
-      -- automator_events[1][2][1] = {'rotate_pattern', 'Arp', 1} --event name, var 1, var 2
-      -- automator_events[1][1][1] = {'transpose', 0} --event name, var 1, var 2
-      -- automator_events[1][5][1] = {'transpose', 2} --event name, var 1, var 2
-      -- automator_events[1][2][2] = {'shuffle_arp'}
-      
+
   
   --Chord params
   params:add_separator ('Chord')
@@ -340,9 +341,9 @@ function init()
   automator_events_index = 1
   selected_automator_events_menu = 'event_name'
   
-  event_edit_pattern = 1
-  event_edit_step = 1
-  
+  event_edit_pattern = 0
+  event_edit_step = 0
+  event_edit_slot = 0
   steps_remaining_in_arrangement = 0
   elapsed = 0
   percent_step_elapsed = 0
@@ -391,6 +392,7 @@ function init()
 end
 
 
+-- MENU_UPDATE. Probably can be improved by only calculating on the current view+page
 function menu_update()
  
   -- Generator menu. TBD if this should be here or in a separate function
@@ -401,13 +403,17 @@ function menu_update()
   arranger_menus = {'arranger_enabled', 'playback'} --, 'crow_assignment'}
   
   
-  -- Automator events menu
-  if params:string('event_name') == 'Shuffle arp' then  -- Probably organize by type and split these option by index #. Or have a lookup table.
-    automator_events_menus = {'event_name', 'event_enable'}
-  else -- events using increments or set value (split at some point with better formatting)
-    automator_events_menus = {'event_name', 'event_type', 'event_value'}
+  -- Events menu
+  local event_index = params:get('event_name')
+  local value_type = events_lookup[event_index][4]
+  if value_type == 'inc, set' then 
+    automator_events_menus =  {'event_name', 'event_value_type', 'event_value'}
+  elseif value_type == 'set' then 
+    automator_events_menus =  {'event_name', 'event_value'}
+  elseif value_type == 'trigger' then 
+    automator_events_menus =  {'event_name'}
   end
-      
+
       
   --Global menu
   if params:string('repeat_notes') == 'Retrigger' then
@@ -949,19 +955,6 @@ end
 
 
 function automator()
-  --pattern_seq_position, chord_seq_position, event_no
-  
-  -- need to hardcode max # of vars here once known, or generate somehow. Also needs to set # of top level indices based on arranger length 
-  -- automator_events = {
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   {{},{},{},{},{},{},{},{},},
-  --                   }
   -- Arranger pattern_seq_position, chord_seq_position, automation event index
   -- automator_events[1][2][1] = {'rotate_pattern', 'Arp', 1} --event name, var 1, var 2
   -- automator_events[1][1][1] = {'transpose', 0} --event name, var 1, var 2
@@ -984,10 +977,10 @@ function automator()
           -- local var_3 = automator_events[pattern_seq_position][chord_seq_position][i][1]
           
           print(pattern_seq_position .. ' ' .. chord_seq_position .. ' ' .. do_event)
-          if do_event == 'rotate_pattern' then
-            rotate_pattern(var_1, var_2)
+          if do_event == 'rotate_arp' then
+            rotate_pattern('Arp', var_1)
           elseif do_event == 'transpose' then
-            params:set('transpose',(var_2 + (var_1 == 'Incremental' and params:get('transpose') or 0)))
+            params:set('transpose',(var_1 + (var_2 == 'Increment' and params:get('transpose') or 0)))
           elseif do_event == 'shuffle_arp' then
             local shuffled_arp_seq = shuffle(arp_seq[arp_pattern])
             arp_seq[arp_pattern] = shuffled_arp_seq
@@ -1328,7 +1321,10 @@ function grid_redraw()
   for x = 1, pattern_length[pattern_seq[event_edit_pattern]] do
 
     for y = 1,8 do
-      g:led(x, y, 4)
+      g:led(x, y, (automator_events[event_edit_pattern][x][y] == nil and 2 or 7))
+      if x == event_edit_step and y == event_edit_slot then
+        g:led(x, y, 15) -- math.random(10,15))
+      end  
     end
   end
 
@@ -1393,7 +1389,26 @@ function g.key(x,y,z)
       if x <= event_pattern_length then
         event_edit_step = x
         event_edit_slot = y
+        
+        -- Load the Event vars back to the displayed param if it's a populated slot
+        if automator_events[event_edit_pattern][x][y] ~= nil then
+          -- K3 saves event to automator_events
+          -- automator_events are saved as strings so we gotta look those up in Options to re-set them
+          local invert_options = tab.invert(params.params[params.lookup['event_name']]['options'])
+          params:set('event_name', invert_options[automator_events[event_edit_pattern][x][y][2]])
+
+          if #automator_events[event_edit_pattern][x][y] > 2 then
+            params:set('event_value', automator_events[event_edit_pattern][x][y][3])
+            
+            if #automator_events[event_edit_pattern][x][y] > 3 then
+              local invert_options = tab.invert(params.params[params.lookup['event_value_type']]['options'])
+              params:set('event_value_type', invert_options[automator_events[event_edit_pattern][x][y][4]])
+            end
+          end
+          
+        end  
       end
+      
       
     elseif x == 16 and y > 5 then --view switcher buttons
       view_key_count = view_key_count + 1
@@ -1597,13 +1612,30 @@ end
 
 function key(n,z)
   if z == 1 then
+    
+  -- KEY 1 just increments keys and key_count to bring up alt menu  
   keys[n] = 1
   key_count = key_count + 1
     if n == 1 then
       -- Fn menu is displayed since keys[1] == 1
+      
+    -- KEY 2  
     elseif n == 2 then
       if keys[1] == 1 then
         generator()
+        
+      -- Back out of Events and return to Arranger  
+      elseif screen_view_name == 'Events' then
+        if event_edit_step == 0 then
+          screen_view_name = 'Arranger'
+        else
+          event_edit_step = 0
+          event_edit_slot = 0
+          redraw()
+        end      
+        grid_redraw()
+      
+      -- Start/resume  
       elseif params:string('clock_source') == 'internal' then
         if transport_active then
           clock.transport.stop()
@@ -1613,51 +1645,49 @@ function key(n,z)
           clock.transport.start()
         end
       end
+      
+    -- KEY 3  
     elseif n == 3 then
       
-      -- Edit the arranger step
+      -- Edit Events on the arranger segment
       if arranger_key_count > 0 then
-        screen_view_name = 'Events'
-        
-        -- unsure about this but seems we need to reset since the key up event takes place in a new view?
         arranger_keys = {}
         arranger_key_count = 0
         event_edit_step = 0 -- indicates one has not been selected yet
+        event_edit_slot = 0 -- Not sure if necessary
+        screen_view_name = 'Events'
         
         -- Forces redraw but it's kinda awkward because user is now pressing on a key in the event edit view
         grid_redraw()
-      
-      
+
+
       -- K3 saves event to automator_events
-      -- automator_events[event_edit_pattern][event_edit_step][event_edit_slot]
-      
       elseif screen_view_name == 'Events' then
-        if params:string('event_name') == 'Shuffle arp' then
-          automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {'shuffle_arp'}
-        elseif params:string('event_name') == 'Rotate arp' then
-          automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {'rotate_pattern', 'Arp', params:get('event_value')}
-        elseif params:string('event_name') == 'Transpose' then
-          -- if params:string('event_type') == 'Set' then
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {'transpose', params:string('event_type'), params:get('event_value')}
-          -- else -- incremental
-            -- automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {'transpose',  params:get('transpose') + params:get('event_value')}
-          -- end
-        end
+        if event_edit_slot > 0 then
+          local event_index = params:get('event_name')
+          -- local event_id = events_lookup[event_index][1]
+          local event_type = events_lookup[event_index][2]
+          local event_name = events_lookup[event_index][3]
+          local event_value = params:get('event_value')
+          local value_type = events_lookup[event_index][4]
+
+            if value_type == 'trigger' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_name}
+            elseif value_type == 'set' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_name, event_value}
+            elseif value_type == 'inc, set' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_name, event_value, params:string('event_value_type')}              
+          end
+-- tab.print(params.params[params.lookup['event_name']]['options'])          
+
+        -- Or go back to the Arranger
         screen_view_name = 'Arranger'
-        -- Back to the Arranger on Grid, too
+        event_edit_step = 0
+        event_edit_slot = 0
         grid_redraw()
-
-
-        -- automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {'rotate_pattern', 'Arp', 1}
-           
-
-      -- valid events (so far)       
-      -- automator_events[1][2][1] = {'rotate_pattern', 'Arp', 1} --event name, var 1, var 2
-      -- automator_events[1][1][1] = {'transpose', 0} --event name, var 1, var 2
-      -- automator_events[1][5][1] = {'transpose', 2} --event name, var 1, var 2
-      -- automator_events[1][2][2] = {'shuffle_arp'}
-      
-      
+        end
+        
+        
       else  
         -- K3 in Generator immediately randomizes and resets, other views just reset
         if screen_view_name == 'Generator' then
@@ -1761,7 +1791,7 @@ end
 
   
 function enc(n,d)
-  if keys[1] == 1 then -- function key (KEY1) held down mode
+  if keys[1] == 1 then -- fn key (KEY1) held down mode
     if n == 2 then
       rotate_pattern(grid_view_name, d)
     elseif n == 3 then
@@ -1924,73 +1954,42 @@ function redraw()
     screen.level(15)
     screen.move(2,8)
     if event_edit_step == 0 then
-      screen.text('Editing Arranger segment ' .. event_edit_pattern)
+      screen.text('Editing segment ' .. event_edit_pattern)
       screen.move(2,28)
       screen.text('Select a step (column) and')
       screen.move(2,38)
       screen.text('event slot (row) on Grid')
+      screen.move(2,58)
+      screen.text('Back: KEY 2')
     else
       screen.level(3)
-      screen.text('Editing Arranger segment ' .. event_edit_pattern .. '.' .. event_edit_step) -- event_edit_step
-      screen.move(2,28)
+      screen.text('Editing slot ' .. event_edit_slot .. ' of segment '.. event_edit_pattern .. '.' .. event_edit_step) -- event_edit_step
 
-      -- screen.text(param_id_to_name(automator_events_menus[automator_events_index]) .. ': ' ..
-      --             params:string(automator_events_menus[automator_events_index]))
+      -- Scrolling events menu
+      local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
+      line = 1
+      for i = 1,#automator_events_menus do
+        screen.move(2, line * 10 + 13 - menu_offset)    --exp
+        screen.level(automator_events_index == i and 15 or 3)
+        -- screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
+        screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' ..
+        params:string(automator_events_menus[i]))
 
-        -- Scrolling events menu
-        local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
-        line = 1
-        for i = 1,#automator_events_menus do
-          screen.move(2, line * 10 + 8 - menu_offset)    --exp
-          screen.level(automator_events_index == i and 15 or 3)
-          -- screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
-          screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' ..
-          params:string(automator_events_menus[i]))
-
-          line = line + 1
-        end
-      
-      --         -- Scrolling menus
-      --   local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
-      --   line = 1
-      --   for i = 1,#menus[page_index] do
-      --     screen.move(2, line * 10 + 8 - menu_offset)    --exp
-      --     screen.level(menu_index == i and 15 or 3)
-      --     screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
-      --     line = line + 1
-      --   end
-     
-      --   --Sticky header
-      --   screen.level(menu_index == 0 and 15 or 4)
-      --   screen.rect(0,0,92,11)
-      --   screen.fill()
-      --   screen.move(2,8)
-      --   screen.level(0)
-      --   screen.text('SESSION-'.. page_name)
-        
-      -- screen.fill()
-      
-      --   params:add_option('event_type', 'Event type', {'Transpose', 'Rotate arp', 'Shuffle arp'}, 1)
-      --   params:add_option('event_enable', 'Enable', {'True','False'}, 1)
-      --   params:add_number('event_increment', 'Increment', -999, 999, 0)
-  
-      --   -- valid events (so far)       
-      -- -- automator_events[1][2][1] = {'rotate_pattern', 'Arp', 1} --event name, var 1, var 2
-      -- -- automator_events[1][1][1] = {'transpose', 0} --event name, var 1, var 2
-      -- -- automator_events[1][5][1] = {'transpose', 2} --event name, var 1, var 2
-      -- -- automator_events[1][2][2] = {'shuffle_arp'}
-      
-      
+        line = line + 1
+      end
+      screen.level(3)
+      screen.move(2,58)
+      screen.text('Back: KEY 2')
+      screen.move(78,58)  -- 128 - screen.text_extents('Save: KEY 3')
+      screen.text('Save: KEY 3')
     end
-    -- screen.move(2,28)
-    -- screen.text('KEY 3: Edit step')
   
   elseif arranger_key_count > 0 then
     screen.level(15)
     screen.move(2,8)
-    screen.text('Edit Arranger step')
+    screen.text('Arranger segment ' .. event_edit_pattern .. ' selected')
     screen.move(2,28)
-    screen.text('KEY 3: Edit step')
+    screen.text('Press KEY 3 to edit events')
     -- screen.move(2,48)
     -- screen.text('ENC 2: Rotate seq ↑↓')
     -- screen.move(2,58)
