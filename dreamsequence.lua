@@ -955,43 +955,45 @@ end
 
 
 function automator()
-  -- Arranger pattern_seq_position, chord_seq_position, automation event index
-  -- automator_events[1][2][1] = {'rotate_pattern', 'Arp', 1} --event name, var 1, var 2
-  -- automator_events[1][1][1] = {'transpose', 0} --event name, var 1, var 2
-  -- automator_events[1][5][1] = {'transpose', 2} --event name, var 1, var 2
-  -- automator_events[1][2][2] = {'shuffle_arp'}
-
   if pattern_seq_position ~= 0 and chord_seq_position ~= 0 then
-    -- if automator_events[pattern_seq_position][chord_seq_position] ~= nil then
-    if automator_events[pattern_seq_position][chord_seq_position][1] then -- only checks for first event. insert and remove to preserve something in index 1
+    
+    -- only checks for first event. insert and remove to preserve something in slot 1?
+    -- NOT FIRING UNLESS THERE IS AN EVENT IN SLOT 1 BECAUSE OF SHITTY CHECK
+    if automator_events[pattern_seq_position][chord_seq_position][1] then
       -- print(pattern_seq_position .. ' ' .. chord_seq_position .. ' ' ..automator_events[pattern_seq_position][chord_seq_position][1][1])
 
       for i = 1,8 do
         -- Cheesy
         if automator_events[pattern_seq_position][chord_seq_position][i] ~= nil  then
-
-          local do_event = automator_events[pattern_seq_position][chord_seq_position][i][1]
-          -- Sub for do loop for dynamic # of vars being stored
-          local var_1 = automator_events[pattern_seq_position][chord_seq_position][i][2]
-          local var_2 = automator_events[pattern_seq_position][chord_seq_position][i][3]
-          -- local var_3 = automator_events[pattern_seq_position][chord_seq_position][i][1]
+          -- NOT FIRING UNLESS THERE IS AN EVENT IN SLOT 1 BECAUSE OF SHITTY CHECK ABOVE
+          print('Firing event slot ' .. i)
+          local event_type = automator_events[pattern_seq_position][chord_seq_position][i][1]
+          event_name = events_lookup[automator_events[pattern_seq_position][chord_seq_position][i][2]][1]
+          local value = automator_events[pattern_seq_position][chord_seq_position][i][3] or ''
+          local value_type_index = automator_events[pattern_seq_position][chord_seq_position][i][4]
+          local value_type = params.params[params.lookup['event_value_type']]['options'][value_type_index] or ''
           
-          print(pattern_seq_position .. ' ' .. chord_seq_position .. ' ' .. do_event)
-          if do_event == 'rotate_arp' then
-            rotate_pattern('Arp', var_1)
-          elseif do_event == 'transpose' then
-            params:set('transpose',(var_1 + (var_2 == 'Increment' and params:get('transpose') or 0)))
-          elseif do_event == 'shuffle_arp' then
-            local shuffled_arp_seq = shuffle(arp_seq[arp_pattern])
-            arp_seq[arp_pattern] = shuffled_arp_seq
+          print('event_type: ' .. event_type)
+          print('event_name: ' .. event_name)
+          print('value: ' .. value)
+          print('value_type: ' .. value_type)
+          
+          if event_type == 'param' then
+            params:set(event_name, (value + (value_type == 'Increment' and params:get(event_name) or 0)))
+          else -- functions
+            _G[event_name](value)
           end
+          
+        -- If needed
+        -- redraw()  
         end
         
       end
     end
   end
 end
-  
+
+
 function generate_chord_names()
   if chord_no > 0 then
     chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
@@ -1389,22 +1391,34 @@ function g.key(x,y,z)
       if x <= event_pattern_length then
         event_edit_step = x
         event_edit_slot = y
-        
+      
         -- Load the Event vars back to the displayed param if it's a populated slot
         if automator_events[event_edit_pattern][x][y] ~= nil then
           -- K3 saves event to automator_events
-          -- automator_events are saved as strings so we gotta look those up in Options to re-set them
-          local invert_options = tab.invert(params.params[params.lookup['event_name']]['options'])
-          params:set('event_name', invert_options[automator_events[event_edit_pattern][x][y][2]])
+          
+          -- simplified to use param index rather than decoding strings. For now.
+          params:set('event_name', automator_events[event_edit_pattern][x][y][2])
 
           if #automator_events[event_edit_pattern][x][y] > 2 then
             params:set('event_value', automator_events[event_edit_pattern][x][y][3])
             
             if #automator_events[event_edit_pattern][x][y] > 3 then
-              local invert_options = tab.invert(params.params[params.lookup['event_value_type']]['options'])
-              params:set('event_value_type', invert_options[automator_events[event_edit_pattern][x][y][4]])
+              params:set('event_value_type', automator_events[event_edit_pattern][x][y][4])
             end
           end
+          
+          -- -- automator_events are saved as strings so we gotta look those up in Options to re-set them
+          -- local invert_options = tab.invert(params.params[params.lookup['event_name']]['options'])
+          -- params:set('event_name', invert_options[automator_events[event_edit_pattern][x][y][2]])
+
+          -- if #automator_events[event_edit_pattern][x][y] > 2 then
+          --   params:set('event_value', automator_events[event_edit_pattern][x][y][3])
+            
+          --   if #automator_events[event_edit_pattern][x][y] > 3 then
+          --     local invert_options = tab.invert(params.params[params.lookup['event_value_type']]['options'])
+          --     params:set('event_value_type', invert_options[automator_events[event_edit_pattern][x][y][4]])
+          --   end
+          -- end
           
         end  
       end
@@ -1627,7 +1641,9 @@ function key(n,z)
       -- Back out of Events and return to Arranger  
       elseif screen_view_name == 'Events' then
         if event_edit_step == 0 then
-          screen_view_name = 'Arranger'
+          -- Changed from 'Back' using K2 to 'Done' using K3 so this is not necessary (but optional)
+          -- Might want to set it to Back: K2 on initial load and Done: K3 after setting an event
+          -- screen_view_name = 'Arranger'
         else
           event_edit_step = 0
           event_edit_slot = 0
@@ -1665,26 +1681,34 @@ function key(n,z)
       elseif screen_view_name == 'Events' then
         if event_edit_slot > 0 then
           local event_index = params:get('event_name')
-          -- local event_id = events_lookup[event_index][1]
+          local event_id = events_lookup[event_index][1]
           local event_type = events_lookup[event_index][2]
-          local event_name = events_lookup[event_index][3]
+          -- local event_name = events_lookup[event_index][3]
           local event_value = params:get('event_value')
           local value_type = events_lookup[event_index][4]
 
             if value_type == 'trigger' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_name}
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index}
             elseif value_type == 'set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_name, event_value}
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value}
             elseif value_type == 'inc, set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_name, event_value, params:string('event_value_type')}              
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value, params:get('event_value_type')}              
           end
--- tab.print(params.params[params.lookup['event_name']]['options'])          
+          -- tab.print(params.params[params.lookup['event_name']]['options'])          
 
-        -- Or go back to the Arranger
-        screen_view_name = 'Arranger'
-        event_edit_step = 0
-        event_edit_slot = 0
-        grid_redraw()
+        -- And steps back
+          event_edit_step = 0
+          event_edit_slot = 0
+          grid_redraw()
+        
+        -- -- Alternative that returns to the Arranger  
+        -- screen_view_name = 'Arranger'
+        -- event_edit_step = 0
+        -- event_edit_slot = 0
+        -- grid_redraw()
+        else -- event_edit_slot == 0
+          screen_view_name = 'Arranger'
+          grid_redraw()
         end
         
         
@@ -1741,6 +1765,16 @@ function key(n,z)
   redraw()
 end
 
+
+function shuffle_arp()
+  local shuffled_arp_seq = shuffle(arp_seq[arp_pattern])
+  arp_seq[arp_pattern] = shuffled_arp_seq
+end
+          
+-- Passes along 'Arp' var so we can have a specific event for just arp
+function rotate_arp(direction)
+  rotate_pattern('Arp', direction)
+end
 
 -- Rotate looping portion of pattern
 function rotate_pattern(view, direction)
@@ -1959,8 +1993,8 @@ function redraw()
       screen.text('Select a step (column) and')
       screen.move(2,38)
       screen.text('event slot (row) on Grid')
-      screen.move(2,58)
-      screen.text('Back: KEY 2')
+      screen.move(78,58)
+      screen.text('Done: KEY 3')
     else
       screen.level(3)
       screen.text('Editing slot ' .. event_edit_slot .. ' of segment '.. event_edit_pattern .. '.' .. event_edit_step) -- event_edit_step
@@ -1979,7 +2013,7 @@ function redraw()
       end
       screen.level(3)
       screen.move(2,58)
-      screen.text('Back: KEY 2')
+      screen.text('Cancel: KEY 2')
       screen.move(78,58)  -- 128 - screen.text_extents('Save: KEY 3')
       screen.text('Save: KEY 3')
     end
