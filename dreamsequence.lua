@@ -1415,9 +1415,17 @@ function g.key(x,y,z)
         -- else 
         --   pattern_seq[x] = y
         -- end
+        
+        -- Deletion of arranger step occurs at key UP and can be interrupted if user enters event edit mode
+        if y == pattern_seq[x] and x > 1 then
+          delete_arranger_step = true
+        else
+          delete_arranger_step = false
+        end
+        
         pattern_seq[x] = y
         
-        -- Calculate arranger length
+        -- Calculate arranger length (also runs at key up)------------------------------------
         for i = 1,17 do
           if pattern_seq[i] == 0  or i == 17 then
             pattern_seq_length = i - 1
@@ -1436,6 +1444,7 @@ function g.key(x,y,z)
             table.remove(pattern_seq_extd[x], #pattern_seq_extd[x])
           end
         end
+        -- End of arranger length stuff --------------------------------------------------------
         
         -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
         if params:get('arranger_enabled') == 1 and pattern_seq_position == 0 and chord_seq_position == 0 then  
@@ -1550,10 +1559,44 @@ function g.key(x,y,z)
         else chord_no = 0
         end
       end
+    
+    -- Arranger key up  
     elseif grid_view_name == 'Arranger' then
       if y < 5 then
         arranger_key_count = math.max(arranger_key_count - 1, 0)
         arranger_keys[y] = nil
+        
+        if delete_arranger_step == true then
+          pattern_seq[x] = 0
+                    -- Calculate arranger length (also runs at key down. MAKE FUNCTION?)------------------------------------
+          for i = 1,17 do
+            if pattern_seq[i] == 0  or i == 17 then
+              pattern_seq_length = i - 1
+              break
+            end
+          end
+          
+          -- Set the pattern # for each step in the pattern_seq
+          for s = 1, pattern_length[y] do
+            pattern_seq_extd[x][s] = y
+          end
+          
+          -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
+          if #pattern_seq_extd[x] > pattern_length[y] then
+            for s = 1, #pattern_seq_extd[x] - pattern_length[y] do
+              table.remove(pattern_seq_extd[x], #pattern_seq_extd[x])
+            end
+          end
+          -- End of arranger length stuff --------------------------------------------------------
+        end
+        
+        -- -- Disable arranger step 
+        -- if y == pattern_seq[x] and x > 1 then
+        --   pattern_seq[x] = 0
+        -- else 
+        --   pattern_seq[x] = y
+        -- end
+        
       end
     end
     
@@ -1606,10 +1649,10 @@ function key(n,z)
       if keys[1] == 1 then
         generator()
         
-      -- Back out of Events and return to Arranger  
       elseif screen_view_name == 'Events' then
+        -- Use event_edit_step to determine if we are editing an event slot or just viewing them all
         if event_edit_step ~= 0 then
-          -- Check if slot is populated and should thus be deleted
+          -- Check if slot is populated and needs to be deleted
           local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
           if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] ~= nil then
             automator_events[event_edit_pattern][event_edit_step].populated = event_count - 1
@@ -1618,10 +1661,25 @@ function key(n,z)
           event_edit_step = 0
           event_edit_slot = 0
           redraw()
-        -- else  
+        -- Option to delete arranger step and ALL events
+        else
+        -- -- Disable arranger step 
+        -- if y == pattern_seq[x] and x > 1 then
+        --   pattern_seq[x] = 0
+        -- else 
+        --   pattern_seq[x] = y
+        -- end
+        
         -- Changed from 'Back' using K2 to 'Done' using K3 so this is not necessary (but optional)
         -- Might want to set it to Back: K2 on initial load and Done: K3 after setting an event
-        -- screen_view_name = 'Arranger'
+        
+        -- pattern_seq[event_edit_pattern] = 0
+        
+        -- Delete all: KEY 2
+        for p = 1,8 do
+          automator_events[event_edit_pattern][p] = {}
+        end    
+        screen_view_name = 'Arranger'
         end      
         grid_redraw()
       
@@ -1641,6 +1699,9 @@ function key(n,z)
       
       -- Edit Events on the arranger segment
       if arranger_key_count > 0 then
+        
+        -- Interrupts the disabling of the arranger segment on g.key up if we're entering event edit mode
+        delete_arranger_step = false
         arranger_keys = {}
         arranger_key_count = 0
         event_edit_step = 0 -- indicates one has not been selected yet
@@ -1973,6 +2034,8 @@ function redraw()
       screen.text('Select a step (column) and')
       screen.move(2,38)
       screen.text('event slot (row) on Grid')
+      screen.move(2,58)
+      screen.text('Delete all: KEY 2')
       screen.move(78,58)
       screen.text('Done: KEY 3')
     else
