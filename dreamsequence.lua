@@ -279,27 +279,13 @@ function init()
   steps_remaining_in_pattern = pattern_length[pattern]
   pattern_queue = false
   pattern_copy_performed = false
-  pattern_seq_retrig = false
-  pattern_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-  pattern_seq_position = 0
-  pattern_seq_length = 1
+  arranger_seq_retrig = false
+  arranger_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+  arranger_seq_position = 0
+  arranger_seq_length = 1
   
   
-  -- pattern_seq_extd = {{{}}}
-
-  -- for i = 1,16 do
-    -- pattern_seq_extd[i] = {{{}}}
-  -- end
-  
-  -- pattern_seq_extd[1] = {1,1,1,1}
-  
-  -- for i = 1,4 do
-  --   pattern_seq_extd[1][i] = {},{},{},{},{},{},{},{}
-  -- end
-
-
-  
-  pattern_seq_extd = {
+  arranger_seq_extd = {
     {1,1,1,1},
     {},
     {},
@@ -879,8 +865,8 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
-  pattern_seq_position = 0
-  pattern = pattern_seq[1]
+  arranger_seq_position = 0
+  pattern = arranger_seq[1]
   reset_clock()
   get_next_chord()
   grid_redraw()
@@ -902,7 +888,7 @@ function advance_chord_seq()
   if params:get('arranger_enabled') == 1 then
 
     -- If it's post-reset or at the end of chord sequence
-    if (pattern_seq_position == 0 and chord_seq_position == 0) or chord_seq_position >= pattern_length[pattern] then
+    if (arranger_seq_position == 0 and chord_seq_position == 0) or chord_seq_position >= pattern_length[pattern] then
       
       -- Check if it's the last pattern in the arrangement.
       -- This also needs to be run after firing chord so we can catch last-minute changes to arranger_one_shot_last_pattern
@@ -911,32 +897,36 @@ function advance_chord_seq()
         reset_arrangement()
         clock.transport.stop()
       else  -- If not the last pattern in the arrangement, update the arranger sequence position
-        pattern_seq_position = util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)
-        pattern = pattern_seq[pattern_seq_position]
+        arranger_seq_position = util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)
+        
+        -- pattern = arranger_seq[arranger_seq_position]  -- Only updating pattern if Arranger is not holding (pattern 0)
+        if arranger_seq[arranger_seq_position] > 0 then 
+          pattern = arranger_seq[arranger_seq_position]
+        end
       end
       -- Indicates arranger has moved to new pattern.
-      pattern_seq_retrig = true
+      arranger_seq_retrig = true
     end
     
     -- Flag if arranger is on the last pattern of a 1-shot sequence
-    arranger_one_shot_last_pattern = pattern_seq_position >= pattern_seq_length and params:string('playback') == 'One-shot'
+    arranger_one_shot_last_pattern = arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
   end
   
   -- If arrangement was not just reset, update chord position. 
   if arrangement_reset == false then
-    if chord_seq_position >= pattern_length[pattern] or pattern_seq_retrig then
+    if chord_seq_position >= pattern_length[pattern] or arranger_seq_retrig then
       if pattern_queue then
         pattern = pattern_queue
         pattern_queue = false
       end
       chord_seq_position = 1
-      pattern_seq_retrig = false
+      arranger_seq_retrig = false
     else  
       chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
     end
     
     -- Arranger automation step. Might need to move this to get_next_chord
-    if params:get('arranger_enabled') == 1 then
+    if params:get('arranger_enabled') == 1 and arranger_seq[arranger_seq_position] > 0 then
       automator()
     end
     
@@ -955,16 +945,16 @@ end
 
 
 function automator()
-  if pattern_seq_position ~= 0 and chord_seq_position ~= 0 then
-    if automator_events[pattern_seq_position][chord_seq_position].populated or 0 > 0 then
+  if arranger_seq_position ~= 0 and chord_seq_position ~= 0 then
+    if automator_events[arranger_seq_position][chord_seq_position].populated or 0 > 0 then
       for i = 1,8 do
         -- Cheesy
-        if automator_events[pattern_seq_position][chord_seq_position][i] ~= nil  then
+        if automator_events[arranger_seq_position][chord_seq_position][i] ~= nil  then
           -- print('Firing event slot ' .. i)
-          local event_type = automator_events[pattern_seq_position][chord_seq_position][i][1]
-          event_name = events_lookup[automator_events[pattern_seq_position][chord_seq_position][i][2]][1]
-          local value = automator_events[pattern_seq_position][chord_seq_position][i][3] or ''
-          local value_type_index = automator_events[pattern_seq_position][chord_seq_position][i][4]
+          local event_type = automator_events[arranger_seq_position][chord_seq_position][i][1]
+          event_name = events_lookup[automator_events[arranger_seq_position][chord_seq_position][i][2]][1]
+          local value = automator_events[arranger_seq_position][chord_seq_position][i][3] or ''
+          local value_type_index = automator_events[arranger_seq_position][chord_seq_position][i][4]
           local value_type = params.params[params.lookup['event_value_type']]['options'][value_type_index] or ''
           
           -- print('event_type: ' .. event_type)
@@ -1029,22 +1019,22 @@ end
 function get_next_chord()
   local temp_pattern = pattern
   local temp_chord_seq_position = chord_seq_position
-  local temp_pattern_seq_retrig = false
+  local temp_arranger_seq_retrig = false
 
-  -- Rewriting this to see if it works without temp_pattern_seq_retrig
-  -- FIX: NOPE. pattern_seq_retrig is needed so we move to the right step after arranger advanced pattern. REDO THIS!!
-  -- -- If arranger is enabled and it's the last step in the chord sequence, advance the arranger first and set temp_pattern_seq_retrig
+  -- Rewriting this to see if it works without temp_arranger_seq_retrig
+  -- FIX: NOPE. arranger_seq_retrig is needed so we move to the right step after arranger advanced pattern. REDO THIS!!
+  -- -- If arranger is enabled and it's the last step in the chord sequence, advance the arranger first and set temp_arranger_seq_retrig
   -- if params:get('arranger_enabled') == 1 and temp_chord_seq_position >= pattern_length[temp_pattern] then 
-  --   temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
-  --   temp_pattern_seq_retrig = true
+  --   temp_pattern = arranger_seq[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
+  --   temp_arranger_seq_retrig = true
   -- end
-  -- -- Irrespective of arranger state, if it's the last step in the chord sequence OR temp_pattern_seq_retrig (redundant?), advance the chord sequence pattern and reset temp_pattern_seq_retrig
-  -- if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_pattern_seq_retrig then
+  -- -- Irrespective of arranger state, if it's the last step in the chord sequence OR temp_arranger_seq_retrig (redundant?), advance the chord sequence pattern and reset temp_arranger_seq_retrig
+  -- if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_arranger_seq_retrig then
   --   if pattern_queue then
   --     temp_pattern = pattern_queue
   --   end
   --   temp_chord_seq_position = 1
-  --   temp_pattern_seq_retrig = false
+  --   temp_arranger_seq_retrig = false
   -- else  
   --   temp_chord_seq_position = util.wrap(temp_chord_seq_position + 1, 1, pattern_length[temp_pattern])
   -- end
@@ -1052,7 +1042,14 @@ function get_next_chord()
   --Refactor
   if temp_chord_seq_position >= pattern_length[temp_pattern] then
     if params:get('arranger_enabled') == 1 then
-      temp_pattern = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
+      
+    -- Indicates arranger has moved to new pattern.
+      arranger_seq_retrig = true
+      
+      local temp_arranger_seq_next = arranger_seq[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
+      if temp_arranger_seq_next > 0 then
+        temp_pattern = temp_arranger_seq_next
+      end
     end
     if pattern_queue then
       temp_pattern = pattern_queue
@@ -1079,7 +1076,7 @@ end
 
 
 function advance_arp_seq()
-  if arp_seq_position > arp_pattern_length[arp_pattern] or pattern_seq_retrig == true then -- Validate pattern_seq_retrig addition
+  if arp_seq_position > arp_pattern_length[arp_pattern] or arranger_seq_retrig == true then -- Validate arranger_seq_retrig addition
     arp_seq_position = 1
   else  
     arp_seq_position = util.wrap(arp_seq_position + 1, 1, arp_pattern_length[arp_pattern])
@@ -1311,8 +1308,8 @@ function grid_redraw()
   if screen_view_name == 'Events' then
     
   -- Draw grid with 8 event slots (rows) for each step in the selected pattern  
-    local event_pattern_length = pattern_length[pattern_seq[event_edit_pattern]]
-    for x = 1, 8 do -- pattern_length[pattern_seq[event_edit_pattern]] do
+    local event_pattern_length = pattern_length[arranger_seq[event_edit_pattern]]
+    for x = 1, 8 do -- pattern_length[arranger_seq[event_edit_pattern]] do
       for y = 1,8 do
         g:led(x, y, (automator_events[event_edit_pattern][x][y] ~= nil and 7 or (x > event_pattern_length and 1 or 2)))
         if x == event_edit_step and y == event_edit_slot then
@@ -1325,19 +1322,22 @@ function grid_redraw()
     for i = 6,8 do
       g:led(16,i,4)
     end
+    
     if grid_view_name == 'Arranger' then
       g:led(16,6,15)
       for x = 1,16 do
         for y = 1,4 do
-          g:led(x,y, x == pattern_seq_position and 7 or 3)
-          if y == pattern_seq[x] then
+          g:led(x,y, x == arranger_seq_position and 4 or 0)
+          if y == arranger_seq[x] then
             g:led(x, y, 15)
           end
         end
+        g:led(x,5, x > arranger_seq_length and 4 or 15 )
       end
+      
     elseif grid_view_name == 'Chord' then
       if params:get('arranger_enabled') == 1 and arranger_one_shot_last_pattern == false then
-        next_pattern_indicator = pattern_seq[util.wrap(pattern_seq_position + 1, 1, pattern_seq_length)]
+        next_pattern_indicator = arranger_seq[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
       else
         next_pattern_indicator = pattern_queue or pattern
       end
@@ -1357,6 +1357,7 @@ function grid_redraw()
           g:led(chord_seq[pattern][i].x, i, 15)                         -- set LEDs for chord sequence
         end
       end
+      
     elseif grid_view_name == 'Arp' then
       g:led(16,8,15)
       for i = 1,14 do                                                   -- chord seq playhead
@@ -1406,62 +1407,57 @@ function g.key(x,y,z)
     --ARRANGER KEYS
     elseif grid_view_name == 'Arranger' then
 
-      -- Arranger step updated
-      if y < 5 then
+      -- arranger_seq_length updated 
+      if y == 5 then
+        arranger_seq_length = x
+        
+      -- Arranger_seq updated
+      elseif y < 5 then
 
-        -- Temporarily disabling turning arranger steps off. Either move to key up or require K1/2 to delete, etc...
-        -- if y == pattern_seq[x] and x > 1 then
-        --   pattern_seq[x] = 0
-        -- else 
-        --   pattern_seq[x] = y
-        -- end
-        
-        -- Deletion of arranger step occurs at key UP and can be interrupted if user enters event edit mode
-        if y == pattern_seq[x] and x > 1 then
-          delete_arranger_step = true
-        else
-          delete_arranger_step = false
+      -- Deletion of arranger step occurs at key UP and can be interrupted if user enters event edit mode
+      if y == arranger_seq[x] and x > 1 then
+        delete_arranger_step = true
+      else
+        delete_arranger_step = false
+      end
+      
+      arranger_seq[x] = y
+      
+      -- -- Generate the arranger_seq_gen which includes the raw arranger_seq + held patterns
+      -- for i = 1,16 do
+      --   arranger_seq_gen[i] = arranger_seq[i] == 0 and arranger_seq[math.max(i - 1, 1)]
+      -- end  
+      
+      
+      -- Set the pattern_length for each step in arranger_seq_extd
+      for i = 1, pattern_length[y] do
+        arranger_seq_extd[x][i] = y
+      end
+      
+      -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
+      if #arranger_seq_extd[x] > pattern_length[y] then
+        for i = 1, #arranger_seq_extd[x] - pattern_length[y] do
+          table.remove(arranger_seq_extd[x], #arranger_seq_extd[x])
         end
-        
-        pattern_seq[x] = y
-        
-        -- Calculate arranger length (also runs at key up)------------------------------------
-        for i = 1,17 do
-          if pattern_seq[i] == 0  or i == 17 then
-            pattern_seq_length = i - 1
-            break
-          end
-        end
-        
-        -- Set the pattern # for each step in the pattern_seq
-        for s = 1, pattern_length[y] do
-          pattern_seq_extd[x][s] = y
-        end
-        
-        -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
-        if #pattern_seq_extd[x] > pattern_length[y] then
-          for s = 1, #pattern_seq_extd[x] - pattern_length[y] do
-            table.remove(pattern_seq_extd[x], #pattern_seq_extd[x])
-          end
-        end
-        -- End of arranger length stuff --------------------------------------------------------
-        
-        -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
-        if params:get('arranger_enabled') == 1 and pattern_seq_position == 0 and chord_seq_position == 0 then  
-          pattern = pattern_seq[1]
-        end
-        
-          --------------------------- KEY DOWN--------------------------------------
-        -- This part is at the end so we can capture the updated pattern_length.
-        -- Stuff above might need to be moved to key up tho'
-        arranger_key_count = arranger_key_count + 1
-      -- add record to arranger_keys
-        table.insert(arranger_keys, x)
-        event_edit_pattern = x  -- Last touched pattern is the one we edit
-        -- event_pattern_length is not needed here since we allow out-of-range events
-        -- event_pattern_length = pattern_length[pattern_seq[x]]
-        -- print('event_edit_pattern ' .. event_edit_pattern .. ' | ' .. 'pattern_length ' .. pattern_seq[x])
-        --------------------------------------------------------------------------
+      end
+      -- End of arranger length stuff --------------------------------------------------------
+      
+      -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
+      if params:get('arranger_enabled') == 1 and arranger_seq_position == 0 and chord_seq_position == 0 then  
+        pattern = arranger_seq[1]
+      end
+      
+        --------------------------- KEY DOWN--------------------------------------
+      -- This part is at the end so we can capture the updated pattern_length.
+      -- Stuff above might need to be moved to key up tho'
+      arranger_key_count = arranger_key_count + 1
+    -- add record to arranger_keys
+      table.insert(arranger_keys, x)
+      event_edit_pattern = x  -- Last touched pattern is the one we edit
+      -- event_pattern_length is not needed here since we allow out-of-range events
+      -- event_pattern_length = pattern_length[arranger_seq[x]]
+      -- print('event_edit_pattern ' .. event_edit_pattern .. ' | ' .. 'pattern_length ' .. arranger_seq[x])
+      --------------------------------------------------------------------------
         
       end
       if transport_active == false then -- Update chord for when play starts
@@ -1567,34 +1563,34 @@ function g.key(x,y,z)
         arranger_keys[y] = nil
         
         if delete_arranger_step == true then
-          pattern_seq[x] = 0
-                    -- Calculate arranger length (also runs at key down. MAKE FUNCTION?)------------------------------------
-          for i = 1,17 do
-            if pattern_seq[i] == 0  or i == 17 then
-              pattern_seq_length = i - 1
-              break
-            end
-          end
+          arranger_seq[x] = 0
+          -- Calculate arranger length (also runs at key down. MAKE FUNCTION?)------------------------------------
+          -- for i = 1,17 do
+          --   if arranger_seq[i] == 0  or i == 17 then
+          --     arranger_seq_length = i - 1
+          --     break
+          --   end
+          -- end
           
-          -- Set the pattern # for each step in the pattern_seq
+          -- Set the pattern # for each step in the arranger_seq
           for s = 1, pattern_length[y] do
-            pattern_seq_extd[x][s] = y
+            arranger_seq_extd[x][s] = y
           end
           
           -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
-          if #pattern_seq_extd[x] > pattern_length[y] then
-            for s = 1, #pattern_seq_extd[x] - pattern_length[y] do
-              table.remove(pattern_seq_extd[x], #pattern_seq_extd[x])
+          if #arranger_seq_extd[x] > pattern_length[y] then
+            for s = 1, #arranger_seq_extd[x] - pattern_length[y] do
+              table.remove(arranger_seq_extd[x], #arranger_seq_extd[x])
             end
           end
           -- End of arranger length stuff --------------------------------------------------------
         end
         
         -- -- Disable arranger step 
-        -- if y == pattern_seq[x] and x > 1 then
-        --   pattern_seq[x] = 0
+        -- if y == arranger_seq[x] and x > 1 then
+        --   arranger_seq[x] = 0
         -- else 
-        --   pattern_seq[x] = y
+        --   arranger_seq[x] = y
         -- end
         
       end
@@ -1614,20 +1610,20 @@ end
 
 
 
--- Update pattern_seq_extd to handle changes to loop length
--- Update pattern_seq_extd which stores the extended arranger pattern
+-- Update arranger_seq_extd to handle changes to loop length
+-- Update arranger_seq_extd which stores the extended arranger pattern
 -- If this pattern in the arranger is the same one what was just touched, check if the length grew or shrunk
 function update_arranger_pattern_length(pattern)      
   for p = 1, 16 do
-    if pattern_seq_extd[p][1] == pattern then
+    if arranger_seq_extd[p][1] == pattern then
       -- Grew
-      if pattern_length[pattern] > #pattern_seq_extd[p] then
-        for s = 1, pattern_length[pattern] - #pattern_seq_extd[p] do
-          table.insert(pattern_seq_extd[p], pattern)
+      if pattern_length[pattern] > #arranger_seq_extd[p] then
+        for s = 1, pattern_length[pattern] - #arranger_seq_extd[p] do
+          table.insert(arranger_seq_extd[p], pattern)
         end
-      elseif pattern_length[pattern] < #pattern_seq_extd[p] then
-        for s = 1, #pattern_seq_extd[p] - pattern_length[pattern]  do
-          table.remove(pattern_seq_extd[p], #pattern_seq_extd[p])  -- not sure about this
+      elseif pattern_length[pattern] < #arranger_seq_extd[p] then
+        for s = 1, #arranger_seq_extd[p] - pattern_length[pattern]  do
+          table.remove(arranger_seq_extd[p], #arranger_seq_extd[p])  -- not sure about this
         end
       end
     end
@@ -1664,16 +1660,16 @@ function key(n,z)
         -- Option to delete arranger step and ALL events
         else
         -- -- Disable arranger step 
-        -- if y == pattern_seq[x] and x > 1 then
-        --   pattern_seq[x] = 0
+        -- if y == arranger_seq[x] and x > 1 then
+        --   arranger_seq[x] = 0
         -- else 
-        --   pattern_seq[x] = y
+        --   arranger_seq[x] = y
         -- end
         
         -- Changed from 'Back' using K2 to 'Done' using K3 so this is not necessary (but optional)
         -- Might want to set it to Back: K2 on initial load and Done: K3 after setting an event
         
-        -- pattern_seq[event_edit_pattern] = 0
+        -- arranger_seq[event_edit_pattern] = 0
         
         -- Delete all: KEY 2
         for p = 1,8 do
@@ -1914,7 +1910,7 @@ function enc(n,d)
           -- Moves to the selected pattern and step for editing
           repeat
             local delta = d
-            local steps_to_next_pattern = (#pattern_seq_extd[event_edit_pattern] + 1) - event_edit_step
+            local steps_to_next_pattern = (#arranger_seq_extd[event_edit_pattern] + 1) - event_edit_step
             -- print (steps_to_next_pattern .. ' steps_to_next_pattern')
             if delta < 0 then
               -- Hard stop at sequence begin
@@ -1929,7 +1925,7 @@ function enc(n,d)
                 else
                 -- Move to the last step of the preceeding pattern
                   event_edit_pattern = math.max(event_edit_pattern - 1, 1)
-                  event_edit_step = #pattern_seq_extd[event_edit_pattern]
+                  event_edit_step = #arranger_seq_extd[event_edit_pattern]
                 end
               else
                 -- if event_edit_step =
@@ -1943,12 +1939,12 @@ function enc(n,d)
                 -- Subtract steps_to_next_pattern from delta as we move to the next pattern
                 delta = math.min(delta - steps_to_next_pattern, 0)
                 -- Max out  
-                if event_edit_pattern == pattern_seq_length then
-                  event_edit_step = #pattern_seq_extd[event_edit_pattern]
+                if event_edit_pattern == arranger_seq_length then
+                  event_edit_step = #arranger_seq_extd[event_edit_pattern]
                   delta = 0
                 else
                   -- Move to the first step of the next pattern
-                  event_edit_pattern = math.min(event_edit_pattern + 1, pattern_seq_length)
+                  event_edit_pattern = math.min(event_edit_pattern + 1, arranger_seq_length)
                   event_edit_step = 1
                 end
               else
@@ -2100,31 +2096,38 @@ function redraw()
     end
     
      --Calculate what we need to display arrangement time remaining and draw the arranger mini-chart
-    local rect_x = pattern_seq_position == 0 and 1 or 0 -- If arranger is reset, add an initial gap to the x position
+    local rect_x = arranger_seq_position == 0 and 1 or 0 -- If arranger is reset, add an initial gap to the x position
     steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
   
-    for i = math.max(pattern_seq_position, 1), pattern_seq_length do
-      steps_elapsed = (i == pattern_seq_position and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
+    for i = math.max(arranger_seq_position, 1), arranger_seq_length do
+      steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
       
-      -- little hack here to set to 1 if pattern_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
-      percent_step_elapsed = pattern_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
+      -- little hack here to set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
+      percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
       -- print('percent_step_elapsed =' .. percent_step_elapsed)
       
   
       -- % of current chord step remaining
       -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
       
-      steps_remaining_in_pattern = pattern_length[pattern_seq[i]] - steps_elapsed  --rect_w
+      -- Generate a pattern length even for held arranger steps. This doesn't work unless Global for some reason?
+      pattern_length_gen = pattern_length[arranger_seq[i]] or pattern_length_gen
+      
+      -- steps_remaining_in_pattern = pattern_length[arranger_seq[i]] - steps_elapsed  --rect_w
+      steps_remaining_in_pattern = pattern_length_gen - steps_elapsed  --rect_w
+      
       steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
       seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
       
       -- Draw timeline. Needs to be run in this loop rather than in Arranger view section
       if screen_view_name == 'Arranger' then
         rect_h = 2
-        rect_y = 50 + (pattern_seq[i]* 2) + pattern_seq[i]
+        -- rect_y = 50 + (arranger_seq[i]* 2) + arranger_seq[i]
+        rect_y = arranger_seq[i] == 0 and rect_y or 50 + (arranger_seq[i]* 2) + arranger_seq[i]
+
         
-        -- Cosmetic adjustment to gap if pattern_seq_position == 0 (reset)
-        rect_gap_adj = pattern_seq_position == 0 and 0 or pattern_seq_position - 1
+        -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
+        rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
         screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
         screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, rect_h)
         screen.fill()
@@ -2134,7 +2137,7 @@ function redraw()
         if arranger_menu_index == #arranger_menus + 1 then
           if event_edit_pattern == i then
             screen.level(15)
-            screen.rect(rect_x + i - rect_gap_adj - (pattern_length[pattern_seq[i]] + 1 - event_edit_step), 53, 1, 11)
+            screen.rect(rect_x + i - rect_gap_adj - (pattern_length[arranger_seq[i]] + 1 - event_edit_step), 53, 1, 11)
             screen.move_rel(0,-1)
             screen.text(event_edit_pattern .. '.' .. event_edit_step)
             screen.fill()
@@ -2167,7 +2170,7 @@ function redraw()
   
       -- Axis reference marks so it's easier to distinguish the pattern position
       for i = 1,4 do
-        screen.level(i == pattern_seq[pattern_seq_position] and 15 or 2)
+        screen.level(i == arranger_seq[arranger_seq_position] and 15 or 2)
         screen.rect(0,50 + i * 3, 1, 2)
         screen.fill()
       end  
