@@ -42,8 +42,8 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-    params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
-      params:set_action('repeat_notes',function() menu_update() end)
+  params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
+    params:set_action('repeat_notes',function() menu_update() end)
   params:add_number('dedupe_threshold', 'Threshold', 1, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 1, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
@@ -70,7 +70,7 @@ function init()
   formatter = function(param) return playback_string(param:get()) end}
   params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
 
-  -- Events
+  -- Events, To-do: hide these in system menu
   event_display_names = {}
   for i = 1, #events_lookup do
     event_display_names[i] = events_lookup[i][3]
@@ -79,9 +79,17 @@ function init()
     params:set_action('event_name',function() menu_update() end)
     
   params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
-  params:add_option('event_enable', 'Enable', {'True','False'}, 1)  -- obsolete?
+  -- params:add_option('event_enable', 'Enable', {'True','False'}, 1)  -- obsolete?
   params:add_number('event_value', 'Value', -999, 999, 0)
+  -- params:add_number('event_value', 'Value', 
+  --   -- Lookup min and max if param
+  --   params:get_range(params.lookup[events_lookup[params:get('event_name')][1]])[1], 
+  --   params:get_range(params.lookup[events_lookup[params:get('event_name')][1]])[2], 0)
 
+
+  -- This looks up the min range (set last value to 2 for max) for the currently selected event param
+  -- Might make more sense to just maintain this in events_lookup so it can also be done for event functions
+  --  params:get_range(params.lookup[events_lookup[params:get('event_name')][1]])[1]
   
   --Chord params
   params:add_separator ('Chord')
@@ -1384,7 +1392,7 @@ function g.key(x,y,z)
       if x < 9 then
         event_edit_step = x
         event_edit_slot = y
-      
+
         -- If the event slot is populated, Load the Event vars back to the displayed param
         if automator_events[event_edit_pattern][x][y] ~= nil then
           params:set('event_name', automator_events[event_edit_pattern][x][y][2])
@@ -1394,8 +1402,19 @@ function g.key(x,y,z)
               params:set('event_value_type', automator_events[event_edit_pattern][x][y][4])
             end
           end
-          
+          event_name = events_lookup[params:get('event_name')][1]
+        else
+          event_name = events_lookup[params:get('event_name')][1]
+          -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
+          if events_lookup[params:get('event_name')][2] == 'param' then
+            params:set('event_value', params:get(event_name))
+          else
+            params:set('event_value', 0)
+            -- Alternative
+            -- params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
+          end
         end  
+        
       end
       
       
@@ -1878,13 +1897,13 @@ function enc(n,d)
       
       screen_view_index = util.clamp(screen_view_index + d, 1, 3)
       screen_view_name = screen_views[screen_view_index]
+      
+      -- N == ENC 2 ------------------------------------------------
       elseif n == 2 then
         if screen_view_name == 'Events' then
-          
-          -- This switches the parameter
+          -- Scroll through the Events menus (name, type, val)
           automator_events_index = util.clamp(automator_events_index + d, 1, #automator_events_menus)
           selected_automator_events_menu = automator_events_menus[automator_events_index]
-          
         elseif screen_view_name == 'Arranger' then
           arranger_menu_index = util.clamp(arranger_menu_index + d, 1, #arranger_menus + 1)
           if arranger_menu_index == #arranger_menus + 1 then
@@ -1899,9 +1918,82 @@ function enc(n,d)
           menu_index = util.clamp(menu_index + d, 0, #menus[page_index])
           selected_menu = menus[page_index][menu_index]
         end
-    else -- n== 3
+        
+    -- n == ENC 3 -------------------------------------------------------------  
+    else
+      -- Change event value
       if screen_view_name == 'Events' then
-        params:delta(selected_automator_events_menu, d) -- will misfire unless one is selected at init
+
+        if selected_automator_events_menu == 'event_name' then
+          params:delta(selected_automator_events_menu, d)
+          event_name = events_lookup[params:get('event_name')][1]
+          
+          -- Determine if event range should be clamped
+          if events_lookup[params:get('event_name')][2] == 'param' then
+            -- Unrestrict range if it's a param of the 'inc, set' type and is set to 'Increment'
+            if events_lookup[params:get('event_name')][4] == 'inc, set' and params:string('event_value_type') == 'Increment' then
+              event_range = {-999,999}
+            else -- 'Set', 'Trigger', etc...
+              event_range = params:get_range(params.lookup[event_name]) or {-999,999}
+            end
+          else -- function. May have hardcoded ranges in events_lookup at some point
+            event_range = {-999,999}
+          end
+          
+          -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
+          if events_lookup[params:get('event_name')][2] == 'param' then
+            params:set('event_value', params:get(event_name))
+          else
+            params:set('event_value', 0)
+            -- Alternative
+            -- params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
+          end
+        
+        elseif selected_automator_events_menu == 'event_value_type' then
+          local prev_event_value_str = params:string('event_value_type')
+          params:delta(selected_automator_events_menu, d)
+          -- Determine if event range should be clamped
+          if events_lookup[params:get('event_name')][2] == 'param' then
+            -- Unrestrict range if it's a param of the 'inc, set' type and is set to 'Increment'
+            if events_lookup[params:get('event_name')][4] == 'inc, set' and params:string('event_value_type') == 'Increment' then
+              event_range = {-999,999}
+              -- If switching from Set to Increment, initialize value to 0
+              if prev_event_value_str ~= 'Increment' then
+                params:set('event_value', 0)
+              end
+            else -- 'Set', 'Trigger', etc...
+              event_range = params:get_range(params.lookup[event_name]) or {-999,999}
+            end
+          else -- function. May have hardcoded ranges in events_lookup at some point
+            event_range = {-999,999}
+          end
+          
+          -- Clamp the current event_value in case it's out-of-bounds
+          -- params:set('event_value',event_value)
+          params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
+        
+        
+        elseif selected_automator_events_menu == 'event_value' then
+          -- Determine if event range should be clamped
+          if events_lookup[params:get('event_name')][2] == 'param' then
+            -- Unrestrict range if it's a param of the 'inc, set' type and is set to 'Increment'
+            if events_lookup[params:get('event_name')][4] == 'inc, set' and params:string('event_value_type') == 'Increment' then
+              event_range = {-999,999}
+            else -- 'Set', 'Trigger', etc...
+              event_range = params:get_range(params.lookup[event_name]) or {-999,999}
+            end
+          else -- function. May have hardcoded ranges in events_lookup at some point
+            event_range = {-999,999}
+          end
+          params:set('event_value',util.clamp(util.clamp(params:get('event_value'), event_range[1], event_range[2]) + d, event_range[1], event_range[2]))
+          
+        -- All other Events menus get the usual delta
+        else
+          params:delta(selected_automator_events_menu, d)
+        end
+      
+
+
       elseif screen_view_name == 'Arranger' then
         
         -- If the arranger timeline is selected
@@ -2045,11 +2137,33 @@ function redraw()
         screen.move(2, line * 10 + 13 - menu_offset)    --exp
         screen.level(automator_events_index == i and 15 or 3)
         -- screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
-        screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' ..
-        params:string(automator_events_menus[i]))
-
+        
+        -- switch between number and formatted value for Incremental and Set, respectively
+        if automator_events_menus[i] == 'event_value' then
+          -- Check if there is a formatter assigned to this param/function
+          if events_lookup[params:get('event_name')][5] ~= '' then
+            -- if it's a param than we can either inc or set, check
+            if events_lookup[params:get('event_name')][4] == 'inc, set' then
+              if params:string('event_value_type') == 'Increment' then
+                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' ..
+                params:string(automator_events_menus[i]))
+              else
+                local var_string = _G[events_lookup[params:get('event_name')][5]](params:string('event_value'))
+                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
+              end
+            else
+              local var_string = _G[events_lookup[params:get('event_name')][5]](params:string('event_value'))
+              screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
+            end
+          else
+          screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
+          end
+        else
+          screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))         
+        end
+        
         line = line + 1
-      end
+        end
       screen.level(3)
       screen.move(2,58)
       screen.text('Delete: KEY 2')
