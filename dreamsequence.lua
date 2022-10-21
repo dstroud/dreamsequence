@@ -1741,17 +1741,19 @@ function key(n,z)
           local value_type = events_lookup[event_index][4]
           local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
             
-            -- Keep track of how many event slots are populated so we don't have to iterate through them all later
-            if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] == nil then
-              automator_events[event_edit_pattern][event_edit_step].populated = event_count + 1
-            end
+          -- Keep track of how many event slots are populated so we don't have to iterate through them all later
+          if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] == nil then
+            automator_events[event_edit_pattern][event_edit_step].populated = event_count + 1
+          end
 
-            if value_type == 'trigger' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index}
-            elseif value_type == 'set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value}
-            elseif value_type == 'inc, set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value, params:get('event_value_type')}              
+          -- Write the event vars to automator_events
+          -- To-do: something for more complex function values. Entire contents of Value field will be sent to function.
+          if value_type == 'trigger' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index}
+          elseif value_type == 'set' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value}
+          elseif value_type == 'inc, set' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value, params:get('event_value_type')}              
           end
           -- tab.print(params.params[params.lookup['event_name']]['options'])          
 
@@ -1863,9 +1865,19 @@ function rotate_pattern(view, direction)
 end
 
 
+-- for event triggers
+function transpose_chord_pattern(direction)
+  transpose_pattern('Chord', direction)
+end
+
+-- for event triggers
+function transpose_arp_pattern(direction)
+  transpose_pattern('Arp', direction)
+end
+
 -- "Transposes" pattern if you can call it that
-function transpose_pattern(direction)
-  if grid_view_name == 'Chord' then
+function transpose_pattern(view, direction)
+  if view == 'Chord' then
     for y = 1,8 do
       if chord_seq[pattern][y]['x'] ~= 0 then
         chord_seq[pattern][y]['x'] = util.wrap(chord_seq[pattern][y]['x'] + direction, 1, 14)
@@ -1873,7 +1885,7 @@ function transpose_pattern(direction)
         chord_seq[pattern][y].o = math.floor(chord_seq[pattern][y]['x'] / 8) --octave
       end
     end
-  elseif grid_view_name == 'Arp' then
+  elseif view == 'Arp' then
     for y = 1,8 do
       if arp_seq[arp_pattern][y] ~= 0 then
         arp_seq[arp_pattern][y] = util.wrap(arp_seq[arp_pattern][y] + direction, 1, 14)
@@ -1888,7 +1900,11 @@ function enc(n,d)
     if n == 2 then
       rotate_pattern(grid_view_name, d)
     elseif n == 3 then
-      transpose_pattern(d)
+      if grid_view_name == 'Chord' then
+        transpose_pattern('Chord', d)
+      elseif grid_view_name == 'Arp' then
+        transpose_pattern('Arp', d)
+      end
     end
     grid_redraw()
   else
