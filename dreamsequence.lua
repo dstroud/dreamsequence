@@ -312,26 +312,17 @@ function init()
     {}}
   
   
-  
-  automator_events ={
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},  
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},  
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},  
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},  
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},  
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},  
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},  
-  {{},{},{},{},{},{},{},{}},
-  {{},{},{},{},{},{},{},{}},    
-  }
-  
+    automator_events = {}
+    for patt = 1,16 do
+      automator_events[patt] = {}
+      for step = 1,8 do
+        automator_events[patt][step] = {}
+        -- for slot = 1,8 do
+        --   automator_events[patt][step][slot] = {}
+        -- end  
+      end
+    end
+    
   automator_events_index = 1
   selected_automator_events_menu = 'event_name'
   
@@ -934,7 +925,7 @@ function advance_chord_seq()
     end
     
     -- Arranger automation step. Might need to move this to get_next_chord
-    if params:get('arranger_enabled') == 1 and arranger_seq[arranger_seq_position] > 0 then
+    if params:get('arranger_enabled') == 1 and (arranger_seq[arranger_seq_position] or 0) > 0 then
       automator()
     end
     
@@ -959,15 +950,18 @@ function automator()
         -- Cheesy
         if automator_events[arranger_seq_position][chord_seq_position][i] ~= nil  then
           -- print('Firing event slot ' .. i)
-          local event_type = automator_events[arranger_seq_position][chord_seq_position][i][1]
-          event_name = events_lookup[automator_events[arranger_seq_position][chord_seq_position][i][2]][1]
-          local value = automator_events[arranger_seq_position][chord_seq_position][i][3] or ''
-          local value_type_index = automator_events[arranger_seq_position][chord_seq_position][i][4]
+          local event_type = automator_events[arranger_seq_position][chord_seq_position][i].event_type
+          local event_name = events_lookup[automator_events[arranger_seq_position][chord_seq_position][i].event_index][1]
+          local value = automator_events[arranger_seq_position][chord_seq_position][i].event_value or ''
+          local value_type_index = automator_events[arranger_seq_position][chord_seq_position][i].event_value_type
           local value_type = params.params[params.lookup['event_value_type']]['options'][value_type_index] or ''
+          local action = automator_events[arranger_seq_position][chord_seq_position][i].action or nil
+          local action_var = automator_events[arranger_seq_position][chord_seq_position][i].action_var or nil
           
           -- print('event_type: ' .. event_type)
           -- print('event_name: ' .. event_name)
           -- print('value: ' .. value)
+          -- print('value_type_index: ' .. value_type_index)
           -- print('value_type: ' .. value_type)
           
           if event_type == 'param' then
@@ -975,9 +969,10 @@ function automator()
           else -- functions
             _G[event_name](value)
           end
-          
-        -- If needed
-        -- redraw()  
+          if
+            action ~= nil then
+              _G[action](action_var)
+          end
         end
         
       end
@@ -1395,16 +1390,16 @@ function g.key(x,y,z)
 
         -- If the event slot is populated, Load the Event vars back to the displayed param
         if automator_events[event_edit_pattern][y][x] ~= nil then
-          params:set('event_name', automator_events[event_edit_pattern][y][x][2])
-          if #automator_events[event_edit_pattern][y][x] > 2 then
-            params:set('event_value', automator_events[event_edit_pattern][y][x][3])
-            if #automator_events[event_edit_pattern][y][x] > 3 then
-              params:set('event_value_type', automator_events[event_edit_pattern][y][x][4])
+          params:set('event_name', automator_events[event_edit_pattern][y][x].event_index)
+          if automator_events[event_edit_pattern][y][x].event_value ~= nil then
+            params:set('event_value', automator_events[event_edit_pattern][y][x].event_value)
+            if automator_events[event_edit_pattern][y][x].event_value_type ~= nil then
+              params:set('event_value_type', automator_events[event_edit_pattern][y][x].event_value_type)
             end
           end
           event_name = events_lookup[params:get('event_name')][1]
         else
-          print('a-' .. events_lookup[params:get('event_name')][1])
+          -- print('a-' .. events_lookup[params:get('event_name')][1])
           event_name = events_lookup[params:get('event_name')][1]
           -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
           if events_lookup[params:get('event_name')][2] == 'param' then
@@ -1739,6 +1734,8 @@ function key(n,z)
           -- local event_name = events_lookup[event_index][3]
           local event_value = params:get('event_value')
           local value_type = events_lookup[event_index][4]
+          local action = events_lookup[event_index][6]        
+          local action_var = events_lookup[event_index][7]          
           local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
             
           -- Keep track of how many event slots are populated so we don't have to iterate through them all later
@@ -1747,17 +1744,35 @@ function key(n,z)
           end
 
           -- Write the event vars to automator_events
-          -- To-do: something for more complex function values. Entire contents of Value field will be sent to function.
+          automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {}
+          
           if value_type == 'trigger' then
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index}
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
+            if action ~= '' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
+            end
           elseif value_type == 'set' then
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value}
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
+            if action ~= '' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
+            end
           elseif value_type == 'inc, set' then
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {event_type, event_index, event_value, params:get('event_value_type')}              
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value_type = params:get('event_value_type')
+            if action ~= '' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
+            end
           end
-          -- tab.print(params.params[params.lookup['event_name']]['options'])          
-
-        -- And steps back
+          
+        -- Back to event overview
           event_edit_step = 0
           event_edit_slot = 0
           grid_redraw()
