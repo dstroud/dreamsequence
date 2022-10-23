@@ -49,6 +49,7 @@ function init()
   params:add_number('chord_preload', 'Chord preload', 1, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)      
       
+      
   --Arrange params
   params:add_separator ('Arranger')
   params:add{
@@ -70,26 +71,22 @@ function init()
   formatter = function(param) return playback_string(param:get()) end}
   params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
 
-  -- Events, To-do: hide these in system menu
-  event_display_names = {}
+
+  -- Event params
+  event_display_names = {} -- to-do: make local after debug
   for i = 1, #events_lookup do
-    event_display_names[i] = events_lookup[i][3]
+    event_display_names[i] = events_lookup[i].name
   end
   params:add_option('event_name', 'Event', event_display_names, 1)
     params:set_action('event_name',function() menu_update() end)
+    params:hide(params.lookup['event_name'])
     
   params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
-  -- params:add_option('event_enable', 'Enable', {'True','False'}, 1)  -- obsolete?
+    params:hide(params.lookup['event_value_type'])
+
   params:add_number('event_value', 'Value', -999, 999, 0)
-  -- params:add_number('event_value', 'Value', 
-  --   -- Lookup min and max if param
-  --   params:get_range(params.lookup[events_lookup[params:get('event_name')][1]])[1], 
-  --   params:get_range(params.lookup[events_lookup[params:get('event_name')][1]])[2], 0)
-
-
-  -- This looks up the min range (set last value to 2 for max) for the currently selected event param
-  -- Might make more sense to just maintain this in events_lookup so it can also be done for event functions
-  --  params:get_range(params.lookup[events_lookup[params:get('event_name')][1]])[1]
+    params:hide(params.lookup['event_value'])
+  
   
   --Chord params
   params:add_separator ('Chord')
@@ -390,7 +387,7 @@ function menu_update()
   
   -- Events menu
   local event_index = params:get('event_name')
-  local value_type = events_lookup[event_index][4]
+  local value_type = events_lookup[event_index].value_type
   if value_type == 'inc, set' then 
     automator_events_menus =  {'event_name', 'event_value_type', 'event_value'}
   elseif value_type == 'set' then 
@@ -951,7 +948,7 @@ function automator()
         if automator_events[arranger_seq_position][chord_seq_position][i] ~= nil  then
           -- print('Firing event slot ' .. i)
           local event_type = automator_events[arranger_seq_position][chord_seq_position][i].event_type
-          local event_name = events_lookup[automator_events[arranger_seq_position][chord_seq_position][i].event_index][1]
+          local event_name = events_lookup[automator_events[arranger_seq_position][chord_seq_position][i].event_index].id
           local value = automator_events[arranger_seq_position][chord_seq_position][i].event_value or ''
           local value_type_index = automator_events[arranger_seq_position][chord_seq_position][i].event_value_type
           local value_type = params.params[params.lookup['event_value_type']]['options'][value_type_index] or ''
@@ -1397,12 +1394,11 @@ function g.key(x,y,z)
               params:set('event_value_type', automator_events[event_edit_pattern][y][x].event_value_type)
             end
           end
-          event_name = events_lookup[params:get('event_name')][1]
+          event_name = events_lookup[params:get('event_name')].id
         else
-          -- print('a-' .. events_lookup[params:get('event_name')][1])
-          event_name = events_lookup[params:get('event_name')][1]
+          event_name = events_lookup[params:get('event_name')].id
           -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
-          if events_lookup[params:get('event_name')][2] == 'param' then
+          if events_lookup[params:get('event_name')].event_type == 'param' then
             params:set('event_value', params:get(event_name))
           else
             -- Alternative to initializing here is to only init on initial load, from then on, carry over the last-set 'event_value'
@@ -1726,18 +1722,20 @@ function key(n,z)
 
 
       -- K3 saves event to automator_events
+      -- To-do: rewrite this garbagle LOL
       elseif screen_view_name == 'Events' then
         if event_edit_slot > 0 then
           local event_index = params:get('event_name')
-          local event_id = events_lookup[event_index][1]
-          local event_type = events_lookup[event_index][2]
-          -- local event_name = events_lookup[event_index][3]
+          local event_id = events_lookup[event_index].id
+          local event_type = events_lookup[event_index].event_type
           local event_value = params:get('event_value')
-          local value_type = events_lookup[event_index][4]
-          local action = events_lookup[event_index][6]        
-          local action_var = events_lookup[event_index][7]          
+          local value_type = events_lookup[event_index].value_type
+          local action = events_lookup[event_index].action
+          local action_var = events_lookup[event_index].action_var          
           local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
-            
+          
+          
+
           -- Keep track of how many event slots are populated so we don't have to iterate through them all later
           if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] == nil then
             automator_events[event_edit_pattern][event_edit_step].populated = event_count + 1
@@ -1746,10 +1744,11 @@ function key(n,z)
           -- Write the event vars to automator_events
           automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {}
           
+          
           if value_type == 'trigger' then
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
-            if action ~= '' then
+            if action ~= nil then
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
             end
@@ -1757,7 +1756,7 @@ function key(n,z)
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
-            if action ~= '' then
+            if action ~= nil then
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
             end
@@ -1766,7 +1765,7 @@ function key(n,z)
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value_type = params:get('event_value_type')
-            if action ~= '' then
+            if action ~= nil then
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
             end
@@ -1788,13 +1787,13 @@ function key(n,z)
         end
         
         
-      else  
+      else
         -- K3 in Generator immediately randomizes and resets, other views just reset
         if screen_view_name == 'Generator' then
           generator()
         end
         
-        
+        -- Reset pattern/arp/arranger for standard K3 functionality-----------------
         -- If we're sending MIDI clock out, send a stop msg
         -- Tell the transport to Start on the next sync of sequence_clock
         if params:get('clock_midi_out') ~= 1 then
@@ -1815,11 +1814,7 @@ function key(n,z)
         
   
         
-        -- -- KEEP THIS AROUND: Logic for resetting arranger
-        -- if params:get('arranger_enabled') == 1 then
-        --   reset_arrangement()
-        -- else
-        --   reset_pattern()
+        -- -- KEEP THIS AROUND: Logic for enabling/disabling/resetting arranger
   
         -- Enable/disable Arranger. Switching out with Reset key.
         -- if params:get('arranger_enabled') == 1 then  -- If follow is on, turn off
@@ -1960,11 +1955,11 @@ function enc(n,d)
 
         if selected_automator_events_menu == 'event_name' then
           params:delta(selected_automator_events_menu, d)
-          event_name = events_lookup[params:get('event_name')][1]
+          event_name = events_lookup[params:get('event_name')].id
           set_event_range()
           
           -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
-          if events_lookup[params:get('event_name')][2] == 'param' then
+          if events_lookup[params:get('event_name')].event_type == 'param' then
             params:set('event_value', params:get(event_name))
           else
             params:set('event_value', 0)
@@ -2077,9 +2072,9 @@ end
 
 function set_event_range()
   -- Determine if event range should be clamped
-  if events_lookup[params:get('event_name')][2] == 'param' then
+  if events_lookup[params:get('event_name')].event_type == 'param' then
     -- Unrestrict range if it's a param of the 'inc, set' type and is set to 'Increment'
-    if events_lookup[params:get('event_name')][4] == 'inc, set' and params:string('event_value_type') == 'Increment' then
+    if events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment' then
       event_range = {-999,999}
     else -- 'Set', 'Trigger', etc...
       event_range = params:get_range(params.lookup[event_name]) or {-999,999}
@@ -2149,31 +2144,31 @@ function redraw()
       local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
       line = 1
       for i = 1,#automator_events_menus do
-        screen.move(2, line * 10 + 13 - menu_offset)    --exp
+        screen.move(2, line * 10 + 8 - menu_offset)
         screen.level(automator_events_index == i and 15 or 3)
         -- screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
         
         -- switch between number and formatted value for Incremental and Set, respectively
         if automator_events_menus[i] == 'event_value' then
           -- Check if there is a formatter assigned to this param/function
-          if events_lookup[params:get('event_name')][5] ~= '' then
+          if events_lookup[params:get('event_name')].formatter ~= nil then
             -- if it's a param than we can either inc or set, check
-            if events_lookup[params:get('event_name')][4] == 'inc, set' then
+            if events_lookup[params:get('event_name')].value_type == 'inc, set' then
               if params:string('event_value_type') == 'Increment' then
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' ..
                 params:string(automator_events_menus[i]))
               else
-                local var_string = _G[events_lookup[params:get('event_name')][5]](params:string('event_value'))
+                local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
               end
             else
-              local var_string = _G[events_lookup[params:get('event_name')][5]](params:string('event_value'))
+              local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
             end
           else
           -- Check if it's a param that needs to have an Options lookup
-            if events_lookup[params:get('event_name')][2] == 'param' and params:t(events_lookup[params:get('event_name')][1]) == 2 then
-              options = params.params[params.lookup[events_lookup[params:get('event_name')][1]]].options
+            if events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
+              options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
             else
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
