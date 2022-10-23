@@ -47,7 +47,9 @@ function init()
   params:add_number('dedupe_threshold', 'Threshold', 1, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 1, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
-    params:set_action('chord_preload', function(x) chord_preload(x) end)      
+    params:set_action('chord_preload', function(x) chord_preload(x) end)     
+  params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
+    params:set_action("crow_pullup",function() crow_pullup() end)    
       
       
   --Arrange params
@@ -73,6 +75,17 @@ function init()
 
 
   -- Event params
+  
+  -- Used as a lookup to determine index position for each category. Can move elsewhere in init
+  event_categories = {} -- to-do: make local after debug
+  for i = 1, #events_lookup do
+    event_categories[i] = events_lookup[i].category
+  end
+  
+  params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'CV'}, 1)
+    params:set_action('event_category',function() menu_update() end)
+    params:hide(params.lookup['event_category'])
+    
   event_display_names = {} -- to-do: make local after debug
   for i = 1, #events_lookup do
     event_display_names[i] = events_lookup[i].name
@@ -90,7 +103,7 @@ function init()
   
   --Chord params
   params:add_separator ('Chord')
-  params:add_option('chord_generator', 'Chord', chord_algos['name'], 1)
+  params:add_option('chord_generator', 'Chord', chord_algos['name'], 1) 
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
 
@@ -120,8 +133,6 @@ function init()
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 8)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
-  params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
-    params:set_action("crow_pullup",function() crow_pullup() end)
     
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_duration_index',function() set_duration('chord') end)
@@ -321,7 +332,7 @@ function init()
     end
     
   automator_events_index = 1
-  selected_automator_events_menu = 'event_name'
+  selected_automator_events_menu = 'event_category'
   
   event_edit_pattern = 0
   event_edit_step = 0
@@ -389,11 +400,11 @@ function menu_update()
   local event_index = params:get('event_name')
   local value_type = events_lookup[event_index].value_type
   if value_type == 'inc, set' then 
-    automator_events_menus =  {'event_name', 'event_value_type', 'event_value'}
+    automator_events_menus =  {'event_category', 'event_name', 'event_value_type', 'event_value'}
   elseif value_type == 'set' then 
-    automator_events_menus =  {'event_name', 'event_value'}
+    automator_events_menus =  {'event_category', 'event_name', 'event_value'}
   elseif value_type == 'trigger' then 
-    automator_events_menus =  {'event_name'}
+    automator_events_menus =  {'event_category', 'event_name'}
   end
 
       
@@ -1387,6 +1398,8 @@ function g.key(x,y,z)
 
         -- If the event slot is populated, Load the Event vars back to the displayed param
         if automator_events[event_edit_pattern][y][x] ~= nil then
+          local event_category_options = params.params[params.lookup['event_category']].options
+          params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))          
           params:set('event_name', automator_events[event_edit_pattern][y][x].event_index)
           if automator_events[event_edit_pattern][y][x].event_value ~= nil then
             params:set('event_value', automator_events[event_edit_pattern][y][x].event_value)
@@ -1746,6 +1759,7 @@ function key(n,z)
           
           
           if value_type == 'trigger' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
             if action ~= nil then
@@ -1753,6 +1767,7 @@ function key(n,z)
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
             end
           elseif value_type == 'set' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
@@ -1761,6 +1776,7 @@ function key(n,z)
               automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
             end
           elseif value_type == 'inc, set' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
             automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
@@ -1875,6 +1891,24 @@ function rotate_pattern(view, direction)
 end
 
 
+
+-- Event Crow trigger out
+function crow_event_trigger()
+  crow.output[4].action = 'pulse(.001,10,1)' -- (time,level,polarity)
+  crow.output[4]()
+end
+  
+
+-- -- WIP: Needs to pass two vars though (duration and skew): Event Crow AR envelope out
+-- function crow_event_trigger(value)
+--   crow.output[4].volts = 0  -- Needed or skew 100 AR gets weird
+--   local crow_attack = duration_sec(_G[source .. '_duration']) * params:get(source..'_ar_skew') / 100
+--   local crow_release = duration_sec(_G[source .. '_duration']) * (100 - params:get(source..'_ar_skew')) / 100
+--   crow.output[4].action = 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)'  -- (attack,release,shape) SHAPE is bugged?
+--   crow.output[4]()
+-- end
+
+
 -- for event triggers
 function transpose_chord_pattern(direction)
   transpose_pattern('Chord', direction)
@@ -1933,6 +1967,7 @@ function enc(n,d)
           -- Scroll through the Events menus (name, type, val)
           automator_events_index = util.clamp(automator_events_index + d, 1, #automator_events_menus)
           selected_automator_events_menu = automator_events_menus[automator_events_index]
+          
         elseif screen_view_name == 'Arranger' then
           arranger_menu_index = util.clamp(arranger_menu_index + d, 1, #arranger_menus + 1)
           if arranger_menu_index == #arranger_menus + 1 then
@@ -1940,6 +1975,7 @@ function enc(n,d)
           else
             selected_arranger_menu = arranger_menus[arranger_menu_index]
           end
+          
         elseif screen_view_name == 'Generator' then
           generator_menu_index = util.clamp(generator_menu_index + d, 1, #generator_menus)
           selected_generator_menu = generator_menus[generator_menu_index]
@@ -1953,8 +1989,37 @@ function enc(n,d)
       -- Change event value
       if screen_view_name == 'Events' then
 
-        if selected_automator_events_menu == 'event_name' then
+        if selected_automator_events_menu == 'event_category' then
           params:delta(selected_automator_events_menu, d)
+
+        -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
+        -- Also should be called when K3 opens events menu and when recalling a populated event slot          
+          event_category_min_index = tab.key(event_categories, params:string('event_category'))
+          event_category_max_index = 0
+          for i = 1, #event_categories do
+            event_category_max_index = event_categories[i] == params:string('event_category') and i or event_category_max_index
+          end  
+          
+          -- Change Event to first item in the selected Category
+          params:set('event_name', event_category_min_index)
+          event_name = events_lookup[params:get('event_name')].id
+          set_event_range()
+          
+          -- Change event_value too. Performed elsewhere so probably function this
+          -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
+          if events_lookup[params:get('event_name')].event_type == 'param' then
+            params:set('event_value', params:get(event_name))
+          else
+            params:set('event_value', 0)
+            -- Alternative
+            -- params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
+          end          
+          
+        elseif selected_automator_events_menu == 'event_name' then
+          -- params:delta(selected_automator_events_menu, d)
+        
+
+          params:set(selected_automator_events_menu, util.clamp(params:get(selected_automator_events_menu) + d, event_category_min_index, event_category_max_index))
           event_name = events_lookup[params:get('event_name')].id
           set_event_range()
           
@@ -2121,7 +2186,7 @@ end
 function redraw()
   screen.clear()
   screen.aa(0)
-  
+
   -- This runs first because it should load even if arranger_key_count > 0 after K3 is used to enter this view
   if screen_view_name == 'Events' then
     screen.level(15)
@@ -2132,13 +2197,27 @@ function redraw()
       screen.text('Select a step (column) and')
       screen.move(2,38)
       screen.text('event slot (row) on Grid')
-      screen.move(2,58)
-      screen.text('Delete all: KEY 2')
-      screen.move(78,58)
-      screen.text('Done: KEY 3')
+      screen.level(4)
+      screen.move(1,52)
+      screen.line(128,52)
+      screen.stroke()
+      screen.level(3)      
+      screen.move(1,60)
+      screen.text('< DELETE ALL K2')
+      screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
+      screen.text('DONE K3 >')
+      
+      
     else
-      screen.level(3)
-      screen.text('Editing slot ' .. event_edit_slot .. ' of segment '.. event_edit_pattern .. '.' .. event_edit_step) -- event_edit_step
+      
+      -- Events sticky header
+      -- screen.level(arranger_menu_index == 0 and 15 or 4)
+      screen.level(4)
+      screen.rect(0,0,92,11)
+      screen.fill()
+      screen.move(2,8)
+      screen.level(0)
+      screen.text('POS. '.. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT ' .. event_edit_slot) 
 
       -- Scrolling events menu
       local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
@@ -2168,7 +2247,7 @@ function redraw()
           else
           -- Check if it's a param that needs to have an Options lookup
             if events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
-              options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
+              local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local. Didn't test
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
             else
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
@@ -2180,12 +2259,17 @@ function redraw()
         end
         
         line = line + 1
-        end
+      end
+      screen.level(4)
+      screen.move(1,52)
+      screen.line(128,52)
+      screen.stroke()
       screen.level(3)
-      screen.move(2,58)
-      screen.text('Delete: KEY 2')
-      screen.move(78,58)  -- 128 - screen.text_extents('Save: KEY 3')
-      screen.text('Save: KEY 3')
+      screen.move(1,60)
+      screen.text('< DELETE K2')
+      screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
+      screen.text('DONE K3 >')
+      
     end
   
   elseif arranger_key_count > 0 then
