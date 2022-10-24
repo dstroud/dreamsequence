@@ -268,7 +268,7 @@ function init()
   crow.input[2].change = crow_trigger
   crow.output[2].action = "pulse(.001,5,1)" -- Need to test this more vs. roll-your-own pulse
   crow.output[3].action = "pulse(.001,5,1)" 
-  screen_views = {'Generator','Session','Arranger'}
+  screen_views = {'Session','Events'}
   screen_view_index = 1
   screen_view_name = screen_views[screen_view_index]
   grid_dirty = true
@@ -276,7 +276,7 @@ function init()
   grid_view_index = 2
   grid_view_name = grid_views[grid_view_index]
   -- flicker = 3
-  pages = {'GLOBAL', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
+  pages = {'GLOBAL', 'ARRANGER', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
   page_index = 1
   page_name = pages[page_index]
   menus = {}
@@ -397,12 +397,12 @@ end
 -- MENU_UPDATE. Probably can be improved by only calculating on the current view+page
 function menu_update()
  
-  -- Generator menu. TBD if this should be here or in a separate function
-  generator_menus = {'chord_generator', 'arp_generator'}
+  -- -- Generator menu. TBD if this should be here or in a separate function
+  -- generator_menus = {'chord_generator', 'arp_generator'}
   
   
-  -- Arranger menu. TBD if this should be here or in a separate function
-  arranger_menus = {'arranger_enabled', 'playback'} --, 'crow_assignment'}
+  -- -- Arranger menu. TBD if this should be here or in a separate function
+  -- arranger_menus = {'arranger_enabled', 'playback'} --, 'crow_assignment'}
   
   
   -- Events menu
@@ -424,72 +424,74 @@ function menu_update()
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   end
   
-  
+  --Arrange menus
+  menus[2] = {'arranger_enabled', 'playback'}
+
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
+    menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
   end
  
   
   --arp menus
   if params:string('arp_dest') == 'None' then
-    menus[3] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[3] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     else
-      menus[3] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[3] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
   end
   
     --MIDI menus
   if params:string('midi_dest') == 'None' then
-    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
+    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[4] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[5] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
+      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
     else
-      menus[4] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[4] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
     else
-      menus[4] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('midi_dest') == 'ii-JF' then
-    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
   end
   
     --Crow menus
   if params:string('crow_dest') == 'None' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[5] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[6] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_dest', 'crow_midi_ch', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
+    menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[5] = {'crow_dest', 'crow_tr_env', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
     else
-      menus[5] = {'crow_dest', 'crow_tr_env', 'crow_duration_index', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_duration_index', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('crow_dest') == 'ii-JF' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
+    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
   end  
 end
 
@@ -1354,6 +1356,12 @@ function grid_redraw()
         end
         g:led(x,5, x > arranger_seq_length and 4 or 15 )
       end
+
+      -- WIP- Arranger pages?
+      -- g:led(1,8,15)
+      -- g:led(2,8,15)
+      -- g:led(3,8,15)
+      -- g:led(4,8,15)      
       
     elseif grid_view_name == 'Chord' then
       if params:get('arranger_enabled') == 1 and arranger_one_shot_last_pattern == false then
@@ -1483,10 +1491,11 @@ function g.key(x,y,z)
       end
       
         --------------------------- KEY DOWN--------------------------------------
+        -- print(delete_arranger_step)
       -- This part is at the end so we can capture the updated pattern_length.
       -- Stuff above might need to be moved to key up tho'
       arranger_key_count = arranger_key_count + 1
-    -- add record to arranger_keys
+      -- add record to arranger_keys
       table.insert(arranger_keys, x)
       event_edit_pattern = x  -- Last touched pattern is the one we edit
       -- event_pattern_length is not needed here since we allow out-of-range events
@@ -1599,14 +1608,7 @@ function g.key(x,y,z)
         
         if delete_arranger_step == true then
           arranger_seq[x] = 0
-          -- Calculate arranger length (also runs at key down. MAKE FUNCTION?)------------------------------------
-          -- for i = 1,17 do
-          --   if arranger_seq[i] == 0  or i == 17 then
-          --     arranger_seq_length = i - 1
-          --     break
-          --   end
-          -- end
-          
+
           -- Set the pattern # for each step in the arranger_seq
           for s = 1, pattern_length[y] do
             arranger_seq_extd[x][s] = y
@@ -1710,7 +1712,7 @@ function key(n,z)
         for p = 1,8 do
           automator_events[event_edit_pattern][p] = {}
         end    
-        screen_view_name = 'Arranger'
+        screen_view_name = 'Session'
         end      
         grid_redraw()
       
@@ -1801,22 +1803,18 @@ function key(n,z)
           event_edit_slot = 0
           grid_redraw()
         
-        -- -- Alternative that returns to the Arranger  
-        -- screen_view_name = 'Arranger'
-        -- event_edit_step = 0
-        -- event_edit_slot = 0
-        -- grid_redraw()
+
         else -- event_edit_slot == 0
-          screen_view_name = 'Arranger'
+          screen_view_name = 'Session'
           grid_redraw()
         end
         
         
       else
-        -- K3 in Generator immediately randomizes and resets, other views just reset
-        if screen_view_name == 'Generator' then
-          generator()
-        end
+        -- -- K3 in Generator immediately randomizes and resets, other views just reset
+        -- if screen_view_name == 'Generator' then
+        --   generator()
+        -- end
         
         -- Reset pattern/arp/arranger for standard K3 functionality-----------------
         -- If we're sending MIDI clock out, send a stop msg
@@ -1973,13 +1971,11 @@ function enc(n,d)
     grid_redraw()
   else
       if n == 1 then
-      -- menu_index = 0
-      -- page_index = util.clamp(page_index + d, 1, #pages)
-      -- page_name = pages[page_index]
-      -- selected_menu = menus[page_index][menu_index]
+      menu_index = 0
+      page_index = util.clamp(page_index + d, 1, #pages)
+      page_name = pages[page_index]
+      selected_menu = menus[page_index][menu_index]
       
-      screen_view_index = util.clamp(screen_view_index + d, 1, 3)
-      screen_view_name = screen_views[screen_view_index]
       
       -- N == ENC 2 ------------------------------------------------
       elseif n == 2 then
@@ -1988,17 +1984,6 @@ function enc(n,d)
           automator_events_index = util.clamp(automator_events_index + d, 1, #automator_events_menus)
           selected_automator_events_menu = automator_events_menus[automator_events_index]
           
-        elseif screen_view_name == 'Arranger' then
-          arranger_menu_index = util.clamp(arranger_menu_index + d, 1, #arranger_menus + 1)
-          if arranger_menu_index == #arranger_menus + 1 then
-            selected_arranger_menu = 'timeline'
-          else
-            selected_arranger_menu = arranger_menus[arranger_menu_index]
-          end
-          
-        elseif screen_view_name == 'Generator' then
-          generator_menu_index = util.clamp(generator_menu_index + d, 1, #generator_menus)
-          selected_generator_menu = generator_menus[generator_menu_index]
         else
           menu_index = util.clamp(menu_index + d, 0, #menus[page_index])
           selected_menu = menus[page_index][menu_index]
@@ -2075,8 +2060,8 @@ function enc(n,d)
         end
       
 
-
-      elseif screen_view_name == 'Arranger' then
+      -- to-do: depricate this
+      elseif page_name == 'Arranger' then
         
         -- If the arranger timeline is selected
         if arranger_menu_index == #arranger_menus + 1 then
@@ -2137,9 +2122,6 @@ function enc(n,d)
         end
         
         
-      elseif screen_view_name == 'Generator' then      
-        selected_generator_menu = generator_menus[generator_menu_index]
-        params:delta(selected_generator_menu, d)
       elseif screen_view_name == 'Session' then
         if menu_index == 0 then
           menu_index = 0
@@ -2169,9 +2151,11 @@ function set_event_range()
   end
 end  
 
+
 function chord_steps_to_seconds(steps)
   return(steps * 60 / params:get('clock_tempo') / global_clock_div * chord_div) -- switched to var Fix: timing
 end
+
 
 -- Truncates hours. Requires integer.
 function s_to_min_sec(s)
@@ -2181,6 +2165,7 @@ function s_to_min_sec(s)
   s = s%60
   return string.format("%02d",m) ..":".. string.format("%02d",s)
 end
+
 
 function param_formatter(param)
   if param == 'source' then
@@ -2193,8 +2178,8 @@ function param_formatter(param)
 end
 
 
---This needs some work and will get off if the menu is too long
-function scroll_offset(index, total, in_view, height) --index of list, count of items in list, #viewable, line height
+--index of list, count of items in list, #viewable, line height
+function scroll_offset(index, total, in_view, height)
   if total > in_view and menu_index > 1 then
     --math.ceil might make jumps larger than necessary, but ensures nothing is cut off at the bottom of the menu
     return(math.ceil(((index - 1) * (total - in_view) * height / total)))
@@ -2206,131 +2191,47 @@ end
 function redraw()
   screen.clear()
   screen.aa(0)
-
-  -- This runs first because it should load even if arranger_key_count > 0 after K3 is used to enter this view
-  if screen_view_name == 'Events' then
-    screen.level(15)
-    screen.move(2,8)
-    if event_edit_step == 0 then
-      screen.text('Editing segment ' .. event_edit_pattern)
-      screen.move(2,28)
-      screen.text('Select a step (column) and')
-      screen.move(2,38)
-      screen.text('event slot (row) on Grid')
-      screen.level(4)
-      screen.move(1,52)
-      screen.line(128,52)
-      screen.stroke()
-      screen.level(3)      
-      screen.move(1,60)
-      screen.text('< DELETE ALL K2')
-      screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
-      screen.text('DONE K3 >')
-      
-      
-    else
-      
-      -- Events sticky header
-      -- screen.level(arranger_menu_index == 0 and 15 or 4)
-      screen.level(4)
-      screen.rect(0,0,92,11)
-      screen.fill()
-      screen.move(2,8)
-      screen.level(0)
-      screen.text('POS. '.. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT ' .. event_edit_slot) 
-
-      -- Scrolling events menu
-      local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
-      line = 1
-      for i = 1,#automator_events_menus do
-        screen.move(2, line * 10 + 8 - menu_offset)
-        screen.level(automator_events_index == i and 15 or 3)
-        -- screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
-        
-        -- switch between number and formatted value for Incremental and Set, respectively
-        if automator_events_menus[i] == 'event_value' then
-          -- Check if there is a formatter assigned to this param/function
-          
-          if events_lookup[params:get('event_name')].formatter ~= nil then
-            -- if it's a param than we can either inc or set, check
-            if events_lookup[params:get('event_name')].value_type == 'inc, set' then
-              if params:string('event_value_type') == 'Increment' then
-                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
-              else
-                local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
-                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
-              end
-            else
-              local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
-              screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
-            end
-          else -- Nil formatter
-            -- Check if it's a Set param that needs to have an Options lookup performed
-            if events_lookup[params:get('event_name')].event_type == 'param'
-            and params:t(events_lookup[params:get('event_name')].id) == 2
-            and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then-- combined logic
-              options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
-              screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
-            else
-              screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
-            end
-            
-          end
-        else
-          screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))         
-        end
-        
-        line = line + 1
-      end
-      screen.level(4)
-      screen.move(1,52)
-      screen.line(128,52)
-      screen.stroke()
-      screen.level(3)
-      screen.move(1,60)
-      screen.text('< DELETE K2')
-      screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
-      screen.text('DONE K3 >')
-      
-    end
   
+  -- Screens that pop up when g.keys are being held down take priority--------
+
+  -- POP-up g.key tip always takes priority
+  if view_key_count > 0 then
+    screen.level(7)
+    screen.move(64,32)
+    screen.font_size(16)
+    screen.text_center(grid_view_name)
+    screen.font_size(8)
+    
+    
+  -- Events editor intro
   elseif arranger_key_count > 0 then
     screen.level(15)
     screen.move(2,8)
     screen.text('Arranger segment ' .. event_edit_pattern .. ' selected')
-    screen.move(2,28)
-    screen.text('Press KEY 3 to edit events')
-    -- screen.move(2,48)
-    -- screen.text('ENC 2: Rotate seq ↑↓')
-    -- screen.move(2,58)
-    -- screen.text('ENC 3: Transpose seq ←→')
-    
-  else
-      
-    --Arranger time rect
-    screen.level(7)
-    screen.rect(94,0,34,11)
-    screen.fill()
-    screen.level(0)
-    screen.rect(95,1,32,9)
-    screen.fill()
-  
-    -- Chord readout rect
     screen.level(4)
-    screen.rect(94,13,34,20)
-    screen.fill()
-    screen.level(0)
-    screen.rect(95,14,32,18)
-    screen.fill()
+    screen.move(1,52)
+    screen.line(128,52)
+    screen.stroke()
+    screen.level(3)
+    screen.move(80,60)  -- 128 - screen.text_extents(EVENTS K3 >')
+    screen.text('EVENTS K3 >')  
   
-    -- Chord degree and name
-    if chord_no > 0 then
-      screen.move(111,21)
-      screen.level(15)
-      screen.text_center(chord_degree or '') -- Chord degree
-      screen.move(111,29)
-      screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
-    end
+  
+  -- KEY 1 Fn screen  
+  elseif keys[1] == 1 then
+    screen.level(15)
+    screen.move(2,8)
+    screen.text('FN KEY +')
+    screen.move(2,28)
+    screen.text('KEY 2: Randomize')
+    screen.move(2,48)
+    screen.text('ENC 2: Rotate seq ↑↓')
+    screen.move(2,58)
+    screen.text('ENC 3: Transpose seq ←→')
+ 
+    
+  -- Standard priority (not momentary) menus---------------------------------  
+  else
     
      --Calculate what we need to display arrangement time remaining and draw the arranger mini-chart
     local rect_x = arranger_seq_position == 0 and 1 or 0 -- If arranger is reset, add an initial gap to the x position
@@ -2356,8 +2257,9 @@ function redraw()
       steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
       seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
       
-      -- Draw timeline. Needs to be run in this loop rather than in Arranger view section
-      if screen_view_name == 'Arranger' then
+      
+      -- ARRANGER page: Draw timeline. Needs to be run in this loop rather than in Arranger view section
+      if page_name == 'ARRANGER' and screen_view_name == 'Session' then
         rect_h = 2
         -- rect_y = 50 + (arranger_seq[i]* 2) + arranger_seq[i]
         rect_y = arranger_seq[i] == 0 and rect_y or 50 + (arranger_seq[i]* 2) + arranger_seq[i]
@@ -2370,128 +2272,182 @@ function redraw()
         screen.fill()
         rect_x = rect_x + steps_remaining_in_pattern
         
-        -- Add in arranger edit position indicator
-        if arranger_menu_index == #arranger_menus + 1 then
-          if event_edit_pattern == i then
-            screen.level(15)
-            screen.rect(rect_x + i - rect_gap_adj - (pattern_length[arranger_seq[i]] + 1 - event_edit_step), 53, 1, 11)
-            screen.move_rel(0,-1)
-            screen.text(event_edit_pattern .. '.' .. event_edit_step)
-            screen.fill()
-          end
-        end
+        -- -- Add in arranger edit position indicator. This is broken now but keep around in case we need a timeline scrubber thing.
+        -- if arranger_menu_index == #arranger_menus + 1 then
+        --   if event_edit_pattern == i then
+        --     screen.level(15)
+        --     screen.rect(rect_x + i - rect_gap_adj - (pattern_length[arranger_seq[i]] + 1 - event_edit_step), 53, 1, 11)
+        --     screen.move_rel(0,-1)
+        --     screen.text(event_edit_pattern .. '.' .. event_edit_step)
+        --     screen.fill()
+        --   end
+        -- end
         
       end
-    end
-      
-    -- For all screen views, draw arranger time and glyphs
+    end -- of Arranger clock and partial drawing (everything but axis reference marks)
+    
+    
+    -- For all remaining screen views, draw arranger time and glyphs
+    --Arranger time rect
+    screen.level(7)
+    screen.rect(94,0,34,11)
+    screen.fill()
+    screen.level(0)
+    screen.rect(95,1,32,9)
+    screen.fill()
+  
+    -- Arranger time
     screen.move(97,8)
     screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
     screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
-    if params:get('arranger_enabled') == 1 then
-      local x_offset = 120
-      local y_offset = 3
-        if params:get('playback') == 1 then
-        for i = 1, #glyphs[1] do
-          screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
-        end
-      else 
-        for i = 1, #glyphs[2] do
-          screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
-        end
+    local x_offset = 120
+    local y_offset = 3
+    if params:string('playback') == 'Loop' then
+      for i = 1, #glyphs[1] do
+        screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
+      end
+    else 
+      for i = 1, #glyphs[2] do
+        screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
       end
     end
+    screen.fill()
+
     
-    -- Draw the arranger Y axis reference marks
-    if screen_view_name == 'Arranger' then
-  
-      -- Axis reference marks so it's easier to distinguish the pattern position
-      for i = 1,4 do
-        screen.level(i == arranger_seq[arranger_seq_position] and 15 or 2)
-        screen.rect(0,50 + i * 3, 1, 2)
-        screen.fill()
-      end  
-      
-    -- Arranger menu
-      local menu_offset = scroll_offset(arranger_menu_index,#arranger_menus, 5, 10)  -- To-do: edit values to reflect Arranger screen space
-      line = 1
-      for i = 1,#arranger_menus do
-        screen.move(2, line * 10 + 8 - menu_offset)    --exp
-        screen.level(arranger_menu_index == i and 15 or 3)
-        screen.text(first_to_upper(param_formatter(param_id_to_name(arranger_menus[i]))) .. string.sub(params:string(arranger_menus[i]), 1, 16))
-        line = line + 1
-      end
-   
-      -- Arranger sticky header
-      screen.level(arranger_menu_index == 0 and 15 or 4)
-      screen.rect(0,0,92,11)
-      screen.fill()
-      screen.move(2,8)
-      screen.level(0)
-      screen.text('ARRANGER')
-        
-    elseif screen_view_name == 'Generator' then
-      local menu_offset = scroll_offset(arranger_menu_index,#arranger_menus, 5, 10)  -- To-do: edit values to reflect Generator screen space
-      line = 1
-      for i = 1,#generator_menus do
-        screen.move(2, line * 10 + 8 - menu_offset)    --exp
-        screen.level(generator_menu_index == i and 15 or 3)
-        screen.text(first_to_upper(param_formatter(param_id_to_name(generator_menus[i]))) .. string.sub(params:string(generator_menus[i]), 1, 16))
-        line = line + 1
-      end
-      
-      -- Generator sticky header
+
+    -- Events screen
+    if screen_view_name == 'Events' then
       screen.level(4)
-      screen.rect(0,0,92,11)
-      screen.fill()
       screen.move(2,8)
-      screen.level(0)
-      screen.text('GENERATOR')
-      
-    else -- SESSION
-      -- print('Session')
-      if view_key_count > 0 then
-        screen.level(7)
-        screen.move(64,32)
-        screen.font_size(16)
-        screen.text_center(grid_view_name)
-        screen.font_size(8)
-      
-      -- Fn screen  
-      elseif keys[1] == 1 then
-        screen.level(15)
-        screen.move(2,8)
-        screen.text('FN KEY +')
+      if event_edit_step == 0 then
+        screen.text('Editing segment ' .. event_edit_pattern)
         screen.move(2,28)
-        screen.text('KEY 2: Randomize')
-        screen.move(2,48)
-        screen.text('ENC 2: Rotate seq ↑↓')
-        screen.move(2,58)
-        screen.text('ENC 3: Transpose seq ←→')
-        
+        screen.level(15)
+        screen.text('Use Grid to select step (row)')
+        screen.move(2,38)
+        screen.text('and event save slot (column)')
+        screen.level(4)
+        screen.move(1,52)
+        screen.line(128,52)
+        screen.stroke()
+        screen.level(3)      
+        screen.move(1,60)
+        screen.text('< DELETE ALL K2')
+        screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
+        screen.text('DONE K3 >')
       else
-        
-        -- Scrolling menus
-        local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
-        line = 1
-        for i = 1,#menus[page_index] do
-          screen.move(2, line * 10 + 8 - menu_offset)    --exp
-          screen.level(menu_index == i and 15 or 3)
-          screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
-          line = line + 1
-        end
-     
-        --Sticky header
-        screen.level(menu_index == 0 and 15 or 4)
+        -- Events sticky header
+        screen.level(4)
         screen.rect(0,0,92,11)
         screen.fill()
         screen.move(2,8)
         screen.level(0)
-        screen.text('SESSION-'.. page_name)
-        
-      screen.fill()
+        screen.text('POS. '.. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT ' .. event_edit_slot) 
+  
+        -- Scrolling events menu
+        local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
+        line = 1
+        for i = 1,#automator_events_menus do
+          screen.move(2, line * 10 + 8 - menu_offset)
+          screen.level(automator_events_index == i and 15 or 3)
+          -- screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
+          
+          -- switch between number and formatted value for Incremental and Set, respectively
+          if automator_events_menus[i] == 'event_value' then
+            -- Check if there is a formatter assigned to this param/function
+            
+            if events_lookup[params:get('event_name')].formatter ~= nil then
+              -- if it's a param than we can either inc or set, check
+              if events_lookup[params:get('event_name')].value_type == 'inc, set' then
+                if params:string('event_value_type') == 'Increment' then
+                  screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
+                else
+                  local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
+                  screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
+                end
+              else
+                local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
+                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
+              end
+            else -- Nil formatter
+              -- Check if it's a Set param that needs to have an Options lookup performed
+              if events_lookup[params:get('event_name')].event_type == 'param'
+              and params:t(events_lookup[params:get('event_name')].id) == 2
+              and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then-- combined logic
+                options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
+                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
+              else
+                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
+              end
+              
+            end
+          else
+            screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))         
+          end
+          
+          line = line + 1
+        end
+        screen.level(4)
+        screen.move(1,52)
+        screen.line(128,52)
+        screen.stroke()
+        screen.level(3)
+        screen.move(1,60)
+        screen.text('< DELETE K2')
+        screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
+        screen.text('DONE K3 >')
       end
-    end
+    
+
+    -- NON-EVENTS, not holding down Arranger segments g.keys  
+    else
+       -- Chord readout rect
+      screen.level(4)
+      screen.rect(94,13,34,20)
+      screen.fill()
+      screen.level(0)
+      screen.rect(95,14,32,18)
+      screen.fill()
+    
+      -- Chord degree and name
+      if chord_no > 0 then
+        screen.move(111,21)
+        screen.level(15)
+        screen.text_center(chord_degree or '') -- Chord degree
+        screen.move(111,29)
+        screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
+      end 
+    
+      -- Scrolling menus
+      local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
+      line = 1
+      for i = 1,#menus[page_index] do
+        screen.move(2, line * 10 + 8 - menu_offset)    --exp
+        screen.level(menu_index == i and 15 or 3)
+        screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
+        line = line + 1
+      end
+   
+      --Sticky header
+      screen.level(menu_index == 0 and 15 or 4)
+      screen.rect(0,0,92,11)
+      screen.fill()
+      screen.move(2,8)
+      screen.level(0)
+      screen.text(page_name)
+      screen.fill()
+      
+      
+      -- Axis reference marks so it's easier to distinguish the pattern position
+      if page_name == 'ARRANGER' then
+        for i = 1,4 do
+          screen.level(i == arranger_seq[arranger_seq_position] and 15 or 2)
+          screen.rect(0,50 + i * 3, 1, 2)
+          screen.fill()
+        end  
+      end
+    end -- of event vs. non-event check
+        
   end
   screen.update()
 end
