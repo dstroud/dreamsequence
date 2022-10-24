@@ -82,7 +82,7 @@ function init()
     event_categories[i] = events_lookup[i].category
   end
   
-  params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'CV'}, 1)
+  params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI in', 'CV in'}, 1)
     params:set_action('event_category',function() menu_update() end)
     params:hide(params.lookup['event_category'])
     
@@ -104,6 +104,7 @@ function init()
   --Chord params
   params:add_separator ('Chord')
   params:add_option('chord_generator', 'Chord', chord_algos['name'], 1) 
+    -- params:set_action('chord_generator',function() menu_update() end) -- Testing
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
 
@@ -163,7 +164,7 @@ function init()
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
-  params:set_action("arp_tr_env",function() menu_update() end)
+    params:set_action("arp_tr_env",function() menu_update() end)
   params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
   params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_duration_index',function() set_duration('arp') end)
@@ -333,6 +334,14 @@ function init()
     
   automator_events_index = 1
   selected_automator_events_menu = 'event_category'
+  
+  -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
+  -- Also should be called when K3 opens events menu and when recalling a populated event slot          
+    event_category_min_index = tab.key(event_categories, params:string('event_category'))
+    event_category_max_index = 0
+    for i = 1, #event_categories do
+      event_category_max_index = event_categories[i] == params:string('event_category') and i or event_category_max_index
+    end    
   
   event_edit_pattern = 0
   event_edit_step = 0
@@ -1503,7 +1512,7 @@ function g.key(x,y,z)
           chord_seq[pattern][y].c = util.wrap(x, 1, 7) --chord 1-7 (no octave). Should move this to a function since it's called a few places.
           chord_seq[pattern][y].o = math.floor(x / 8) --octave
         end
-        chord_no = x + (params:get('chord_type') == 4 and 7 or 0) -- or 0
+        chord_no = util.wrap(x,1,7) + (params:get('chord_type') == 4 and 7 or 0) -- or 0
         generate_chord_names()
       elseif x == 15 then
         pattern_length[pattern] = y
@@ -1938,7 +1947,18 @@ function transpose_pattern(view, direction)
   end  
 end   
 
-  
+
+function set_event_category_min_max()
+  -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
+  -- Also should be called when K3 opens events menu and when recalling a populated event slot          
+  event_category_min_index = tab.key(event_categories, params:string('event_category'))
+  event_category_max_index = 0
+  for i = 1, #event_categories do
+    event_category_max_index = event_categories[i] == params:string('event_category') and i or event_category_max_index
+  end 
+end
+       
+          
 function enc(n,d)
   if keys[1] == 1 then -- fn key (KEY1) held down mode
     if n == 2 then
@@ -1992,13 +2012,7 @@ function enc(n,d)
         if selected_automator_events_menu == 'event_category' then
           params:delta(selected_automator_events_menu, d)
 
-        -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
-        -- Also should be called when K3 opens events menu and when recalling a populated event slot          
-          event_category_min_index = tab.key(event_categories, params:string('event_category'))
-          event_category_max_index = 0
-          for i = 1, #event_categories do
-            event_category_max_index = event_categories[i] == params:string('event_category') and i or event_category_max_index
-          end  
+          set_event_category_min_max()
           
           -- Change Event to first item in the selected Category
           params:set('event_name', event_category_min_index)
@@ -2025,7 +2039,11 @@ function enc(n,d)
           
           -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
           if events_lookup[params:get('event_name')].event_type == 'param' then
+            if (events_lookup[params:get('event_name')].value_type == 'inc, set' or events_lookup[params:get('event_name')].value_type == 'set') and params:string('event_value_type') == 'Set' then 
             params:set('event_value', params:get(event_name))
+            else
+              params:set('event_value', 0)
+            end
           else
             params:set('event_value', 0)
             -- Alternative
@@ -2038,6 +2056,8 @@ function enc(n,d)
           set_event_range()
           if params:string('event_value_type') == 'Increment' and prev_event_value_str ~= 'Increment' then
             params:set('event_value', 0)
+          elseif params:string('event_value_type') == 'Set' and prev_event_value_str ~= 'Set' then
+            params:set('event_value', params:get(event_name))
           end
           
           -- Clamp the current event_value in case it's out-of-bounds
@@ -2230,12 +2250,12 @@ function redraw()
         -- switch between number and formatted value for Incremental and Set, respectively
         if automator_events_menus[i] == 'event_value' then
           -- Check if there is a formatter assigned to this param/function
+          
           if events_lookup[params:get('event_name')].formatter ~= nil then
             -- if it's a param than we can either inc or set, check
             if events_lookup[params:get('event_name')].value_type == 'inc, set' then
               if params:string('event_value_type') == 'Increment' then
-                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' ..
-                params:string(automator_events_menus[i]))
+                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
               else
                 local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
@@ -2244,10 +2264,12 @@ function redraw()
               local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
             end
-          else
-          -- Check if it's a param that needs to have an Options lookup
-            if events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
-              local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local. Didn't test
+          else -- Nil formatter
+            -- Check if it's a Set param that needs to have an Options lookup performed
+            if events_lookup[params:get('event_name')].event_type == 'param'
+            and params:t(events_lookup[params:get('event_name')].id) == 2
+            and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then-- combined logic
+              options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
             else
               screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
