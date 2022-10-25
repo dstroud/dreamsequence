@@ -1,19 +1,18 @@
 -- Dreamsequence
 --
--- KEY 1: Fn (hold)
+-- KEY 1: Grid functions (hold)
 -- KEY 2: Play/pause
 -- KEY 3: Reset/Generate
 --
--- ENC 1: Pages
--- ENC 2: Scroll
--- ENC 3: Edit value 
+-- ENC 2: Select
+-- ENC 3: Edit 
 --
 -- Crow IN 1: CV in
 -- Crow IN 2: Trigger in
 -- Crow OUT 1: V/oct out
 -- Crow OUT 2: Trigger/envelope out
 -- Crow OUT 3: Clock out
--- Crow OUT 4: Assignable
+-- Crow OUT 4: Events
 
 
 g = grid.connect()
@@ -523,7 +522,8 @@ function first_to_upper(str)
 end
 
 function divisions_string(index)
-    return(division_names[index][2])
+  -- print('divisions_string = ' .. index)
+  return(division_names[index][2])
 end
 
 --Creates a variable for each source's div.
@@ -950,6 +950,9 @@ function advance_chord_seq()
     
     -- Play the chord
     if chord_seq[pattern][chord_seq_position].c > 0 then
+    -- generator_and_reset sets chord_seq_position back to 0 which breaks on i 2+ so I'm maxing it here.
+    -- if chord_seq[pattern][math.max(chord_seq_position,1)].c > 0 then
+      
   -- if chord_seq_position > 0 then --Turning this off to see if it breaks something. Not sure why it's needed.
       play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
       if chord_key_count == 0 then
@@ -968,6 +971,9 @@ function automator()
       for i = 1,8 do
         -- Cheesy
         if automator_events[arranger_seq_position][chord_seq_position][i] ~= nil  then
+        -- generator_and_reset sets chord_seq_position back to 0 which breaks on i 2+ so I'm maxing it here.
+        -- if automator_events[arranger_seq_position][math.max(chord_seq_position,1)][i] ~= nil  then
+        
           -- print('Firing event slot ' .. i)
           local event_type = automator_events[arranger_seq_position][chord_seq_position][i].event_type
           local event_name = events_lookup[automator_events[arranger_seq_position][chord_seq_position][i].event_index].id
@@ -1330,7 +1336,7 @@ function grid_redraw()
   if screen_view_name == 'Events' then
     
   -- Draw grid with 8 event slots (columns) for each step in the selected pattern  
-    local event_pattern_length = pattern_length[arranger_seq[event_edit_pattern]]
+    local event_pattern_length = pattern_length[arranger_seq[event_edit_pattern]] or 0
     for x = 1, 8 do -- event slots (prob expand beyond 8)
       for y = 1,8 do -- pattern steps
         g:led(x, y, (automator_events[event_edit_pattern][y][x] ~= nil and 7 or (y > event_pattern_length and 1 or 2)))
@@ -1349,7 +1355,7 @@ function grid_redraw()
       g:led(16,6,15)
       for x = 1,16 do
         for y = 1,4 do
-          g:led(x,y, x == arranger_seq_position and 4 or 0)
+          g:led(x,y, x == arranger_seq_position and 4 or (x-1) % 4 == 0 and 2 or 0)
           if y == arranger_seq[x] then
             g:led(x, y, 15)
           end
@@ -1427,16 +1433,7 @@ function g.key(x,y,z)
           event_name = events_lookup[params:get('event_name')].id
         else
           event_name = events_lookup[params:get('event_name')].id
-          -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
-          if events_lookup[params:get('event_name')].event_type == 'param' then
-            params:set('event_value', params:get(event_name))
-          else
-            -- Alternative to initializing here is to only init on initial load, from then on, carry over the last-set 'event_value'
-            -- Holding off on the above for now since we'll have copy-paste and it might make it confusing when Set values like Mode are inconsistent.
-            params:set('event_value', 0)
-            -- Alternative
-            -- params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
-          end
+          init_event_value()
         end
         
       end
@@ -1457,52 +1454,51 @@ function g.key(x,y,z)
       -- Arranger_seq updated
       elseif y < 5 then
 
-      -- Deletion of arranger step occurs at key UP and can be interrupted if user enters event edit mode
-      if y == arranger_seq[x] and x > 1 then
-        delete_arranger_step = true
-      else
-        delete_arranger_step = false
-      end
-      
-      arranger_seq[x] = y
-      
-      -- -- Generate the arranger_seq_gen which includes the raw arranger_seq + held patterns
-      -- for i = 1,16 do
-      --   arranger_seq_gen[i] = arranger_seq[i] == 0 and arranger_seq[math.max(i - 1, 1)]
-      -- end  
-      
-      
-      -- Set the pattern_length for each step in arranger_seq_extd
-      for i = 1, pattern_length[y] do
-        arranger_seq_extd[x][i] = y
-      end
-      
-      -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
-      if #arranger_seq_extd[x] > pattern_length[y] then
-        for i = 1, #arranger_seq_extd[x] - pattern_length[y] do
-          table.remove(arranger_seq_extd[x], #arranger_seq_extd[x])
+        -- Enabling a segment happens immediately since it's common to want to then K3 to edit the events.
+        -- Disabling a segment occurs at key UP and can be interrupted if user enters event edit mode or ENC3 shift
+        if y == arranger_seq[x]then
+          change_arranger_step = 'disable'
+        else
+          change_arranger_step = nil
+          arranger_seq[x] = y
         end
-      end
-      -- End of arranger length stuff --------------------------------------------------------
-      
-      -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
-      if params:get('arranger_enabled') == 1 and arranger_seq_position == 0 and chord_seq_position == 0 then  
-        pattern = arranger_seq[1]
-      end
-      
-        --------------------------- KEY DOWN--------------------------------------
-        -- print(delete_arranger_step)
-      -- This part is at the end so we can capture the updated pattern_length.
-      -- Stuff above might need to be moved to key up tho'
-      arranger_key_count = arranger_key_count + 1
-      -- add record to arranger_keys
-      table.insert(arranger_keys, x)
-      event_edit_pattern = x  -- Last touched pattern is the one we edit
-      -- event_pattern_length is not needed here since we allow out-of-range events
-      -- event_pattern_length = pattern_length[arranger_seq[x]]
-      -- print('event_edit_pattern ' .. event_edit_pattern .. ' | ' .. 'pattern_length ' .. arranger_seq[x])
-      --------------------------------------------------------------------------
         
+        -- Deprecate        
+        -- -- Set the pattern_length for each step in arranger_seq_extd
+        -- for i = 1, pattern_length[y] do
+        --   arranger_seq_extd[x][i] = y
+        -- end
+        
+        -- -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
+        -- if #arranger_seq_extd[x] > pattern_length[y] then
+        --   for i = 1, #arranger_seq_extd[x] - pattern_length[y] do
+        --     table.remove(arranger_seq_extd[x], #arranger_seq_extd[x])
+        --   end
+        -- end
+        -- End of arranger length stuff --------------------------------------------------------
+        
+        -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
+        if params:get('arranger_enabled') == 1 and arranger_seq_position == 0 and chord_seq_position == 0 then  
+          pattern = arranger_seq[1]
+        end
+        
+          --------------------------- KEY DOWN--------------------------------------
+          -- print(delete_arranger_step)
+        -- This part is at the end so we can capture the updated pattern_length.
+        -- Stuff above might need to be moved to key up tho'
+        arranger_key_count = arranger_key_count + 1
+        -- add record to arranger_keys
+        table.insert(arranger_keys, x)
+        event_edit_pattern = x  -- Last touched pattern is the one we edit
+
+        -- Store original arranger sequence values so we can mess with them using ENC 3
+        d_cuml = 0
+        arranger_seq_length_og = arranger_seq_length
+        arranger_seq_og = deepcopy(arranger_seq)
+        automator_events_og = deepcopy(automator_events)
+        event_edit_pattern_og = event_edit_pattern
+        --------------------------------------------------------------------------
+          
       end
       if transport_active == false then -- Update chord for when play starts
         get_next_chord()
@@ -1606,20 +1602,25 @@ function g.key(x,y,z)
         arranger_key_count = math.max(arranger_key_count - 1, 0)
         arranger_keys[y] = nil
         
-        if delete_arranger_step == true then
+        -- This can get a little weird with multi-presses but that needs to be addressed with segment copy+paste anyway
+        if change_arranger_step == 'disable' then
           arranger_seq[x] = 0
-
-          -- Set the pattern # for each step in the arranger_seq
-          for s = 1, pattern_length[y] do
-            arranger_seq_extd[x][s] = y
-          end
           
-          -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
-          if #arranger_seq_extd[x] > pattern_length[y] then
-            for s = 1, #arranger_seq_extd[x] - pattern_length[y] do
-              table.remove(arranger_seq_extd[x], #arranger_seq_extd[x])
-            end
-          end
+        -- elseif change_arranger_step == 'enable' then
+          -- arranger_seq[x] = y
+
+          -- Deprecate arranger_seq_extd any more
+          -- -- Set the pattern # for each step in the arranger_seq
+          -- for s = 1, pattern_length[y] do
+          --   arranger_seq_extd[x][s] = y
+          -- end
+          
+          -- -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
+          -- if #arranger_seq_extd[x] > pattern_length[y] then
+          --   for s = 1, #arranger_seq_extd[x] - pattern_length[y] do
+          --     table.remove(arranger_seq_extd[x], #arranger_seq_extd[x])
+          --   end
+          -- end
           -- End of arranger length stuff --------------------------------------------------------
         end
         
@@ -1680,7 +1681,8 @@ function key(n,z)
     -- KEY 2  
     elseif n == 2 then
       if keys[1] == 1 then
-        generator()
+        -- FN+K2. Enable Arranger maybe?
+        -- generator()
         
       elseif screen_view_name == 'Events' then
         -- Use event_edit_step to determine if we are editing an event slot or just viewing them all
@@ -1729,94 +1731,8 @@ function key(n,z)
       
     -- KEY 3  
     elseif n == 3 then
-      
-      -- Edit Events on the arranger segment
-      if arranger_key_count > 0 then
-        
-        -- Interrupts the disabling of the arranger segment on g.key up if we're entering event edit mode
-        delete_arranger_step = false
-        arranger_keys = {}
-        arranger_key_count = 0
-        event_edit_step = 0 -- indicates one has not been selected yet
-        event_edit_slot = 0 -- Not sure if necessary
-        screen_view_name = 'Events'
-        
-        -- Forces redraw but it's kinda awkward because user is now pressing on a key in the event edit view
-        grid_redraw()
-
-
-      -- K3 saves event to automator_events
-      -- To-do: rewrite this garbagle LOL
-      elseif screen_view_name == 'Events' then
-        if event_edit_slot > 0 then
-          local event_index = params:get('event_name')
-          local event_id = events_lookup[event_index].id
-          local event_type = events_lookup[event_index].event_type
-          local event_value = params:get('event_value')
-          local value_type = events_lookup[event_index].value_type
-          local action = events_lookup[event_index].action
-          local action_var = events_lookup[event_index].action_var          
-          local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
-          
-          
-
-          -- Keep track of how many event slots are populated so we don't have to iterate through them all later
-          if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] == nil then
-            automator_events[event_edit_pattern][event_edit_step].populated = event_count + 1
-          end
-
-          -- Write the event vars to automator_events
-          automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {}
-          
-          
-          if value_type == 'trigger' then
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
-            if action ~= nil then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
-            end
-          elseif value_type == 'set' then
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
-            if action ~= nil then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
-            end
-          elseif value_type == 'inc, set' then
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value_type = params:get('event_value_type')
-            if action ~= nil then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
-            end
-          end
-          
-        -- Back to event overview
-          event_edit_step = 0
-          event_edit_slot = 0
-          grid_redraw()
-        
-
-        else -- event_edit_slot == 0
-          screen_view_name = 'Session'
-          grid_redraw()
-        end
-        
-        
-      else
-        -- -- K3 in Generator immediately randomizes and resets, other views just reset
-        -- if screen_view_name == 'Generator' then
-        --   generator()
-        -- end
-        
-        -- Reset pattern/arp/arranger for standard K3 functionality-----------------
+      if keys[1] == 1 then
+        generator()
         -- If we're sending MIDI clock out, send a stop msg
         -- Tell the transport to Start on the next sync of sequence_clock
         if params:get('clock_midi_out') ~= 1 then
@@ -1828,28 +1744,133 @@ function key(n,z)
           start = true
         end    
   
-    
         if params:get('arranger_enabled') == 1 then
           reset_arrangement()
         else
           reset_pattern()       
-        end
+        end        
         
-  
+      -- Edit Events on the arranger segment
+      elseif arranger_key_count > 0 then
+          
+        -- Interrupts the disabling of the arranger segment on g.key up if we're entering event edit mode
+        change_arranger_step = nil
+        arranger_keys = {}
+        arranger_key_count = 0
+        event_edit_step = 0 -- indicates one has not been selected yet
+        event_edit_slot = 0 -- Not sure if necessary
+        screen_view_name = 'Events'
         
-        -- -- KEEP THIS AROUND: Logic for enabling/disabling/resetting arranger
+        -- Forces redraw but it's kinda awkward because user is now pressing on a key in the event edit view
+        grid_redraw()
   
-        -- Enable/disable Arranger. Switching out with Reset key.
-        -- if params:get('arranger_enabled') == 1 then  -- If follow is on, turn off
-        --   params:set('arranger_enabled', 0)
-        -- elseif transport_active == true then  -- If follow is off but we're playing, pick up arrangement
-        --   print('Resuming arrangement on next pattern advance')
-        --   params:set('arranger_enabled', 1)
-        -- else 
-        --   print('Transport stopped; resetting arrangement')
-        --   params:set('arranger_enabled', 1)  -- If follow is off and transport is stopped, reset arrangement
-        --   reset_arrangement()
-        -- end
+  
+        -- K3 saves event to automator_events
+        -- To-do: rewrite this garbagle LOL
+        elseif screen_view_name == 'Events' then
+          if event_edit_slot > 0 then
+            local event_index = params:get('event_name')
+            local event_id = events_lookup[event_index].id
+            local event_type = events_lookup[event_index].event_type
+            local event_value = params:get('event_value')
+            local value_type = events_lookup[event_index].value_type
+            local action = events_lookup[event_index].action
+            local action_var = events_lookup[event_index].action_var          
+            local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
+            
+            
+  
+            -- Keep track of how many event slots are populated so we don't have to iterate through them all later
+            if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] == nil then
+              automator_events[event_edit_pattern][event_edit_step].populated = event_count + 1
+            end
+  
+            -- Write the event vars to automator_events
+            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {}
+            
+            
+            if value_type == 'trigger' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
+              if action ~= nil then
+                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
+                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
+              end
+            elseif value_type == 'set' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
+              if action ~= nil then
+                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
+                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
+              end
+            elseif value_type == 'inc, set' then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value_type = params:get('event_value_type')
+              if action ~= nil then
+                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
+                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
+              end
+            end
+            
+          -- Back to event overview
+            event_edit_step = 0
+            event_edit_slot = 0
+            grid_redraw()
+          
+  
+          else -- event_edit_slot == 0
+            screen_view_name = 'Session'
+            grid_redraw()
+          end
+          
+          
+        else
+          -- -- K3 in Generator immediately randomizes and resets, other views just reset
+          -- if screen_view_name == 'Generator' then
+          --   generator()
+          -- end
+          
+          -- Reset pattern/arp/arranger for standard K3 functionality-----------------
+          -- If we're sending MIDI clock out, send a stop msg
+          -- Tell the transport to Start on the next sync of sequence_clock
+          if params:get('clock_midi_out') ~= 1 then
+            if transport_active then
+              transport_midi:stop()
+            end
+            -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+            clock_start_method = 'start'
+            start = true
+          end    
+    
+      
+          if params:get('arranger_enabled') == 1 then
+            reset_arrangement()
+          else
+            reset_pattern()       
+          end
+          
+    
+          
+          -- -- KEEP THIS AROUND: Logic for enabling/disabling/resetting arranger
+    
+          -- Enable/disable Arranger. Switching out with Reset key.
+          -- if params:get('arranger_enabled') == 1 then  -- If follow is on, turn off
+          --   params:set('arranger_enabled', 0)
+          -- elseif transport_active == true then  -- If follow is off but we're playing, pick up arrangement
+          --   print('Resuming arrangement on next pattern advance')
+          --   params:set('arranger_enabled', 1)
+          -- else 
+          --   print('Transport stopped; resetting arrangement')
+          --   params:set('arranger_enabled', 1)  -- If follow is off and transport is stopped, reset arrangement
+          --   reset_arrangement()
+          -- end
+          
       end
     end
   elseif z == 0 then
@@ -1898,7 +1919,24 @@ function rotate_pattern(view, direction)
 end
 
 
+-- EVENT FUNCTIONS -----
 
+-- This is a variation on the standard generator that will reset the pattern and arp but not the arranger
+function generator_and_reset()
+  generator()
+  -- fucks up automator and advance_chord_seq by setting chord_seq_position to 0
+  -- reset_pattern()
+  
+  -- pattern_queue = false
+    arp_seq_position = 0
+  -- chord_seq_position = 1
+  -- reset_clock()
+  -- get_next_chord()
+  -- grid_redraw()
+  -- redraw()
+end    
+        
+        
 -- Event Crow trigger out
 function crow_event_trigger()
   crow.output[4].action = 'pulse(.001,10,1)' -- (time,level,polarity)
@@ -1970,11 +2008,12 @@ function enc(n,d)
     end
     grid_redraw()
   else
+      -- Reserved for scrolling/extending Arranger, Chord, Arp sequences
       if n == 1 then
-      menu_index = 0
-      page_index = util.clamp(page_index + d, 1, #pages)
-      page_name = pages[page_index]
-      selected_menu = menus[page_index][menu_index]
+      -- menu_index = 0
+      -- page_index = util.clamp(page_index + d, 1, #pages)
+      -- page_name = pages[page_index]
+      -- selected_menu = menus[page_index][menu_index]
       
       
       -- N == ENC 2 ------------------------------------------------
@@ -1996,44 +2035,19 @@ function enc(n,d)
 
         if selected_automator_events_menu == 'event_category' then
           params:delta(selected_automator_events_menu, d)
-
           set_event_category_min_max()
-          
-          -- Change Event to first item in the selected Category
+          -- -- Change event_name to first item in the selected Category and event_value to the current value (Set) or 0 (Increment)
+          -- print('event_category_min_index ' .. event_category_min_index)
           params:set('event_name', event_category_min_index)
           event_name = events_lookup[params:get('event_name')].id
           set_event_range()
-          
-          -- Change event_value too. Performed elsewhere so probably function this
-          -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
-          if events_lookup[params:get('event_name')].event_type == 'param' then
-            params:set('event_value', params:get(event_name))
-          else
-            params:set('event_value', 0)
-            -- Alternative
-            -- params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
-          end          
-          
-        elseif selected_automator_events_menu == 'event_name' then
-          -- params:delta(selected_automator_events_menu, d)
-        
+          init_event_value()
 
+        elseif selected_automator_events_menu == 'event_name' then
           params:set(selected_automator_events_menu, util.clamp(params:get(selected_automator_events_menu) + d, event_category_min_index, event_category_max_index))
           event_name = events_lookup[params:get('event_name')].id
           set_event_range()
-          
-          -- If it's a param, set the value to the current system param's value. Otherwise, clamp (or set to 0- TBD)
-          if events_lookup[params:get('event_name')].event_type == 'param' then
-            if (events_lookup[params:get('event_name')].value_type == 'inc, set' or events_lookup[params:get('event_name')].value_type == 'set') and params:string('event_value_type') == 'Set' then 
-            params:set('event_value', params:get(event_name))
-            else
-              params:set('event_value', 0)
-            end
-          else
-            params:set('event_value', 0)
-            -- Alternative
-            -- params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
-          end
+          init_event_value()  
         
         elseif selected_automator_events_menu == 'event_value_type' then
           local prev_event_value_str = params:string('event_value_type')
@@ -2060,66 +2074,112 @@ function enc(n,d)
         end
       
 
-      -- to-do: depricate this
-      elseif page_name == 'Arranger' then
-        
-        -- If the arranger timeline is selected
-        if arranger_menu_index == #arranger_menus + 1 then
+      elseif grid_view_name == 'Arranger' and arranger_key_count > 0 then
+        -- Arranger segment detail options are on-screen
+        if arranger_key_count > 0 then
+          -- Original pattern and events are stored at g.key-down so we can restore if user over-scrolls and tries to recover
+          -- arranger_seq_shift_cuml
+          -- arranger_seq_length_og = arranger_seq_length
+          -- arranger_seq_og = arranger_seq
+          -- automator_events_og = automator_events
+          -- event_edit_pattern_og = event_edit_pattern
+          
+          -- Cancel the disabling of touched step on g.key up
+          change_arranger_step = nil
+          d_cuml = d_cuml + d
+          arranger_seq_length = arranger_seq_length_og + d_cuml
+          event_edit_pattern = event_edit_pattern_og + d_cuml
 
-          -- Moves to the selected pattern and step for editing
-          repeat
-            local delta = d
-            local steps_to_next_pattern = (#arranger_seq_extd[event_edit_pattern] + 1) - event_edit_step
-            -- print (steps_to_next_pattern .. ' steps_to_next_pattern')
-            if delta < 0 then
-              -- Hard stop at sequence begin
-              -- If subtracting the delta from the current step position puts us into a preceeding pattern
-              if math.abs(delta) >= event_edit_step then
-                -- Subtract # of steps in current pattern from the delta (negative here)
-                delta = math.max(delta + event_edit_step, 0)
-                -- Bottom out
-                if event_edit_pattern == 1 then
-                  event_edit_step = 1
-                  delta = 0
-                else
-                -- Move to the last step of the preceeding pattern
-                  event_edit_pattern = math.max(event_edit_pattern - 1, 1)
-                  event_edit_step = #arranger_seq_extd[event_edit_pattern]
+          -- Shifting pattern to the right and opening up blank(s)
+          if d > 0 then
+            for i = 16, 1, -1 do -- Process in reverse. Will need to be variable once Arranger can be extended beyond 16 segments
+              if i >= event_edit_pattern_og + d_cuml then
+                arranger_seq[i] = arranger_seq_og[i - d_cuml]
+                automator_events[i] = deepcopy(automator_events_og[i - d_cuml])
+                
+              elseif i >= event_edit_pattern_og and i < event_edit_pattern_og + d_cuml then
+                arranger_seq[i] = 0
+                -- automator_events[i] = {}  -- sus
+                for s = 1,8 do -- To-do: hardcoded number of Event slots
+                  automator_events[i][s] = {} 
                 end
-              else
-                -- if event_edit_step =
-                event_edit_step = event_edit_step + delta
-                delta = delta + 1
+                
+              elseif i < event_edit_pattern_og then
+                arranger_seq[i] = arranger_seq_og[i]
+                automator_events[i] = deepcopy(automator_events_og[i])
               end
-              elseif delta > 0 then
-              -- Hard stop at sequence end
-              -- If adding the delta to the current step puts us into the next pattern
-              if delta >= steps_to_next_pattern then
-                -- Subtract steps_to_next_pattern from delta as we move to the next pattern
-                delta = math.min(delta - steps_to_next_pattern, 0)
-                -- Max out  
-                if event_edit_pattern == arranger_seq_length then
-                  event_edit_step = #arranger_seq_extd[event_edit_pattern]
-                  delta = 0
-                else
-                  -- Move to the first step of the next pattern
-                  event_edit_pattern = math.min(event_edit_pattern + 1, arranger_seq_length)
-                  event_edit_step = 1
-                end
-              else
-                -- print('+' .. delta .. ' within pattern')
-                event_edit_step = event_edit_step + delta
-                delta = delta - 1
+              
+            end
+            
+          elseif d < 0 then
+            for i = 1, 16 do -- Will need to be variable once Arranger can be extended beyond 16 segments
+              if i >= event_edit_pattern_og + d_cuml then
+                arranger_seq[i] = arranger_seq_og[i - d_cuml]
+                automator_events[i] = deepcopy(automator_events_og[i - d_cuml])
               end
             end
-          until delta == 0
-          print(event_edit_pattern .. '.' .. event_edit_step)
-      
-        -- Standard Arranger menus just have their param updated  
-        else
-          -- selected_arranger_menu = arranger_menus[arranger_menu_index]
-          params:delta(selected_arranger_menu, d)
+          end
+          grid_redraw()
         end
+        
+        -- Timeline selector stuff that we're not using at the moment
+        -- -- If the arranger timeline is selected
+        -- if arranger_menu_index == #arranger_menus + 1 then
+
+        --   -- Moves to the selected pattern and step for editing
+        --   repeat
+        --     local delta = d
+        --     local steps_to_next_pattern = (#arranger_seq_extd[event_edit_pattern] + 1) - event_edit_step
+        --     -- print (steps_to_next_pattern .. ' steps_to_next_pattern')
+        --     if delta < 0 then
+        --       -- Hard stop at sequence begin
+        --       -- If subtracting the delta from the current step position puts us into a preceeding pattern
+        --       if math.abs(delta) >= event_edit_step then
+        --         -- Subtract # of steps in current pattern from the delta (negative here)
+        --         delta = math.max(delta + event_edit_step, 0)
+        --         -- Bottom out
+        --         if event_edit_pattern == 1 then
+        --           event_edit_step = 1
+        --           delta = 0
+        --         else
+        --         -- Move to the last step of the preceeding pattern
+        --           event_edit_pattern = math.max(event_edit_pattern - 1, 1)
+        --           event_edit_step = #arranger_seq_extd[event_edit_pattern]
+        --         end
+        --       else
+        --         -- if event_edit_step =
+        --         event_edit_step = event_edit_step + delta
+        --         delta = delta + 1
+        --       end
+        --       elseif delta > 0 then
+        --       -- Hard stop at sequence end
+        --       -- If adding the delta to the current step puts us into the next pattern
+        --       if delta >= steps_to_next_pattern then
+        --         -- Subtract steps_to_next_pattern from delta as we move to the next pattern
+        --         delta = math.min(delta - steps_to_next_pattern, 0)
+        --         -- Max out  
+        --         if event_edit_pattern == arranger_seq_length then
+        --           event_edit_step = #arranger_seq_extd[event_edit_pattern]
+        --           delta = 0
+        --         else
+        --           -- Move to the first step of the next pattern
+        --           event_edit_pattern = math.min(event_edit_pattern + 1, arranger_seq_length)
+        --           event_edit_step = 1
+        --         end
+        --       else
+        --         -- print('+' .. delta .. ' within pattern')
+        --         event_edit_step = event_edit_step + delta
+        --         delta = delta - 1
+        --       end
+        --     end
+        --   until delta == 0
+        --   print(event_edit_pattern .. '.' .. event_edit_step)
+      
+        -- -- Standard Arranger menus just have their param updated  
+        -- else
+        --   -- selected_arranger_menu = arranger_menus[arranger_menu_index]
+        --   params:delta(selected_arranger_menu, d)
+        -- end
         
         
       elseif screen_view_name == 'Session' then
@@ -2135,6 +2195,48 @@ function enc(n,d)
     end
   end
   redraw()
+end
+
+
+function init_event_value()
+  -- print('init_event_value() called')
+  -- print('event_name = ' .. event_name)
+  -- print('event_type = ' ..events_lookup[params:get('event_name')].event_type)
+  -- print('value_type mapping = ' .. events_lookup[params:get('event_name')].value_type)
+  -- print('event_value_type = ' .. params:string('event_value_type'))
+  
+  if events_lookup[params:get('event_name')].event_type == 'param' then
+    -- if (events_lookup[params:get('event_name')].value_type == 'inc, set' or events_lookup[params:get('event_name')].value_type == 'set')
+    -- and params:string('event_value_type') == 'Set' then
+    if (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Set') 
+    or events_lookup[params:get('event_name')].value_type == 'set' then
+      
+    -- print('Setting to system val ' .. params:get(event_name))
+      params:set('event_value', params:get(event_name))
+    else
+      -- print('param. event_value setting to 0')
+      params:set('event_value', 0)
+    end
+  else
+    -- print('func. event_value setting to 0')
+    params:set('event_value', 0)
+  end
+end
+  
+          
+function deepcopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
 end
 
 function set_event_range()
@@ -2208,26 +2310,41 @@ function redraw()
     screen.level(15)
     screen.move(2,8)
     screen.text('Arranger segment ' .. event_edit_pattern .. ' selected')
+    -- To-do: might be cool to add a scrollable (K2) list of events in this segment here
+    screen.move(2,48)
+    screen.text('ENC 3: Shift segment ' .. event_edit_pattern ..'+ ←→')
     screen.level(4)
     screen.move(1,52)
     screen.line(128,52)
     screen.stroke()
     screen.level(3)
-    screen.move(80,60)  -- 128 - screen.text_extents(EVENTS K3 >')
-    screen.text('EVENTS K3 >')  
+    screen.move(59,60)  -- 128 - screen.text_extents(EVENTS K3 >')
+    screen.text('EDIT EVENTS K3 >')  
   
   
   -- KEY 1 Fn screen  
-  elseif keys[1] == 1 then
-    screen.level(15)
-    screen.move(2,8)
-    screen.text('FN KEY +')
-    screen.move(2,28)
-    screen.text('KEY 2: Randomize')
-    screen.move(2,48)
-    screen.text('ENC 2: Rotate seq ↑↓')
-    screen.move(2,58)
-    screen.text('ENC 3: Transpose seq ←→')
+  elseif keys[1] == 1 and (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
+      screen.level(15)
+      screen.move(2,8)
+      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+      screen.move(2,28)
+      screen.text('KEY 3: Randomize')
+      screen.move(2,48)
+      screen.text('ENC 2: Rotate seq ↑↓')
+      screen.move(2,58)
+      screen.text('ENC 3: Transpose seq ←→')
+    -- elseif grid_view_name == 'Arranger' then
+    --   -- Alternate grid functions for Arranger TBD
+    --   -- screen.level(15)
+    --   -- screen.move(2,8)
+    --   -- screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+    --   -- screen.move(2,28)
+    --   -- screen.text('KEY 3: ')
+    --   -- screen.move(2,48)
+    --   -- screen.text('ENC 2: ')
+    --   -- screen.move(2,58)
+    --   -- screen.text('ENC 3: Playhead ←→')      
+    -- end
  
     
   -- Standard priority (not momentary) menus---------------------------------  
@@ -2323,9 +2440,20 @@ function redraw()
         screen.text('Editing segment ' .. event_edit_pattern)
         screen.move(2,28)
         screen.level(15)
-        screen.text('Use Grid to select step (row)')
+        -- screen.text('Use Grid to select step (row)')
+        -- screen.move(2,38)
+        -- screen.text('and event number (column)')
+
+        screen.text('Use Grid to select step (↑↓)')
         screen.move(2,38)
-        screen.text('and event save slot (column)')
+        screen.text('and event number (←→)')
+        
+        -- -- screen.text('Use Grid to select step ↑↓')
+        -- screen.text('Use Grid to select step 1 '..pattern_length[event_edit_pattern].. ' ↓')
+        -- screen.move(2,38)
+        -- screen.text('and event number 1-8 →')        
+        -- ←
+      
         screen.level(4)
         screen.move(1,52)
         screen.line(128,52)
@@ -2342,7 +2470,9 @@ function redraw()
         screen.fill()
         screen.move(2,8)
         screen.level(0)
-        screen.text('POS. '.. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT ' .. event_edit_slot) 
+        -- screen.text('POS. '.. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT ' .. event_edit_slot) 
+        screen.text('SEG. ' .. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT #' .. event_edit_slot) 
+
   
         -- Scrolling events menu
         local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
@@ -2354,18 +2484,22 @@ function redraw()
           
           -- switch between number and formatted value for Incremental and Set, respectively
           if automator_events_menus[i] == 'event_value' then
-            -- Check if there is a formatter assigned to this param/function
+            -- print(events_lookup[params:get('event_name')].name)
             
+            -- Check if there is a formatter assigned to this param/function
             if events_lookup[params:get('event_name')].formatter ~= nil then
-              -- if it's a param than we can either inc or set, check
+              
+              -- Check if it's value_type inc or set which will require a second check to see which of the two is selected in param
               if events_lookup[params:get('event_name')].value_type == 'inc, set' then
                 if params:string('event_value_type') == 'Increment' then
+                  -- print('value_type == inc,set, ' .. 'event_value_type param == Increment')
                   screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
                 else
                   local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                   screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
                 end
               else
+                -- print('value_type == ' ..events_lookup[params:get('event_name')].value_type.. ', event_value_type param == ' .. params:string('event_value_type'))
                 local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
               end
@@ -2373,7 +2507,7 @@ function redraw()
               -- Check if it's a Set param that needs to have an Options lookup performed
               if events_lookup[params:get('event_name')].event_type == 'param'
               and params:t(events_lookup[params:get('event_name')].id) == 2
-              and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then-- combined logic
+              and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then -- combined logic
                 options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
               else
