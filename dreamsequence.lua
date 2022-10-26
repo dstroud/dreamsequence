@@ -28,7 +28,7 @@ function init()
   init_generator()
   crow.ii.jf.mode(1)
   params:set('clock_crow_out', 1) -- Turn off built-in Crow clock so it doesn't conflict with ours
-
+  
   
   --Global params
   params:add_separator ('Global')
@@ -74,13 +74,6 @@ function init()
 
 
   -- Event params
-  
-  -- Used as a lookup to determine index position for each category. Can move elsewhere in init
-  event_categories = {} -- to-do: make local after debug
-  for i = 1, #events_lookup do
-    event_categories[i] = events_lookup[i].category
-  end
-  
   params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI in', 'CV in'}, 1)
     params:set_action('event_category',function() menu_update() end)
     params:hide(params.lookup['event_category'])
@@ -89,7 +82,7 @@ function init()
   for i = 1, #events_lookup do
     event_display_names[i] = events_lookup[i].name
   end
-  params:add_option('event_name', 'Event', event_display_names, 1)
+  params:add_option('event_name', 'Event', event_display_names, 1) -- Default value will be overwritten later in Init
     params:set_action('event_name',function() menu_update() end)
     params:hide(params.lookup['event_name'])
     
@@ -103,7 +96,6 @@ function init()
   --Chord params
   params:add_separator ('Chord')
   params:add_option('chord_generator', 'Chord', chord_algos['name'], 1) 
-    -- params:set_action('chord_generator',function() menu_update() end) -- Testing
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
 
@@ -326,28 +318,24 @@ function init()
     {}}
   
   
-    automator_events = {}
-    for patt = 1,16 do
-      automator_events[patt] = {}
-      for step = 1,8 do
-        automator_events[patt][step] = {}
-        -- for slot = 1,8 do
-        --   automator_events[patt][step][slot] = {}
-        -- end  
-      end
+  automator_events = {}
+  for patt = 1,16 do
+    automator_events[patt] = {}
+    for step = 1,8 do
+      automator_events[patt][step] = {}
     end
-    
+  end
   automator_events_index = 1
   selected_automator_events_menu = 'event_category'
   
   -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
-  -- Also should be called when K3 opens events menu and when recalling a populated event slot          
-    event_category_min_index = tab.key(event_categories, params:string('event_category'))
-    event_category_max_index = 0
-    for i = 1, #event_categories do
-      event_category_max_index = event_categories[i] == params:string('event_category') and i or event_category_max_index
-    end    
-  
+  -- Also should be called when K3 opens events menu and when recalling a populated event slot
+  event_categories = {} -- to-do: make local after debug
+  for i = 1, #events_lookup do
+    event_categories[i] = events_lookup[i].category
+  end  
+  set_event_category_min_max()
+  params:set('event_name', event_category_min_index)  -- Overwrites initial value
   event_edit_pattern = 0
   event_edit_step = 0
   event_edit_slot = 0
@@ -401,15 +389,7 @@ end
 
 -- MENU_UPDATE. Probably can be improved by only calculating on the current view+page
 function menu_update()
- 
-  -- -- Generator menu. TBD if this should be here or in a separate function
-  -- generator_menus = {'chord_generator', 'arp_generator'}
-  
-  
-  -- -- Arranger menu. TBD if this should be here or in a separate function
-  -- arranger_menus = {'arranger_enabled', 'playback'} --, 'crow_assignment'}
-  
-  
+
   -- Events menu
   local event_index = params:get('event_name')
   local value_type = events_lookup[event_index].value_type
@@ -421,15 +401,14 @@ function menu_update()
     automator_events_menus =  {'event_category', 'event_name'}
   end
 
-      
-  --Global menu
+  -- Global menu
   if params:string('repeat_notes') == 'Retrigger' then
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'chord_preload', 'crow_pullup'}
   else
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   end
   
-  --Arrange menus
+  -- Arrange menus
   menus[2] = {'arranger_enabled', 'playback'}
 
   --chord menus   
@@ -442,9 +421,8 @@ function menu_update()
   elseif params:string('chord_dest') == 'ii-JF' then
     menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
   end
- 
   
-  --arp menus
+  -- arp menus
   if params:string('arp_dest') == 'None' then
     menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
@@ -461,7 +439,7 @@ function menu_update()
     menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
   end
   
-    --MIDI menus
+  -- MIDI menus
   if params:string('midi_dest') == 'None' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
@@ -482,7 +460,7 @@ function menu_update()
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
   end
   
-    --Crow menus
+  -- Crow menus
   if params:string('crow_dest') == 'None' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
@@ -528,7 +506,6 @@ function first_to_upper(str)
 end
 
 function divisions_string(index)
-  -- print('divisions_string = ' .. index)
   return(division_names[index][2])
 end
 
@@ -565,7 +542,7 @@ end
 
 function transpose_string(x)
   local keys = {'C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C'}
-  return(keys[x + 13] .. (x >= 1 and ' +' or ' ') .. (x ~= 0 and x or '') )
+  return(keys[x + 13] .. (x == 0 and '' or ' ') ..  (x >= 1 and '+' or '') .. (x ~= 0 and x or '') )
 end
 
 function t_f_bool(x)
@@ -607,6 +584,7 @@ end
 -- Callback function when system tempo changes
 function clock.tempo_change_handler()  
   dedupe_threshold()
+  -- To-do: thing about other tempo-based things that are not generated dynamically
 end  
 
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
@@ -1428,7 +1406,8 @@ function g.key(x,y,z)
         -- If the event slot is populated, Load the Event vars back to the displayed param
         if automator_events[event_edit_pattern][y][x] ~= nil then
           local event_category_options = params.params[params.lookup['event_category']].options
-          params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))          
+          params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))
+          set_event_category_min_max()
           params:set('event_name', automator_events[event_edit_pattern][y][x].event_index)
           if automator_events[event_edit_pattern][y][x].event_value ~= nil then
             params:set('event_value', automator_events[event_edit_pattern][y][x].event_value)
@@ -1724,6 +1703,8 @@ function key(n,z)
     -- KEY 3  
     elseif n == 3 then
       if keys[1] == 1 then
+        
+        -- FN menu + K3 runs Generator and resets pattern/arp/arranger
         generator()
         -- If we're sending MIDI clock out, send a stop msg
         -- Tell the transport to Start on the next sync of sequence_clock
@@ -1731,22 +1712,20 @@ function key(n,z)
           if transport_active then
             transport_midi:stop()
           end
-          -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
-          clock_start_method = 'start'
-          start = true
+          
+        -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+        clock_start_method = 'start'
+        start = true
         end    
   
-        if params:get('arranger_enabled') == 1 then
-          reset_arrangement()
-        else
-          reset_pattern()       
-        end        
+        if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end        
         
       -- Edit Events on the arranger segment
       elseif arranger_key_count > 0 then
           
         -- Interrupts the disabling of the arranger segment on g.key up if we're entering event edit mode
         change_arranger_step = nil
+        
         arranger_keys = {}
         arranger_key_count = 0
         event_edit_step = 0 -- indicates one has not been selected yet
@@ -1770,52 +1749,29 @@ function key(n,z)
             local action_var = events_lookup[event_index].action_var          
             local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
             
-            
-  
             -- Keep track of how many event slots are populated so we don't have to iterate through them all later
             if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] == nil then
               automator_events[event_edit_pattern][event_edit_step].populated = event_count + 1
             end
-  
-            -- Write the event vars to automator_events
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {}
-            
-            
+
+            -- Wipe existing events, write the event vars to automator_events
             if value_type == 'trigger' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
-              if action ~= nil then
-                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
-                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
-              end
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index}
             elseif value_type == 'set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
-              if action ~= nil then
-                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
-                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
-              end
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value}
             elseif value_type == 'inc, set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].category = events_lookup[event_index].category
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_type = event_type
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_index = event_index
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value = event_value
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].event_value_type = params:get('event_value_type')
-              if action ~= nil then
-                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
-                automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
-              end
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value, event_value_type = params:get('event_value_type')}
             end
+            if action ~= nil then
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
+              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
+            end            
             
-          -- Back to event overview
+            -- Back to event overview
             event_edit_step = 0
             event_edit_slot = 0
             grid_redraw()
           
-  
           else -- event_edit_slot == 0
             screen_view_name = 'Session'
             grid_redraw()
@@ -2422,7 +2378,6 @@ function redraw()
     end
     screen.fill()
 
-    
 
     -- Events screen
     if screen_view_name == 'Events' then
@@ -2432,20 +2387,9 @@ function redraw()
         screen.text('Editing segment ' .. event_edit_pattern)
         screen.move(2,28)
         screen.level(15)
-        -- screen.text('Use Grid to select step (row)')
-        -- screen.move(2,38)
-        -- screen.text('and event number (column)')
-
         screen.text('Use Grid to select step (↑↓)')
         screen.move(2,38)
         screen.text('and event number (←→)')
-        
-        -- -- screen.text('Use Grid to select step ↑↓')
-        -- screen.text('Use Grid to select step 1 '..pattern_length[event_edit_pattern].. ' ↓')
-        -- screen.move(2,38)
-        -- screen.text('and event number 1-8 →')        
-        -- ←
-      
         screen.level(4)
         screen.move(1,52)
         screen.line(128,52)
@@ -2462,7 +2406,6 @@ function redraw()
         screen.fill()
         screen.move(2,8)
         screen.level(0)
-        -- screen.text('POS. '.. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT ' .. event_edit_slot) 
         screen.text('SEG. ' .. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT #' .. event_edit_slot) 
 
   
