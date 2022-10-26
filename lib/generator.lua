@@ -7,19 +7,10 @@ end
 
 function generator()
   
-  params:set('chord_octave', math.random(0,1)) -- Linked to cutoff
-  params:set('arp_octave', math.random(-1,1)) -- Linked to cutoff
+  params:set('chord_octave', math.random(0,1))
+  params:set('arp_octave', math.random(-1,1))
     
     
-  -- These can be overwritten by individual algorithms
-  -- local random_divisions = {16,32,12,20,24,28,32}
-  -- params:set('chord_div_index', random_divisions[math.random(1,2) + (percent_chance(10) and math.random(1,5) or 0)]) -- Mostly standard
-
-  -- local random_divisions = {4,2,1,8,6,3,16,12,32,24,28,20} -- Front loaded with ones I like more
-  -- params:set('arp_div_index', random_divisions[math.random(1,6 + (percent_chance(20) and math.random(1,6) or 0))])
-  
--- generate_arp_base()
-  
   --SEQUENCE RANDOMIZATION
   
   params:set('transpose', math.random(-12,12))
@@ -86,31 +77,7 @@ chord_generator('run')
   end
   
   print('Chord algo: ' .. chord_algos['name'][chord_algo])
-
-
-      
-                  
-arp_generator('run')
-
-  -- Set the engine cutoff values to something reasonable for the pitch of the chord and arp  
-  local chord_octave_shift = (params:get('chord_octave') * 7 ) -- octave param effectively shifts chord x by this many colums 
-  local arp_octave_shift = (params:get('arp_octave') * params:get('arp_chord_type') ) -- octave param effectively shifts arp x by this many colums  
-
-  max_chord_x = 0
-  for i = 1,8 do
-    max_chord_x = chord_seq[pattern][i].x > max_chord_x and chord_seq[pattern][i].x or max_chord_x
-  end
-  max_chord_x = max_chord_x + chord_octave_shift + params:get('transpose')
-  
-  local max_arp_x = math.max(table.unpack(arp_seq[1])) + arp_octave_shift + (params:get('transpose') / params:get('arp_chord_type'))-- Max x + effective offset for arp octave
-  local arp_min_cutoff = util.round(math.exp(.09 * max_arp_x + 6.1)) -- Makes sure the cutoff is appropriate for the arp range
-  local arp_max_cutoff = util.round(52.8017 * max_arp_x  + 3294.61) -- Setting an upper limit on the cutoff so there is some adjustability after
-  local chord_min_cutoff = util.round(math.exp(0.03 * max_arp_x + 6.2)) -- Makes sure the cutoff is appropriate for the chord range
-  
-  -- To-do: update cutoff logic to consider pitch change from 4-note (7th chords as well as key/transposition)
-  params:set('arp_pp_cutoff', math.random(arp_min_cutoff, arp_min_cutoff + 1000)) -- testing with min first math.random(arp_min_cutoff, arp_max_cutoff))
-  params:set('chord_pp_cutoff', math.random(chord_min_cutoff, chord_min_cutoff + 1000)) -- testing with min first
-
+  arp_generator('run')
   grid_redraw()
   redraw()
 end

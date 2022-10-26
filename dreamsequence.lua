@@ -41,7 +41,7 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-  params:add_option('repeat_notes', 'Rpt. notes', {'Retrigger','Dedupe'},1)
+  params:add_option('repeat_notes', 'Rpt. note', {'Retrigger','Dedupe'},1)
     params:set_action('repeat_notes',function() menu_update() end)
   params:add_number('dedupe_threshold', 'Threshold', 1, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
@@ -107,7 +107,7 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
 
-  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},3)
+  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
     params:set_action("chord_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -117,19 +117,22 @@ function init()
     max = 100,
     default = 80,
     formatter = function(param) return percent(param:get()) end}
-  params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-    pp_gain = controlspec.def{
+  params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
+  params:add_number('chord_pp_tracking', 'Fltr tracking',0,100,50, function(param) return percent(param:get()) end)
+  
+  pp_gain = controlspec.def{
     min=0,
     max=400,
     warp='lin',
-    step=5,
+    step=10,
     default=100,
-    quantum=.01,
+    -- quantum=.025,
     wrap=false,
     -- units='khz'
   }
-  params:add_control("chord_pp_gain","Gain", pp_gain)
-  params:add_number("chord_pp_pw","Pulse width",1, 99, 50)
+  
+  params:add_control("chord_pp_gain","Gain",pp_gain,function(param) return util.round(param:get()) end)
+  params:add_number("chord_pp_pw","Pulse width",1, 99, 50, function(param) return percent(param:get()) end)
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 8)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -146,7 +149,7 @@ function init()
   params:add_option('arp_generator', 'Arp', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -156,9 +159,10 @@ function init()
     max = 100,
     default = 80,
     formatter = function(param) return percent(param:get()) end}
-  params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-  params:add_control("arp_pp_gain","Gain", pp_gain)
-  params:add_number("arp_pp_pw","Pulse width",1, 99, 50)
+  params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
+  params:add_number('arp_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
+  params:add_control("arp_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
+  params:add_number("arp_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
   params:add_number('arp_midi_ch','Channel',1, 16, 2)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -185,9 +189,10 @@ function init()
     max = 100,
     default = 80,
     formatter = function(param) return percent(param:get()) end}
-  params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-  params:add_control("midi_pp_gain","Gain", pp_gain)
-  params:add_number("midi_pp_pw","Pulse width",1, 99, 50)
+  params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
+  params:add_number('midi_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
+  params:add_control("midi_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
+  params:add_number("midi_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
   params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -231,9 +236,10 @@ function init()
     max = 1,
     default = 0,
     formatter = function(param) return t_f_string(param:get()) end}
-  params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,800,'hz'))
-  params:add_control("crow_pp_gain","Gain", pp_gain)
-  params:add_number("crow_pp_pw","Pulse width",1, 99, 50)
+  params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
+  params:add_number('crow_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
+  params:add_control("crow_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
+  params:add_number("crow_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -430,7 +436,7 @@ function menu_update()
   if params:string('chord_dest') == 'None' then
     menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[3] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[3] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
     menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
@@ -442,7 +448,7 @@ function menu_update()
   if params:string('arp_dest') == 'None' then
     menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_gain', 'arp_pp_pw'}
+    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
     menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
@@ -459,7 +465,7 @@ function menu_update()
   if params:string('midi_dest') == 'None' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[5] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[5] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
       menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
@@ -480,7 +486,7 @@ function menu_update()
   if params:string('crow_dest') == 'None' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[6] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[6] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
     menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
@@ -559,7 +565,7 @@ end
 
 function transpose_string(x)
   local keys = {'C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C'}
-  return(keys[x + 13] .. ' ' .. (x >= 1 and '+' or '') .. (x ~= 0 and x or '') )
+  return(keys[x + 13] .. (x >= 1 and ' +' or ' ') .. (x ~= 0 and x or '') )
 end
 
 function t_f_bool(x)
@@ -1198,14 +1204,14 @@ function to_engine(source, note)
   end
   
   if engine_play_note == true then
+    note_hz = musicutil.note_num_to_freq(note + 36) -- To-do: local
     engine.amp(params:get(source..'_pp_amp') / 100)
-    engine.cutoff(params:get(source..'_pp_cutoff'))
-    -- engine.release(duration_sec(source.._duration))
+    engine.cutoff(note_hz * params:get(source..'_pp_tracking') *.01 + params:get(source..'_pp_cutoff'))
     engine.release(duration_sec(_G[source .. '_duration']))
 
     engine.gain(params:get(source..'_pp_gain') / 100)
     engine.pw(params:get(source..'_pp_pw') / 100)
-    engine.hz(musicutil.note_num_to_freq(note + 36))
+    engine.hz(note_hz)
   end
   
   if engine_note_history_insert == true then
@@ -1362,7 +1368,7 @@ function grid_redraw()
         end
         g:led(x,5, x > arranger_seq_length and 4 or 15 )
       end
-
+      g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
       -- WIP- Arranger pages?
       -- g:led(1,8,15)
       -- g:led(2,8,15)
@@ -1444,16 +1450,22 @@ function g.key(x,y,z)
       grid_view_index = y - 5
       grid_view_name = grid_views[grid_view_index]
       
-    --ARRANGER KEYS
+    --ARRANGER KEY DOWN-------------------------------------------------------
     elseif grid_view_name == 'Arranger' then
 
-      -- arranger_seq_length updated 
-      if y == 5 then
+      -- enable/disable Arranger
+      if x == 1 and y == 8 then
+        if params:get('arranger_enabled') == 0 then
+          params:set('arranger_enabled',1)
+        else
+          params:set('arranger_enabled',0)
+        end
+      -- arranger_seq_length 
+      elseif y == 5 then
         arranger_seq_length = x
         
       -- Arranger_seq updated
       elseif y < 5 then
-
         -- Enabling a segment happens immediately since it's common to want to then K3 to edit the events.
         -- Disabling a segment occurs at key UP and can be interrupted if user enters event edit mode or ENC3 shift
         if y == arranger_seq[x]then
@@ -1463,42 +1475,22 @@ function g.key(x,y,z)
           arranger_seq[x] = y
         end
         
-        -- Deprecate        
-        -- -- Set the pattern_length for each step in arranger_seq_extd
-        -- for i = 1, pattern_length[y] do
-        --   arranger_seq_extd[x][i] = y
-        -- end
-        
-        -- -- Remove any extra fields (if we're moving from a pattern with more steps to one with fewer)
-        -- if #arranger_seq_extd[x] > pattern_length[y] then
-        --   for i = 1, #arranger_seq_extd[x] - pattern_length[y] do
-        --     table.remove(arranger_seq_extd[x], #arranger_seq_extd[x])
-        --   end
-        -- end
-        -- End of arranger length stuff --------------------------------------------------------
-        
         -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
         if params:get('arranger_enabled') == 1 and arranger_seq_position == 0 and chord_seq_position == 0 then  
           pattern = arranger_seq[1]
         end
         
-          --------------------------- KEY DOWN--------------------------------------
-          -- print(delete_arranger_step)
-        -- This part is at the end so we can capture the updated pattern_length.
-        -- Stuff above might need to be moved to key up tho'
         arranger_key_count = arranger_key_count + 1
         -- add record to arranger_keys
         table.insert(arranger_keys, x)
         event_edit_pattern = x  -- Last touched pattern is the one we edit
 
-        -- Store original arranger sequence values so we can mess with them using ENC 3
+        -- Store original arranger sequence values so we can have non-desctructive pattern shifting using ENC 3
         d_cuml = 0
         arranger_seq_length_og = arranger_seq_length
         arranger_seq_og = deepcopy(arranger_seq)
         automator_events_og = deepcopy(automator_events)
         event_edit_pattern_og = event_edit_pattern
-        --------------------------------------------------------------------------
-          
       end
       if transport_active == false then -- Update chord for when play starts
         get_next_chord()
@@ -2271,11 +2263,11 @@ end
 
 function param_formatter(param)
   if param == 'source' then
-    return('Clock: ')
+    return('Clock:')
   elseif param == 'midi out' then
-    return('Out: ')
+    return('Out:')
   else 
-    return(param .. ': ')
+    return(param .. ':')
   end
 end
 
@@ -2480,7 +2472,6 @@ function redraw()
         for i = 1,#automator_events_menus do
           screen.move(2, line * 10 + 8 - menu_offset)
           screen.level(automator_events_index == i and 15 or 3)
-          -- screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
           
           -- switch between number and formatted value for Incremental and Set, respectively
           if automator_events_menus[i] == 'event_value' then
@@ -2499,7 +2490,6 @@ function redraw()
                   screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
                 end
               else
-                -- print('value_type == ' ..events_lookup[params:get('event_name')].value_type.. ', event_value_type param == ' .. params:string('event_value_type'))
                 local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
               end
@@ -2558,7 +2548,28 @@ function redraw()
       for i = 1,#menus[page_index] do
         screen.move(2, line * 10 + 8 - menu_offset)    --exp
         screen.level(menu_index == i and 15 or 3)
-        screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. string.sub(params:string(menus[page_index][i]), 1, 16))
+        
+        -- Draws indicator if there are menu options available < or >
+        local trunc = 16
+        local d = 0
+        if menu_index == i then
+          local min_menu_index = (params.params[params.lookup[menus[page_index][i]]]['min'] or 1)
+          local max_menu_index = (params.params[params.lookup[menus[page_index][i]]]['max'] or params.params[params.lookup[menus[page_index][i]]].count or '')
+          local menu_value = params:get(menus[page_index][i])
+          local menu_value_pre = menu_value > min_menu_index and '<' or ' '
+          local menu_value_suf = max_menu_index == '' and '>' or menu_value < max_menu_index and '>' or ''
+          local txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, trunc) .. menu_value_suf
+
+          while screen.text_extents(txt) > 90 do
+            trunc = trunc - 1
+            txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, trunc) .. menu_value_suf
+          end
+          screen.text(txt)
+
+        else  
+          screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. ' ' .. string.sub(params:string(menus[page_index][i]), 1, 16))          
+        end
+
         line = line + 1
       end
    
