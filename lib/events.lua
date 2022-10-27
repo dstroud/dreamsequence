@@ -53,7 +53,7 @@ events_lookup = {
   {	category= 'CV in', 	event_type= 'param', 	id= 'do_crow_auto_rest', 	name= 'Auto-rest', 	value_type= 'set', 	formatter= 't_f_string', 			},
   {	category= 'CV in', 	event_type= 'param', 	id= 'crow_pp_tracking', 	name= 'Engine fltr tracking', 	value_type= 'inc, set', 	formatter= 'percent', 			},
   {	category= 'Global', 	event_type= 'param', 	id= 'clock_tempo', 	name= 'Tempo', 	value_type= 'inc, set', 				},
-  {	category= 'Global', 	event_type= 'param', 	id= 'crow_div', 	name= 'Crow clock out div', 	value_type= 'set, inc', 				},
+  {	category= 'Global', 	event_type= 'param', 	id= 'crow_div', 	name= 'Crow clock out div', 	value_type= 'inc, set', 				},
   {	category= 'Global', 	event_type= 'function', 	id= 'generator_and_reset', 	name= 'Generate patterns', 	value_type= 'trigger', 				},
   {	category= 'Global', 	event_type= 'param', 	id= 'mode', 	name= 'Mode', 	value_type= 'set', 	formatter= 'mode_index_to_name', 			},
   {	category= 'Global', 	event_type= 'param', 	id= 'transpose', 	name= 'Key', 	value_type= 'inc, set', 	formatter= 'transpose_string', 			},

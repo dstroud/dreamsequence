@@ -41,11 +41,9 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-  params:add_option('repeat_notes', 'Rpt. note', {'Retrigger','Dedupe'},1)
-    params:set_action('repeat_notes',function() menu_update() end)
-  params:add_number('dedupe_threshold', 'Threshold', 1, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
+  params:add_number('dedupe_threshold', 'Dedupe wind.', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
-  params:add_number('chord_preload', 'Chord preload', 1, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
+  params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)     
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
     params:set_action("crow_pullup",function() crow_pullup() end)    
@@ -402,11 +400,7 @@ function menu_update()
   end
 
   -- Global menu
-  if params:string('repeat_notes') == 'Retrigger' then
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'chord_preload', 'crow_pullup'}
-  else
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'repeat_notes', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
-  end
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   
   -- Arrange menus
   menus[2] = {'arranger_enabled', 'playback'}
@@ -505,8 +499,8 @@ function first_to_upper(str)
     return (str:gsub("^%l", string.upper))
 end
 
-function divisions_string(index)
-  return(division_names[index][2])
+function divisions_string(index) 
+  if index == 0 then return('Off') else return(division_names[index][2]) end
 end
 
 --Creates a variable for each source's div.
@@ -571,13 +565,14 @@ end
 
 -- Establishes the threshold in seconds for considering duplicate notes as well as providing an integer for placeholder duration
 function dedupe_threshold()
-  dedupe_threshold_int = division_names[params:get('dedupe_threshold')][1]
-  dedupe_threshold_s = duration_sec(dedupe_threshold_int) * .95
+  local index = params:get('dedupe_threshold')
+  dedupe_threshold_int = (index == 0) and 1 or division_names[index][1]
+  dedupe_threshold_s = (index == 0) and 1 or duration_sec(dedupe_threshold_int) * .95
 end  
 
 
 function chord_preload(index)
-  chord_preload_tics = division_names[index][1]
+  chord_preload_tics = (index == 0) and 0 or division_names[index][1]
 end  
 
 
@@ -743,9 +738,10 @@ function sequence_clock()
     -- Checking transport state again in case transport was just set to 'false' by Stop
     if transport_active then
       -- pre-loads next chord to allow early notes to be quantized according to the upcoming chord
-      if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
+      if chord_preload_tics ~= 0 and util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
         get_next_chord()
       end
+      
       
       if clock_step % chord_div == 0 then
         advance_chord_seq()
@@ -1029,54 +1025,66 @@ end
 
 -- Pre-load upcoming chord to address race condition around quantize_note() events occurring before chord change
 function get_next_chord()
-  local temp_pattern = pattern
-  local temp_chord_seq_position = chord_seq_position
-  local temp_arranger_seq_retrig = false
+  local pre_arrangement_reset = false
+  local pre_arranger_seq_position = arranger_seq_position
+  local pre_arranger_seq_retrig = arranger_seq_retrig
+  local pre_chord_seq_position = chord_seq_position
+  local pre_pattern = pattern
+  local pre_pattern_queue = pattern_queue
 
-  -- Rewriting this to see if it works without temp_arranger_seq_retrig
-  -- FIX: NOPE. arranger_seq_retrig is needed so we move to the right step after arranger advanced pattern. REDO THIS!!
-  -- -- If arranger is enabled and it's the last step in the chord sequence, advance the arranger first and set temp_arranger_seq_retrig
-  -- if params:get('arranger_enabled') == 1 and temp_chord_seq_position >= pattern_length[temp_pattern] then 
-  --   temp_pattern = arranger_seq[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
-  --   temp_arranger_seq_retrig = true
-  -- end
-  -- -- Irrespective of arranger state, if it's the last step in the chord sequence OR temp_arranger_seq_retrig (redundant?), advance the chord sequence pattern and reset temp_arranger_seq_retrig
-  -- if temp_chord_seq_position >= pattern_length[temp_pattern] or temp_arranger_seq_retrig then
-  --   if pattern_queue then
-  --     temp_pattern = pattern_queue
-  --   end
-  --   temp_chord_seq_position = 1
-  --   temp_arranger_seq_retrig = false
-  -- else  
-  --   temp_chord_seq_position = util.wrap(temp_chord_seq_position + 1, 1, pattern_length[temp_pattern])
-  -- end
+  -- Move arranger sequence if enabled
+  if params:get('arranger_enabled') == 1 then
 
-  --Refactor
-  if temp_chord_seq_position >= pattern_length[temp_pattern] then
-    if params:get('arranger_enabled') == 1 then
+    -- If it's post-reset or at the end of chord sequence
+    if (pre_arranger_seq_position == 0 and pre_chord_seq_position == 0) or pre_chord_seq_position >= pattern_length[pre_pattern] then
       
-    -- Indicates arranger has moved to new pattern.
-      arranger_seq_retrig = true
-      
-      local temp_arranger_seq_next = arranger_seq[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
-      if temp_arranger_seq_next > 0 then
-        temp_pattern = temp_arranger_seq_next
+      -- Check if it's the last pattern in the arrangement.
+      -- This also needs to be run after firing chord so we can catch last-minute changes to arranger_one_shot_last_pattern
+      if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
+        pre_arrangement_reset = true
+      else  -- If not the last pattern in the arrangement, update the arranger sequence position
+        pre_arranger_seq_position = util.wrap(pre_arranger_seq_position + 1, 1, arranger_seq_length)
+        
+        -- Only updating pattern if Arranger is not holding (pattern 0)
+        if arranger_seq[pre_arranger_seq_position] > 0 then 
+          pre_pattern = arranger_seq[pre_arranger_seq_position]
+        end
       end
+      -- Indicates arranger has moved to new pattern.
+      pre_arranger_seq_retrig = true
     end
-    if pattern_queue then
-      temp_pattern = pattern_queue
-    end
-    temp_chord_seq_position = 1
-  else  
-    temp_chord_seq_position = util.wrap(temp_chord_seq_position + 1, 1, pattern_length[temp_pattern])
+    
+    -- Flag if arranger is on the last pattern of a 1-shot sequence
+    arranger_one_shot_last_pattern = pre_arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
   end
   
-  
-  if chord_seq[temp_pattern][temp_chord_seq_position].c > 0 then
-    chord = musicutil.generate_chord_scale_degree(chord_seq[temp_pattern][temp_chord_seq_position].o * 12, params:get('mode'), chord_seq[temp_pattern][temp_chord_seq_position].c, true)
+  -- If arrangement was not just reset, update chord position. 
+  if pre_arrangement_reset == false then
+    if pre_chord_seq_position >= pattern_length[pre_pattern] or pre_arranger_seq_retrig then
+      if pre_pattern_queue then
+        pre_pattern = pre_pattern_queue
+        pre_pattern_queue = false
+      end
+      pre_chord_seq_position = 1
+      pre_arranger_seq_retrig = false
+    else  
+      pre_chord_seq_position = util.wrap(pre_chord_seq_position + 1, 1, pattern_length[pre_pattern])
+    end
+    
+    -- Arranger automation step. To-do: examine impact of running some events here rather than in advance_chord_seq
+    -- Could be important for anything that changes patterns but might also be weird for grid redraw
+    -- if params:get('arranger_enabled') == 1 and (arranger_seq[pre_arranger_seq_position] or 0) > 0 then
+    --   automator()
+    -- end
+    
+    -- Update the chord
+    if chord_seq[pre_pattern][pre_chord_seq_position].c > 0 then
+      chord = musicutil.generate_chord_scale_degree(chord_seq[pre_pattern][pre_chord_seq_position].o * 12, params:get('mode'), chord_seq[pre_pattern][pre_chord_seq_position].c, true)
+    end
   end
 end
 
+    
 
 function quantize_note(note_num, source)
   local chord_length = params:get(source..'_chord_type') -- Move upstream?
@@ -1171,11 +1179,11 @@ function to_engine(source, note)
   engine_play_note = true
   engine_note_history_insert = true  
   
-  -- Check for duplicate notes and process according to repeat_notes setting
+  -- Check for duplicate notes and process according to dedupe_threshold setting
   for i = 1, #engine_note_history do
     if engine_note_history[i][2] == note then
       engine_note_history_insert = false -- Don't insert or update note record since one is already there
-      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - engine_note_history[i][3]) < dedupe_threshold_s then
+      if params:get('dedupe_threshold') > 1 and (note_on_time - engine_note_history[i][3]) < dedupe_threshold_s then
         engine_play_note = false
       end
     end
@@ -1205,7 +1213,7 @@ function to_midi(note, velocity, channel, duration)
   midi_play_note = true
   midi_note_history_insert = true
   
-  -- Check for duplicate notes and process according to repeat_notes setting
+  -- Check for duplicate notes and process according to dedupe_threshold setting
   for i = 1, #midi_note_history do
     if midi_note_history[i][2] == midi_note and midi_note_history[i][3] == channel then
 
@@ -1214,14 +1222,14 @@ function to_midi(note, velocity, channel, duration)
       midi_note_history[i][1] = math.max(duration, midi_note_history[i][1])
       midi_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
 
-      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - midi_note_history[i][4]) < dedupe_threshold_s then
+      if params:get('dedupe_threshold') > 1 and (note_on_time - midi_note_history[i][4]) < dedupe_threshold_s then
         -- print(('Deduped ' .. note_on_time - midi_note_history[i][4]) .. ' | ' .. dedupe_threshold_s)
         midi_play_note = false -- Prevent duplicate note from playing
       end
     
       -- Always update any existing note_on_time, even if a note wasn't played. 
       -- Otherwise the note duration may be extended but the gap between note_on_time and current time grows indefinitely and no dedupe occurs.
-      -- Alternative is to not extend the duration when 'repeat_notes' == 'Dedupe' and a duplicate is found
+      -- Alternative is to not extend the duration when dedupe_threshold > 0 and a duplicate is found
       midi_note_history[i][4] = note_on_time
     end
   end
@@ -1241,11 +1249,11 @@ function to_crow(source, note)
   crow_play_note = true
   crow_note_history_insert = true
 
-  -- Check for duplicate notes and process according to repeat_notes setting
+  -- Check for duplicate notes and process according to dedupe_threshold setting
   for i = 1, #crow_note_history do
     if crow_note_history[i][2] == note then
       crow_note_history_insert = false -- Don't insert or update note record since one is already there
-      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - crow_note_history[i][3]) < dedupe_threshold_s then
+      if params:get('dedupe_threshold') > 1 and (note_on_time - crow_note_history[i][3]) < dedupe_threshold_s then
         crow_play_note = false
       end
     end
@@ -1292,11 +1300,11 @@ function to_jf(source, note, amp)
   jf_play_note = true
   jf_note_history_insert = true 
 
-  -- Check for duplicate notes and process according to repeat_notes setting
+  -- Check for duplicate notes and process according to dedupe_threshold setting
   for i = 1, #jf_note_history do
     if jf_note_history[i][2] == note then
       jf_note_history_insert = false -- Don't insert or update note record since one is already there
-      if params:string('repeat_notes') == 'Dedupe' and (note_on_time - jf_note_history[i][3]) < dedupe_threshold_s then
+      if params:get('dedupe_threshold') > 1 and (note_on_time - jf_note_history[i][3]) < dedupe_threshold_s then
         jf_play_note = false
       end
     end
@@ -1992,10 +2000,14 @@ function enc(n,d)
           init_event_value()
 
         elseif selected_automator_events_menu == 'event_name' then
+          local prev_event_name = event_name
           params:set(selected_automator_events_menu, util.clamp(params:get(selected_automator_events_menu) + d, event_category_min_index, event_category_max_index))
           event_name = events_lookup[params:get('event_name')].id
-          set_event_range()
-          init_event_value()  
+          -- We don't want values to be reset if user hits the start/end of the event_name range and keeps turning the encoder. 
+          if event_name ~= prev_event_name then
+            set_event_range()
+            init_event_value()  
+          end
         
         elseif selected_automator_events_menu == 'event_value_type' then
           local prev_event_value_str = params:string('event_value_type')
@@ -2416,38 +2428,30 @@ function redraw()
           screen.move(2, line * 10 + 8 - menu_offset)
           screen.level(automator_events_index == i and 15 or 3)
           
-          -- switch between number and formatted value for Incremental and Set, respectively
+          -- Switch between number and formatted value for Incremental and Set, respectively
           if automator_events_menus[i] == 'event_value' then
-            -- print(events_lookup[params:get('event_name')].name)
-            
             -- Check if there is a formatter assigned to this param/function
             if events_lookup[params:get('event_name')].formatter ~= nil then
-              
               -- Check if it's value_type inc or set which will require a second check to see which of the two is selected in param
-              if events_lookup[params:get('event_name')].value_type == 'inc, set' then
-                if params:string('event_value_type') == 'Increment' then
-                  -- print('value_type == inc,set, ' .. 'event_value_type param == Increment')
-                  screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
-                else
-                  local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
-                  screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
-                end
+              if events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment' then
+                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
               else
                 local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
               end
-            else -- Nil formatter
-              -- Check if it's a Set param that needs to have an Options lookup performed
-              if events_lookup[params:get('event_name')].event_type == 'param'
-              and params:t(events_lookup[params:get('event_name')].id) == 2
-              and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then -- combined logic
+              
+            -- Nil formatter event + Set param that needs to have an Options lookup performed
+            elseif events_lookup[params:get('event_name')].event_type == 'param'
+            and params:t(events_lookup[params:get('event_name')].id) == 2
+            and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then
                 options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
                 screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
-              else
-                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
-              end
-              
+            -- Nil formatter event without Options    
+            else
+              screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
             end
+          
+          -- Non-event_value menus
           else
             screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))         
           end
@@ -2492,27 +2496,23 @@ function redraw()
         screen.move(2, line * 10 + 8 - menu_offset)    --exp
         screen.level(menu_index == i and 15 or 3)
         
-        -- Draws indicator if there are menu options available < or >
-        local trunc = 16
-        local d = 0
+        -- Generate menu and draw <> indicators for scroll range
+        session_menu_trunc = 16
         if menu_index == i then
           local min_menu_index = (params.params[params.lookup[menus[page_index][i]]]['min'] or 1)
           local max_menu_index = (params.params[params.lookup[menus[page_index][i]]]['max'] or params.params[params.lookup[menus[page_index][i]]].count or '')
-          local menu_value = params:get(menus[page_index][i])
-          local menu_value_pre = menu_value > min_menu_index and '<' or ' '
-          local menu_value_suf = max_menu_index == '' and '>' or menu_value < max_menu_index and '>' or ''
-          local txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, trunc) .. menu_value_suf
+          local menu_value_pre = params:get(menus[page_index][i]) > min_menu_index and '<' or ' '
+          local menu_value_suf = max_menu_index == '' and '>' or params:get(menus[page_index][i]) < max_menu_index and '>' or ''
+          local session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
 
-          while screen.text_extents(txt) > 90 do
-            trunc = trunc - 1
-            txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, trunc) .. menu_value_suf
+          while screen.text_extents(session_menu_txt) > 90 do
+            session_menu_trunc = session_menu_trunc - 1
+            session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
           end
-          screen.text(txt)
-
+          screen.text(session_menu_txt)
         else  
-          screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. ' ' .. string.sub(params:string(menus[page_index][i]), 1, 16))          
+          screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. ' ' .. string.sub(params:string(menus[page_index][i]), 1, 16))
         end
-
         line = line + 1
       end
    
