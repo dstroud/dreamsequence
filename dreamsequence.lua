@@ -41,7 +41,7 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-  params:add_number('dedupe_threshold', 'Dedupe wind.', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
+  params:add_number('dedupe_threshold', 'Dedupe window', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)     
@@ -738,7 +738,9 @@ function sequence_clock()
     -- Checking transport state again in case transport was just set to 'false' by Stop
     if transport_active then
       -- pre-loads next chord to allow early notes to be quantized according to the upcoming chord
-      if chord_preload_tics ~= 0 and util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
+      -- Technically more efficient but this means there is a delay when changing from 0 pre-load to other value
+      -- if chord_preload_tics ~= 0 and util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
+      if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
         get_next_chord()
       end
       
@@ -853,6 +855,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   chord_seq_position = 0
   reset_clock()
   get_next_chord()
+  chord = next_chord
   grid_redraw()
   redraw()
 end
@@ -867,6 +870,7 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   pattern = arranger_seq[1]
   reset_clock()
   get_next_chord()
+  chord = next_chord
   grid_redraw()
   redraw()
 end
@@ -1077,14 +1081,22 @@ function get_next_chord()
     --   automator()
     -- end
     
-    -- Update the chord
+    -- Update next_chord
     if chord_seq[pre_pattern][pre_chord_seq_position].c > 0 then
-      chord = musicutil.generate_chord_scale_degree(chord_seq[pre_pattern][pre_chord_seq_position].o * 12, params:get('mode'), chord_seq[pre_pattern][pre_chord_seq_position].c, true)
+      next_chord = musicutil.generate_chord_scale_degree(chord_seq[pre_pattern][pre_chord_seq_position].o * 12, params:get('mode'), chord_seq[pre_pattern][pre_chord_seq_position].c, true)
     end
   end
 end
 
     
+-- Used my source == midi and crow to quantize with upcoming chord.
+function pre_quantize_note(note_num, source)
+  local chord_length = params:get(source..'_chord_type') -- Move upstream?
+  local source_octave = params:get(source..'_octave') -- Move upstream?
+  local quantized_note = next_chord[util.wrap(note_num, 1, chord_length)]
+  local quantized_octave = math.floor((note_num - 1) / chord_length)
+  return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
+end
 
 function quantize_note(note_num, source)
   local chord_length = params:get(source..'_chord_type') -- Move upstream?
@@ -1130,8 +1142,8 @@ end
 
 
 function sample_crow(volts)
-  local note = quantize_note(round(volts * 12, 0) + 1, 'crow')
-  
+  -- local note = quantize_note(round(volts * 12, 0) + 1, 'crow')
+  local note = params:get('chord_preload') == 0 and quantize_note(round(volts * 12, 0) + 1, 'crow') or pre_quantize_note(round(volts * 12, 0) + 1, 'crow')
   -- Blocks duplicate notes within a chord step so rests can be added to simple CV sources
   if chord_seq_retrig == true
   or params:get('do_crow_auto_rest') == 0 
@@ -1159,7 +1171,8 @@ in_midi.event = function(data)
   local d = midi.to_msg(data)
   -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
   if d.type == "note_on" then
-    local note = quantize_note(d.note - 35, 'midi')
+    -- local note = quantize_note(d.note - 35, 'midi')
+    local note = params:get('chord_preload') == 0 and quantize_note(d.note - 35, 'midi') or pre_quantize_note(d.note - 35, 'midi')
     local destination = params:string('midi_dest')
     if destination == 'Engine' then
       to_engine('midi', note)
@@ -1414,7 +1427,7 @@ function g.key(x,y,z)
         -- If the event slot is populated, Load the Event vars back to the displayed param
         if automator_events[event_edit_pattern][y][x] ~= nil then
           local event_category_options = params.params[params.lookup['event_category']].options
-          params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))
+          params:set('event_category', tab.key(event_categofry_options, automator_events[event_edit_pattern][y][x].category))
           set_event_category_min_max()
           params:set('event_name', automator_events[event_edit_pattern][y][x].event_index)
           if automator_events[event_edit_pattern][y][x].event_value ~= nil then
@@ -1426,6 +1439,7 @@ function g.key(x,y,z)
           event_name = events_lookup[params:get('event_name')].id
         else
           event_name = events_lookup[params:get('event_name')].id
+          set_event_range()
           init_event_value()
         end
         
@@ -1481,6 +1495,7 @@ function g.key(x,y,z)
       end
       if transport_active == false then -- Update chord for when play starts
         get_next_chord()
+        chord = next_chord
       end
       
     --CHORD KEYS
@@ -1521,6 +1536,7 @@ function g.key(x,y,z)
       end
       if transport_active == false then -- Pre-load chord for when play starts
         get_next_chord()
+        chord = next_chord
       end
       
     -- ARP KEYS
@@ -1888,6 +1904,7 @@ function generator_and_reset()
   -- chord_seq_position = 1
   -- reset_clock()
   -- get_next_chord()
+  -- chord = next_chord
   -- grid_redraw()
   -- redraw()
 end    
@@ -2255,7 +2272,6 @@ function redraw()
   screen.aa(0)
   
   -- Screens that pop up when g.keys are being held down take priority--------
-
   -- POP-up g.key tip always takes priority
   if view_key_count > 0 then
     screen.level(7)
@@ -2271,15 +2287,15 @@ function redraw()
     screen.move(2,8)
     screen.text('Arranger segment ' .. event_edit_pattern .. ' selected')
     -- To-do: might be cool to add a scrollable (K2) list of events in this segment here
-    screen.move(2,48)
+    screen.move(2,28)
     screen.text('ENC 3: Shift segment ' .. event_edit_pattern ..'+ ←→')
     screen.level(4)
-    screen.move(1,52)
-    screen.line(128,52)
+    screen.move(1,54)
+    screen.line(128,54)
     screen.stroke()
     screen.level(3)
-    screen.move(59,60)  -- 128 - screen.text_extents(EVENTS K3 >')
-    screen.text('EDIT EVENTS K3 >')  
+    screen.move(61,62)  -- 128 - screen.text_extents(EVENTS K3 >')
+    screen.text('(K3) EDIT EVENTS')  
   
   
   -- KEY 1 Fn screen  
@@ -2288,11 +2304,16 @@ function redraw()
       screen.move(2,8)
       screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
       screen.move(2,28)
-      screen.text('KEY 3: Randomize')
-      screen.move(2,48)
       screen.text('ENC 2: Rotate seq ↑↓')
-      screen.move(2,58)
+      screen.move(2,38)
       screen.text('ENC 3: Transpose seq ←→')
+      screen.level(4)
+      screen.move(1,54)
+      screen.line(128,54)
+      screen.stroke()
+      screen.level(3)      
+      screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
+      screen.text('(K3) GENERATOR')    
     -- elseif grid_view_name == 'Arranger' then
     --   -- Alternate grid functions for Arranger TBD
     --   -- screen.level(15)
@@ -2403,14 +2424,14 @@ function redraw()
         screen.move(2,38)
         screen.text('and event number (←→)')
         screen.level(4)
-        screen.move(1,52)
-        screen.line(128,52)
+        screen.move(1,54)
+        screen.line(128,54)
         screen.stroke()
         screen.level(3)      
-        screen.move(1,60)
-        screen.text('< DELETE ALL K2')
-        screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
-        screen.text('DONE K3 >')
+        screen.move(1,62)
+        screen.text('(K2) DELETE ALL')
+        screen.move(90,62)  -- 128 - screen.text_extents('(K3) DONE')
+        screen.text('(K3) DONE')
       else
         -- Events sticky header
         screen.level(4)
@@ -2427,46 +2448,61 @@ function redraw()
         for i = 1,#automator_events_menus do
           screen.move(2, line * 10 + 8 - menu_offset)
           screen.level(automator_events_index == i and 15 or 3)
-          
+
           -- Switch between number and formatted value for Incremental and Set, respectively
+          event_val_string = params:string(automator_events_menus[i])
           if automator_events_menus[i] == 'event_value' then
-            -- Check if there is a formatter assigned to this param/function
-            if events_lookup[params:get('event_name')].formatter ~= nil then
-              -- Check if it's value_type inc or set which will require a second check to see which of the two is selected in param
-              if events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment' then
-                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
-              else
-                local var_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
-                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. var_string)
+            if not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then
+              if events_lookup[params:get('event_name')].formatter ~= nil then
+                event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
+              elseif events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
+                local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
+                event_val_string = options[params:get(automator_events_menus[i])]                
               end
-              
-            -- Nil formatter event + Set param that needs to have an Options lookup performed
-            elseif events_lookup[params:get('event_name')].event_type == 'param'
-            and params:t(events_lookup[params:get('event_name')].id) == 2
-            and not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then
-                options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
-                screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. options[params:get(automator_events_menus[i])])
-            -- Nil formatter event without Options    
-            else
-              screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))
-            end
-          
-          -- Non-event_value menus
-          else
-            screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. params:string(automator_events_menus[i]))         
+            end  
           end
-          
+
+          -- Draw menu and <> indicators for scroll range
+          -- Leaving in param formatter and some code for truncating string in case we want to add system param events later.
+          local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
+          if events_lookup[params:get('event_name')].event_type == 'param' then
+            if automator_events_index == i then
+              local param_id = automator_events_menus[i]
+              local range =
+                (param_id == 'event_category' or param_id == 'event_value_type') and params:get_range(param_id)
+                or param_id == 'event_name' and {event_category_min_index, event_category_max_index}
+                or event_range
+
+              local menu_value_suf = params:get(param_id) == range[1] and '>' or ''
+              local menu_value_pre = params:get(param_id) == range[2] and '<' or ' '
+              local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+      
+              -- Not strictly necessary to limit range for Events due to screen layout
+              -- while screen.text_extents(events_menu_txt) > 90 do
+              --   events_menu_trunc = events_menu_trunc - 1
+              --   events_menu_txt = first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+              -- end
+              
+              screen.text(events_menu_txt)
+            else
+              screen.text(first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
+            end
+          -- Functions  
+          else
+            screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. string.sub(event_val_string, 1, events_menu_trunc))
+          end
+        
           line = line + 1
         end
         screen.level(4)
-        screen.move(1,52)
-        screen.line(128,52)
+        screen.move(1,54)
+        screen.line(128,54)
         screen.stroke()
         screen.level(3)
-        screen.move(1,60)
-        screen.text('< DELETE K2')
-        screen.move(88,60)  -- 128 - screen.text_extents('DONE K3 >')
-        screen.text('DONE K3 >')
+        screen.move(1,62)
+        screen.text('(K2) DELETE')
+        screen.move(90,62)  -- 128 - screen.text_extents('DONE K3 >')
+        screen.text('(K3) DONE')
       end
     
 
@@ -2499,16 +2535,16 @@ function redraw()
         -- Generate menu and draw <> indicators for scroll range
         session_menu_trunc = 16
         if menu_index == i then
-          local min_menu_index = (params.params[params.lookup[menus[page_index][i]]]['min'] or 1)
-          local max_menu_index = (params.params[params.lookup[menus[page_index][i]]]['max'] or params.params[params.lookup[menus[page_index][i]]].count or '')
-          local menu_value_pre = params:get(menus[page_index][i]) > min_menu_index and '<' or ' '
-          local menu_value_suf = max_menu_index == '' and '>' or params:get(menus[page_index][i]) < max_menu_index and '>' or ''
+          local range = params:get_range(menus[page_index][i])
+          local menu_value_suf = params:get(menus[page_index][i]) == range[1] and '>' or ''
+          local menu_value_pre = params:get(menus[page_index][i]) == range[2] and '<' or ' '
           local session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
 
           while screen.text_extents(session_menu_txt) > 90 do
             session_menu_trunc = session_menu_trunc - 1
             session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
           end
+          
           screen.text(session_menu_txt)
         else  
           screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. ' ' .. string.sub(params:string(menus[page_index][i]), 1, 16))
