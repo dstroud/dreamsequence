@@ -47,6 +47,8 @@ function init()
     params:set_action('chord_preload', function(x) chord_preload(x) end)     
   params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
     params:set_action("crow_pullup",function() crow_pullup() end)    
+  -- params:add_number('count_in', 'Count-in', 0, 8, 0)
+  -- params:add_number('clock_offset', 'Clock offset', -999, 999, 0)
       
       
   --Arrange params
@@ -139,7 +141,7 @@ function init()
   params:add_option('arp_generator', 'Arp', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
     params:set_action("arp_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -164,7 +166,7 @@ function init()
     
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
-  params:add_option("arp_mode", "Mode", {'Loop','One-shot'},2)
+  params:add_option("arp_mode", "Mode", {'Loop','One-shot'},1)
   
   
   --MIDI params
@@ -207,8 +209,11 @@ function init()
   
   --Crow params
   params:add_separator ('Crow')
-  params:add_number('crow_div', 'Crow clk. div', 1, 32, 8) --most useful TBD. Should change to PPQN
-  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},1)
+  -- Crow clock uses hybrid notation/PPQN
+  params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
+    params:set_action('crow_clock_index',function() set_crow_clock() end)
+    
+  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
     params:set_action("crow_dest",function() menu_update() end)
   params:add{
     type = 'number',
@@ -259,10 +264,14 @@ function init()
   chord_seq_retrig = true
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
+  -- voltage threshold, hysteresis, "rising", "falling", or “both"
   crow.input[2].mode("change",2,0.1,"rising") --might want to use as a gate with "both"
   crow.input[2].change = crow_trigger
+  -- time,level,polarity
   crow.output[2].action = "pulse(.001,5,1)" -- Need to test this more vs. roll-your-own pulse
-  crow.output[3].action = "pulse(.001,5,1)" 
+  crow.output[3].slew = 0
+  -- crow.output[3].action = "pulse(.0001,5,1)" 
+  -- crow.output[3].action = "pulse(.001,5,1)" 
   screen_views = {'Session','Events'}
   screen_view_index = 1
   screen_view_name = screen_views[screen_view_index]
@@ -362,6 +371,10 @@ function init()
   chord_seq_position = 0
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
   chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
+  current_chord_o = 0
+  current_chord_c = 1
+  next_chord_o = 0
+  next_chord_c = 1  
   arp_seq = {{0,0,0,0,0,0,0,0},
             {8,8,8,8,8,8,8,8},
             {8,8,8,8,8,8,8,8},
@@ -377,7 +390,8 @@ function init()
   jf_note_history = {}
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
-  get_next_chord() -- Placeholder for when table loading from file is implemented
+  -- get_next_chord() -- Placeholder for when table loading from file is implemented
+  next_chord = chord
   -- grid_dirty = true
   params:bang()
   grid_redraw()
@@ -400,7 +414,7 @@ function menu_update()
   end
 
   -- Global menu
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_div', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   
   -- Arrange menus
   menus[2] = {'arranger_enabled', 'playback'}
@@ -425,9 +439,9 @@ function menu_update()
     menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', }
     else
-      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', 'do_crow_auto_rest'}
+      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', }
     end
   elseif params:string('arp_dest') == 'ii-JF' then
     menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
@@ -446,15 +460,15 @@ function menu_update()
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', }
     else
-      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', 'do_crow_auto_rest'}
+      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', }
     end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
   end
   
-  -- Crow menus
+  -- CV-in/Crow menus
   if params:string('crow_dest') == 'None' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
@@ -468,7 +482,7 @@ function menu_update()
       menus[6] = {'crow_dest', 'crow_tr_env', 'crow_duration_index', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
     end
   elseif params:string('crow_dest') == 'ii-JF' then
-    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_jf_amp'}
+    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
   end  
 end
 
@@ -497,6 +511,15 @@ end
 
 function first_to_upper(str)
     return (str:gsub("^%l", string.upper))
+end
+
+function crow_clock_string(index) 
+  return(clock_names[index][2])
+end
+
+function set_crow_clock(source)
+  crow_div = clock_names[params:get('crow_clock_index')][1]
+  -- crow_slew = clock.get_beat_sec() / global_clock_div --- divisior should be PPQN
 end
 
 function divisions_string(index) 
@@ -670,18 +693,20 @@ end
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
  -- To-do: evaluate efficiency of having separate clocks, one for tuplets and one for standard meter
 function sequence_clock()
-  while transport_active do
-    -- To-do: add option for initial delay when syncing to external MIDI/Link
-    
-    
-    clock.sync(1/global_clock_div)    -- To-do: Add offset param usable for Link delay compensation
+  
+  -- -- Optional count-in for when syncing to external MIDI/Link
+  -- if params:string('clock_source') ~= 'internal' and params:get('count_in') > 0 then
+  --   clock.sync(params:get('count_in'))
+  -- end
 
+  while transport_active do
+    clock.sync(1/global_clock_div)
 
     -- START
     if start == true and stop ~= true then
       -- Send out MIDI start/continue messages
       transport_midi_update()
-      if params:get('clock_midi_out') ~= 1 then 
+      if params:get('clock_midi_out') ~= 1 then
         if clock_start_method == 'start' then
           transport_midi:start()
         else
@@ -698,7 +723,6 @@ function sequence_clock()
     -- Wrap not strictly needed and could actually be used to count arranger position? 
     -- 192 tics per measure * 8 (max a step can be, 0-indexed. 
     clock_step = util.wrap(clock_step + 1,0, 1535)
-    
     
     
     -- STOP beat-quantized
@@ -721,7 +745,7 @@ function sequence_clock()
         clock.cancel(sequence_clock_id)-- or 0)
       
         -- If syncing to an external clock source
-        if params:get('clock_source') ~= 1 then -- External clock
+        if params:string('clock_source') ~= 'internal' then
           if params:get('arranger_enabled') == 1 then 
             reset_arrangement()
           else
@@ -730,20 +754,16 @@ function sequence_clock()
         end
         transport_active = false
         stop = false
-          -- transport_active = false
       end
     end
   
   
     -- Checking transport state again in case transport was just set to 'false' by Stop
     if transport_active then
-      -- pre-loads next chord to allow early notes to be quantized according to the upcoming chord
-      -- Technically more efficient but this means there is a delay when changing from 0 pre-load to other value
-      -- if chord_preload_tics ~= 0 and util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
+ 
       if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
         get_next_chord()
       end
-      
       
       if clock_step % chord_div == 0 then
         advance_chord_seq()
@@ -758,9 +778,18 @@ function sequence_clock()
         end
       end
       
-      if clock_step % params:get('crow_div') == 0 then
-        crow.output[3]() --pulse defined in init
+      -- if clock_step % params:get('crow_clock') == 0 then
+      -- crow.output[3]() --pulse defined in init
+      -- end
+      
+      if clock_step % crow_div == 0 then
+      -- crow.output[3]() --pulse defined in init
+      crow.output[3].volts = 5
+      crow.output[3].slew = 0.001 --Should be just less than 192 PPQN @ 300 BPM
+      crow.output[3].volts = 0    
+      crow.output[3].slew = 0
       end
+      
     end
     
     if grid_dirty == true then
@@ -821,11 +850,10 @@ end
     
 
 function clock.transport.start()
-  if params:string('clock_source') == 'link' then link_start = true end
-
+  -- if params:string('clock_source') == 'link' then link_start = true end
+  
   transport_active = true
   
-    
   -- Clock for note duration, note-off events
   clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
@@ -833,12 +861,12 @@ function clock.transport.start()
   -- Clock for chord/arp/arranger sequences
   sequence_clock_id = clock.run(sequence_clock)
   
-  
   --Clock used to refresh screen once a second for the arranger countdown timer
   clock.cancel(seconds_clock_id or 0) 
   seconds_clock_id = clock.run(seconds_clock)
   
-  -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+  -- Tells sequence_clock to send a MIDI start/continue message AFTER initial clock sync
+  -- Might want to have this only run if clock_source = internal
   start = true
 end
 
@@ -932,19 +960,22 @@ function advance_chord_seq()
       automator()
     end
     
+    -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
+    -- Mode is always updated in case no chord has been set but user has changed Mode param.
+      current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
+      current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
+      chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+
     -- Play the chord
     if chord_seq[pattern][chord_seq_position].c > 0 then
-    -- generator_and_reset sets chord_seq_position back to 0 which breaks on i 2+ so I'm maxing it here.
-    -- if chord_seq[pattern][math.max(chord_seq_position,1)].c > 0 then
-      
-  -- if chord_seq_position > 0 then --Turning this off to see if it breaks something. Not sure why it's needed.
       play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
-      if chord_key_count == 0 then
-        chord_no = chord_seq[pattern][chord_seq_position].c + (params:get('chord_type') == 4 and 7 or 0) --or 0
-        generate_chord_names()
-      end
-  -- end
     end
+
+    if chord_key_count == 0 then
+      chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0) --or 0
+      generate_chord_names()
+    end
+
   end
 end
 
@@ -1001,7 +1032,7 @@ end
 
 
 function play_chord(destination, channel)
-  chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, true)
+  -- chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, true)
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
@@ -1059,7 +1090,7 @@ function get_next_chord()
     end
     
     -- Flag if arranger is on the last pattern of a 1-shot sequence
-    arranger_one_shot_last_pattern = pre_arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
+    -- arranger_one_shot_last_pattern = pre_arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
   end
   
   -- If arrangement was not just reset, update chord position. 
@@ -1081,15 +1112,17 @@ function get_next_chord()
     --   automator()
     -- end
     
-    -- Update next_chord
-    if chord_seq[pre_pattern][pre_chord_seq_position].c > 0 then
-      next_chord = musicutil.generate_chord_scale_degree(chord_seq[pre_pattern][pre_chord_seq_position].o * 12, params:get('mode'), chord_seq[pre_pattern][pre_chord_seq_position].c, true)
-    end
+    -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
+    -- Mode is always updated in case no chord has been set but user has changed Mode param.
+      next_chord_o = chord_seq[pre_pattern][pre_chord_seq_position].c > 0 and chord_seq[pre_pattern][pre_chord_seq_position].o or next_chord_o
+      next_chord_c = chord_seq[pre_pattern][pre_chord_seq_position].c > 0 and chord_seq[pre_pattern][pre_chord_seq_position].c or next_chord_c
+      next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
+    
   end
 end
 
     
--- Used my source == midi and crow to quantize with upcoming chord.
+-- Used by source == midi and crow to quantize with upcoming chord.
 function pre_quantize_note(note_num, source)
   local chord_length = params:get(source..'_chord_type') -- Move upstream?
   local source_octave = params:get(source..'_octave') -- Move upstream?
@@ -1134,21 +1167,24 @@ function advance_arp_seq()
   end   
 end
 
-function crow_trigger(s) --Trigger in used to sample voltage from Crow IN 1
-    state = s
+function crow_trigger() --Trigger in used to sample voltage from Crow IN 1
     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
 end
 
 
 function sample_crow(volts)
-  -- local note = quantize_note(round(volts * 12, 0) + 1, 'crow')
   local note = params:get('chord_preload') == 0 and quantize_note(round(volts * 12, 0) + 1, 'crow') or pre_quantize_note(round(volts * 12, 0) + 1, 'crow')
+  
   -- Blocks duplicate notes within a chord step so rests can be added to simple CV sources
+  -- DEBUG
+  -- print('----------')
+  -- print(chord_seq_retrig)
+  -- print(prev_note)
+  -- print(note)
   if chord_seq_retrig == true
   or params:get('do_crow_auto_rest') == 0 
   or (params:get('do_crow_auto_rest') == 1 and (prev_note ~= note)) then
-    
     -- Play the note
     local destination = params:string('crow_dest')
     if destination == 'Engine' then
@@ -1427,7 +1463,7 @@ function g.key(x,y,z)
         -- If the event slot is populated, Load the Event vars back to the displayed param
         if automator_events[event_edit_pattern][y][x] ~= nil then
           local event_category_options = params.params[params.lookup['event_category']].options
-          params:set('event_category', tab.key(event_categofry_options, automator_events[event_edit_pattern][y][x].category))
+          params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))
           set_event_category_min_max()
           params:set('event_name', automator_events[event_edit_pattern][y][x].event_index)
           if automator_events[event_edit_pattern][y][x].event_value ~= nil then
@@ -1584,10 +1620,9 @@ function g.key(x,y,z)
         end
       elseif x < 15 then
         chord_key_count = chord_key_count - 1
-        if chord_key_count == 0 and chord_seq_position ~= 0 then
-          chord_no = chord_seq[pattern][chord_seq_position].c + (params:get('chord_type') == 4 and 7 or 0)
+        if chord_key_count == 0 then
+          chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)          
           generate_chord_names()
-        else chord_no = 0
         end
       end
     
@@ -1896,17 +1931,7 @@ end
 -- This is a variation on the standard generator that will reset the pattern and arp but not the arranger
 function generator_and_reset()
   generator()
-  -- fucks up automator and advance_chord_seq by setting chord_seq_position to 0
-  -- reset_pattern()
-  
-  -- pattern_queue = false
-    arp_seq_position = 0
-  -- chord_seq_position = 1
-  -- reset_clock()
-  -- get_next_chord()
-  -- chord = next_chord
-  -- grid_redraw()
-  -- redraw()
+  arp_seq_position = 0
 end    
         
         
@@ -2349,8 +2374,8 @@ function redraw()
       -- Generate a pattern length even for held arranger steps. This doesn't work unless Global for some reason?
       pattern_length_gen = pattern_length[arranger_seq[i]] or pattern_length_gen
       
-      -- steps_remaining_in_pattern = pattern_length[arranger_seq[i]] - steps_elapsed  --rect_w
-      steps_remaining_in_pattern = pattern_length_gen - steps_elapsed  --rect_w
+      -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
+      steps_remaining_in_pattern = math.max(pattern_length_gen - steps_elapsed, 0)  --rect_w
       
       steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
       seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
