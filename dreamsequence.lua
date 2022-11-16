@@ -1,9 +1,8 @@
----@diagnostic disable: lowercase-global
 -- Dreamsequence
 --
 -- KEY 1: Grid functions (hold)
 -- KEY 2: Play/pause
--- KEY 3: Reset/Generate
+-- KEY 3: Reset
 --
 -- ENC 2: Select
 -- ENC 3: Edit 
@@ -78,7 +77,7 @@ function init()
 
   -- Event params
   params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI in', 'CV in'}, 1)
-    params:set_action('event_category',function() menu_update() end)
+    params:set_action('event_category',function() update_menus() end)
     params:hide(params.lookup['event_category'])
     
   event_display_names = {} -- to-do: make local after debug
@@ -86,7 +85,7 @@ function init()
     event_display_names[i] = events_lookup[i].name
   end
   params:add_option('event_name', 'Event', event_display_names, 1) -- Default value will be overwritten later in Init
-    params:set_action('event_name',function() menu_update() end)
+    params:set_action('event_name',function() update_menus() end)
     params:hide(params.lookup['event_name'])
     
   params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
@@ -103,7 +102,7 @@ function init()
     params:set_action('chord_div_index',function() set_div('chord') end)
 
   params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
-    params:set_action("chord_dest",function() menu_update() end)
+    params:set_action("chord_dest",function() update_menus() end)
   params:add{
     type = 'number',
     id = 'chord_pp_amp',
@@ -145,7 +144,7 @@ function init()
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
-    params:set_action("arp_dest",function() menu_update() end)
+    params:set_action("arp_dest",function() update_menus() end)
   params:add{
     type = 'number',
     id = 'arp_pp_amp',
@@ -162,7 +161,7 @@ function init()
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
-    params:set_action("arp_tr_env",function() menu_update() end)
+    params:set_action("arp_tr_env",function() update_menus() end)
   params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
   params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_duration_index',function() set_duration('arp') end)
@@ -175,7 +174,7 @@ function init()
   --MIDI params
   params:add_separator ('MIDI')
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
-    params:set_action("midi_dest",function() menu_update() end)
+    params:set_action("midi_dest",function() update_menus() end)
   params:add{
     type = 'number',
     id = 'midi_pp_amp',
@@ -199,9 +198,9 @@ function init()
     max = 1,
     default = 0,
     formatter = function(param) return t_f_string(param:get()) end,
-    action = function() menu_update() end}
+    action = function() update_menus() end}
   params:add_option("midi_tr_env", "Output", {'Trigger','AR env.'},1)
-    params:set_action("midi_tr_env",function() menu_update() end)
+    params:set_action("midi_tr_env",function() update_menus() end)
   params:add_number('midi_ar_skew','AR env. skew',0, 100, 0)
   params:add_number('midi_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
     params:set_action('midi_duration_index',function() set_duration('midi') end)
@@ -217,7 +216,7 @@ function init()
     params:set_action('crow_clock_index',function() set_crow_clock() end)
     
   params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},3)
-    params:set_action("crow_dest",function() menu_update() end)
+    params:set_action("crow_dest",function() update_menus() end)
   params:add{
     type = 'number',
     id = 'crow_pp_amp',
@@ -242,7 +241,7 @@ function init()
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_option("crow_tr_env", "Output", {'Trigger','AR env.'},1)
-    params:set_action("crow_tr_env",function() menu_update() end)
+    params:set_action("crow_tr_env",function() update_menus() end)
   params:add_number('crow_ar_skew','AR env. skew',0, 100, 0)
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
     params:set_action('crow_duration_index',function() set_duration('crow') end)
@@ -287,7 +286,7 @@ function init()
   page_index = 1
   page_name = pages[page_index]
   menus = {}
-  menu_update()
+  update_menus()
   menu_index = 0
   selected_menu = menus[page_index][menu_index]
   generator_menus = {}
@@ -404,8 +403,8 @@ function init()
 end
 
 
--- MENU_UPDATE. Probably can be improved by only calculating on the current view+page
-function menu_update()
+-- UPDATE_MENUS. Probably can be improved by only calculating on the current view+page
+function update_menus()
 
   -- Events menu
   local event_index = params:get('event_name')
@@ -426,48 +425,48 @@ function menu_update()
 
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave'}
+    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[3] = {'chord_dest', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[3] = {'chord_dest', 'chord_midi_ch', 'chord_div_index', 'chord_duration_index', 'chord_type', 'chord_octave', 'chord_midi_velocity'}
+    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[3] = {'chord_dest', 'chord_div_index', 'chord_type', 'chord_octave', 'chord_jf_amp'}
+    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_jf_amp'}
   end
   
   -- arp menus
   if params:string('arp_dest') == 'None' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave'}
+    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', }
   elseif params:string('arp_dest') == 'Engine' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
+    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_midi_ch', 'arp_div_index', 'arp_duration_index', 'arp_chord_type', 'arp_octave', 'arp_midi_velocity'}
+    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_ch', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_chord_type', 'arp_octave', }
-    else
-      menus[4] = {'arp_dest', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew', 'arp_chord_type', 'arp_octave', }
+      menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
+    else -- AR envelope
+      menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[4] = {'arp_dest', 'arp_mode', 'arp_div_index', 'arp_chord_type', 'arp_octave', 'arp_jf_amp'}
+    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
   end
   
   -- MIDI menus
   if params:string('midi_dest') == 'None' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[5] = {'midi_dest', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru'}
+      menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru'}
     else
-      menus[5] = {'midi_dest', 'midi_midi_ch', 'midi_duration_index', 'midi_chord_type', 'midi_octave', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_chord_type', 'midi_octave', }
-    else
-      menus[5] = {'midi_dest', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', 'midi_chord_type', 'midi_octave', }
+      menus[5] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env', }
+    else -- AR envelope
+      menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', }
     end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
@@ -477,14 +476,14 @@ function menu_update()
   if params:string('crow_dest') == 'None' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[6] = {'crow_dest', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[6] = {'crow_dest', 'crow_midi_ch', 'crow_duration_index', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_midi_velocity'}
+    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
-    else
-      menus[6] = {'crow_dest', 'crow_tr_env', 'crow_duration_index', 'crow_ar_skew', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+      menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
+    else -- AR envelope
+      menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ar_skew', }
     end
   elseif params:string('crow_dest') == 'ii-JF' then
     menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
@@ -722,8 +721,6 @@ function sequence_clock()
         end
       end
       clock_start_method = 'continue'
-      print("Clock "..sequence_clock_id.. " started")
-  
       start = false
     end
     
