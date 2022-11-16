@@ -1,3 +1,4 @@
+---@diagnostic disable: lowercase-global
 -- Dreamsequence
 --
 -- KEY 1: Grid functions (hold)
@@ -41,7 +42,9 @@ function init()
     max = 9,
     default = 1,
     formatter = function(param) return mode_index_to_name(param:get()) end,}
-  params:add_number('dedupe_threshold', 'Dedupe window', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
+    -- moving action to post-bang
+    -- params:set_action('mode', function() update_chord() end)
+  params:add_number('dedupe_threshold', 'Repeat window', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)     
@@ -394,6 +397,8 @@ function init()
   next_chord = chord
   -- grid_dirty = true
   params:bang()
+  -- Action needs to occur post-bang
+  params:set_action('mode', function() update_chord_action() end)
   grid_redraw()
   redraw()
 end
@@ -700,10 +705,13 @@ function sequence_clock()
   -- end
 
   while transport_active do
-    clock.sync(1/global_clock_div)
+    
+    -- Moving this to the end for external sync.
+    -- clock.sync(1/global_clock_div)
 
-    -- START
+    -- START. This might not be syncing correctly when a reset or generator event occurs (modulo/clock_step weirdness?)
     if start == true and stop ~= true then
+  
       -- Send out MIDI start/continue messages
       transport_midi_update()
       if params:get('clock_midi_out') ~= 1 then
@@ -715,6 +723,7 @@ function sequence_clock()
       end
       clock_start_method = 'continue'
       print("Clock "..sequence_clock_id.. " started")
+  
       start = false
     end
     
@@ -728,33 +737,48 @@ function sequence_clock()
     -- STOP beat-quantized
     if stop == true then
       
-      -- Stop is quantized to occur at the end of the beat ( trying out x4 to stop at end of measure) To-do: add param for this?
-      if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the beat.
-        
-        -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
-        clock_step = util.wrap(clock_step - 1, 0, 1535)  
+      -- When internally clocked, stop is quantized to occur at the end of the beat
+      -- Default quantization is global_clock_div * 4 to stop at end of measure but... To-do: add param for this?
+      if params:string('clock_source') == 'internal' then
+        if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the beat.
           
-        transport_midi_update() 
-        if params:get('clock_midi_out') ~= 1 then
-          transport_midi:stop()
+          -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
+          clock_step = util.wrap(clock_step - 1, 0, 1535)  
+            
+          transport_midi_update() 
+          if params:string('clock_midi_out') ~= 'off' then
+            transport_midi:stop()
+          end
+          
+          print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+          print('Canceling clock_id ' .. (sequence_clock_id or 0))
+          
+          clock.cancel(sequence_clock_id)-- or 0)
+          transport_active = false
+          stop = false
         end
+        
+      else -- External clock_source. No quantization. Just resets pattern/arrangement
+           -- To-do: enable pause-like functionality rather than just resetting
+        
+        -- IDK why someone would be syncing to an external source and also be sending a clock out from Norns but whatever  
+        transport_midi_update() 
+        if params:string('clock_midi_out') ~= 'off' then transport_midi:stop() end
         
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
         print('Canceling clock_id ' .. (sequence_clock_id or 0))
         
         clock.cancel(sequence_clock_id)-- or 0)
-      
-        -- If syncing to an external clock source
-        if params:string('clock_source') ~= 'internal' then
-          if params:get('arranger_enabled') == 1 then 
-            reset_arrangement()
-          else
-            reset_pattern()
-          end
+        if params:get('arranger_enabled') == 1 then 
+          reset_arrangement()
+        else
+          reset_pattern()
         end
+      
         transport_active = false
         stop = false
       end
+      
     end
   
   
@@ -789,7 +813,7 @@ function sequence_clock()
       crow.output[3].volts = 0    
       crow.output[3].slew = 0
       end
-      
+
     end
     
     if grid_dirty == true then
@@ -797,20 +821,26 @@ function sequence_clock()
       grid_dirty = false
     end
 
+    -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync
+    clock.sync(1/global_clock_div)
+      
   end
 end
 
 
---Clock used to redraw screen every second for arranger countdown timer
+-- Clock used to redraw screen 10x a second for arranger countdown timer
+-- To-do: Ideally only needs to fire once a second but the potential for it to get out of sync (tempo changes, reset, Generator) causes issues.
+-- Might create a reinitialization function to call when needed (param actions and when resetting etc...)
 function seconds_clock()
   while true do
     redraw()
-    clock.sleep(1)
+    clock.sleep(.1)
   end
 end
     
     
 -- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic
+-- Unlike the sequence_clock, this continues to run after transport stop to turn off sustained notes
 function timing_clock()
   while true do
     clock.sync(1/global_clock_div)
@@ -848,7 +878,7 @@ function timing_clock()
 end
     
     
-
+-- To-do: might need to move timing_clock and/or second_clock to start after the initial sync of sequence_clock
 function clock.transport.start()
   -- if params:string('clock_source') == 'link' then link_start = true end
   
@@ -905,7 +935,7 @@ end
 
 
 function reset_clock()
-  clock_step = -1 -- clock_step rewrite
+  clock_step = -1
 end
 
 
@@ -960,11 +990,15 @@ function advance_chord_seq()
       automator()
     end
     
-    -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
-    -- Mode is always updated in case no chord has been set but user has changed Mode param.
-      current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
-      current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
-      chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+    -- -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
+    -- -- Mode is always updated in case no chord has been set but user has changed Mode param.
+    --   current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
+    --   current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
+    --   chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+
+
+    -- Update the chord
+    update_chord()
 
     -- Play the chord
     if chord_seq[pattern][chord_seq_position].c > 0 then
@@ -1031,8 +1065,23 @@ function generate_chord_names()
 end  
 
 
+function update_chord()
+-- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
+-- Mode is always updated in case no chord has been set but user has changed Mode param.
+  current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
+  current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
+  chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+end
+
+
+-- Simpler chord update that just picks up the current mode (for param actions)
+function update_chord_action()
+  chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
+end
+
+
 function play_chord(destination, channel)
-  -- chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][chord_seq_position].o * 12, params:get('mode'), chord_seq[pattern][chord_seq_position].c, true)
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
@@ -1621,8 +1670,10 @@ function g.key(x,y,z)
       elseif x < 15 then
         chord_key_count = chord_key_count - 1
         if chord_key_count == 0 then
-          chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)          
-          generate_chord_names()
+          -- This reverts the chord readout to the currently loaded chord but it is kinda confusing when paused so now it just wipes and refreshes at the next chord step.
+          -- chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)          
+          -- generate_chord_names()
+          chord_no = 0
         end
       end
     
@@ -1712,7 +1763,6 @@ function key(n,z)
     elseif n == 2 then
       if keys[1] == 1 then
         -- FN+K2. Enable Arranger maybe?
-        -- generator()
         
       elseif screen_view_name == 'Events' then
         -- Use event_edit_step to determine if we are editing an event slot or just viewing them all
@@ -1728,23 +1778,23 @@ function key(n,z)
           redraw()
         -- Option to delete arranger step and ALL events
         else
-        -- -- Disable arranger step 
-        -- if y == arranger_seq[x] and x > 1 then
-        --   arranger_seq[x] = 0
-        -- else 
-        --   arranger_seq[x] = y
-        -- end
-        
-        -- Changed from 'Back' using K2 to 'Done' using K3 so this is not necessary (but optional)
-        -- Might want to set it to Back: K2 on initial load and Done: K3 after setting an event
-        
-        -- arranger_seq[event_edit_pattern] = 0
-        
-        -- Delete all: KEY 2
-        for p = 1,8 do
-          automator_events[event_edit_pattern][p] = {}
-        end    
-        screen_view_name = 'Session'
+          -- -- Disable arranger step 
+          -- if y == arranger_seq[x] and x > 1 then
+          --   arranger_seq[x] = 0
+          -- else 
+          --   arranger_seq[x] = y
+          -- end
+          
+          -- Changed from 'Back' using K2 to 'Done' using K3 so this is not necessary (but optional)
+          -- Might want to set it to Back: K2 on initial load and Done: K3 after setting an event
+          
+          -- arranger_seq[event_edit_pattern] = 0
+          
+          -- Delete all: KEY 2
+          for p = 1,8 do
+            automator_events[event_edit_pattern][p] = {}
+          end    
+          screen_view_name = 'Session'
         end      
         grid_redraw()
       
@@ -1767,7 +1817,7 @@ function key(n,z)
         generator()
         -- If we're sending MIDI clock out, send a stop msg
         -- Tell the transport to Start on the next sync of sequence_clock
-        if params:get('clock_midi_out') ~= 1 then
+        if params:string('clock_midi_out') ~= 'off' then
           if transport_active then
             transport_midi:stop()
           end
@@ -2486,39 +2536,34 @@ function redraw()
               end
             end  
           end
-
+          
           -- Draw menu and <> indicators for scroll range
-          -- Leaving in param formatter and some code for truncating string in case we want to add system param events later.
+          -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
           local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
-          if events_lookup[params:get('event_name')].event_type == 'param' then
-            if automator_events_index == i then
-              local param_id = automator_events_menus[i]
-              local range =
-                (param_id == 'event_category' or param_id == 'event_value_type') and params:get_range(param_id)
-                or param_id == 'event_name' and {event_category_min_index, event_category_max_index}
-                or event_range
-
-              local menu_value_suf = params:get(param_id) == range[1] and '>' or ''
-              local menu_value_pre = params:get(param_id) == range[2] and '<' or ' '
-              local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
-      
-              -- Not strictly necessary to limit range for Events due to screen layout
-              -- while screen.text_extents(events_menu_txt) > 90 do
-              --   events_menu_trunc = events_menu_trunc - 1
-              --   events_menu_txt = first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
-              -- end
-              
-              screen.text(events_menu_txt)
-            else
-              screen.text(first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
-            end
-          -- Functions  
+          if automator_events_index == i then
+            local selected_events_menu = automator_events_menus[i]
+            local range =
+              (selected_events_menu == 'event_category' or selected_events_menu == 'event_value_type') and params:get_range(selected_events_menu)
+              or selected_events_menu == 'event_name' and {event_category_min_index, event_category_max_index}
+              or event_range
+            local menu_value_suf = params:get(selected_events_menu) == range[1] and '>' or ''
+            local menu_value_pre = params:get(selected_events_menu) == range[2] and '<' or ' '
+            local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+    
+            -- Not strictly necessary to limit range for Events due to screen layout
+            -- while screen.text_extents(events_menu_txt) > 90 do
+            --   events_menu_trunc = events_menu_trunc - 1
+            --   events_menu_txt = first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+            -- end
+            
+            screen.text(events_menu_txt)
           else
-            screen.text(param_id_to_name(automator_events_menus[i]) .. ': ' .. string.sub(event_val_string, 1, events_menu_trunc))
+            screen.text(first_to_upper(param_formatter(param_id_to_name(automator_events_menus[i]))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
           end
         
           line = line + 1
         end
+        
         screen.level(4)
         screen.move(1,54)
         screen.line(128,54)
