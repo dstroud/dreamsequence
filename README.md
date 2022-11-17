@@ -3,7 +3,11 @@
 Requirements: Monome Norns and Grid
 Optional: Crow, Just Friends, MIDI sequencer/controller, CV sources
 
-Dreamsequence is a chord-centric composer, arpeggiator, CV/MIDI harmonizer, and arranger. It was designed as a sort of compositional walled-garden for folks who may not have a strong music theory background (or just don't enjoy working with traditional tools like the piano-roll). It has a very quick workflow that is ideal for creating musical sketches, but with some work in the Arranger it's possible to create a song with various sections, dynamic changes, and even procedural transformations.
+Dreamsequence is a chord-centric composer, arpeggiator, CV/MIDI harmonizer, and arranger. It takes a walled-garden approach to composition that prioritizes efficiency and experimentation.
+
+Dreamsequence's chord sequencer lays the foundation of the composition, which can then be embellished with the arpeggiator and by transforming external CV or MIDI sequences with the harmonizer.
+
+Although the efficient workflow is ideal for creating musical sketches, it is also possible to use the Arranger to create a song with various sections, dynamic changes, and procedural transformations.
 
 
 ## NORNS INTERFACE
