@@ -293,7 +293,8 @@ function init()
   grid_view_index = 2
   grid_view_name = grid_views[grid_view_index]
   -- flicker = 3
-  pages = {'GLOBAL', 'ARRANGER', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
+  -- pages = {'GLOBAL', 'ARRANGER', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
+  pages = {'GLOBAL', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
   page_index = 1
   page_name = pages[page_index]
   menus = {}
@@ -414,73 +415,73 @@ function update_menus()
   -- Global menu
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   
-  -- Arrange menus
-  menus[2] = {'arranger_enabled', 'playback'}
+  -- -- Arrange menus
+  -- menus[2] = {'arranger_enabled', 'playback'}
 
   --chord menus   
   if params:string('chord_dest') == 'None' then
-    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[3] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_jf_amp'}
   end
   
   -- arp menus
   if params:string('arp_dest') == 'None' then
-    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', }
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', }
   elseif params:string('arp_dest') == 'Engine' then
-    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_ch', 'arp_midi_velocity'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_ch', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
     else -- AR envelope
-      menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew',}
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[4] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
   end
   
   -- MIDI menus
   if params:string('midi_dest') == 'None' then
-    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru'}
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru'}
     else
-      menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[5] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env', }
+      menus[4] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env', }
     else -- AR envelope
-      menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', }
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', }
     end
   elseif params:string('midi_dest') == 'ii-JF' then
-    menus[5] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
   end
   
   -- CV-in/Crow menus
   if params:string('crow_dest') == 'None' then
-    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
+      menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
     else -- AR envelope
-      menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ar_skew', }
+      menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ar_skew', }
     end
   elseif params:string('crow_dest') == 'ii-JF' then
-    menus[6] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
   end  
 end
 
@@ -2368,6 +2369,7 @@ end
 function redraw()
   screen.clear()
   screen.aa(0)
+  local dash_x = 94
   
   -- Screens that pop up when g.keys are being held down take priority--------
   -- POP-up g.key tip always takes priority
@@ -2437,58 +2439,77 @@ function redraw()
   -- Standard priority (not momentary) menus---------------------------------  
   else
     
-     --Calculate what we need to display arrangement time remaining and draw the arranger mini-chart
-    local rect_x = arranger_seq_position == 0 and 1 or 0 -- If arranger is reset, add an initial gap to the x position
-    steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
   
-    for i = math.max(arranger_seq_position, 1), arranger_seq_length do
-      steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
+    -- --------------------------------------------
+    -- -- Arranger timeline v2
+    -- --------------------------------------------
+    -- -- Timeline rect
+    --   local timeline_y = 13
+    --   if screen_view_name == 'Session' then
+    --   screen.level(4)
+    --   screen.rect(dash_x,timeline_y,34,16)
+    --   screen.fill()
+    --   screen.level(0)
+    --   screen.rect(dash_x + 1 ,timeline_y + 1,32,14)
+    --   screen.fill()
+    -- end
       
-      -- little hack here to set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
-      percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
-      -- print('percent_step_elapsed =' .. percent_step_elapsed)
-      
+    -- -- Calculations for 1. ARRANGEMENT TIMER and 2. ARRANGER MINI CHART
+    -- -- Some drawing takes place here and other bits happen elsewhere
+    -- local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 3) -- If arranger is reset, add an initial gap to the x position
+    
+    -- steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
   
-      -- % of current chord step remaining
-      -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
+    -- for i = math.max(arranger_seq_position, 1), arranger_seq_length do
+    --   steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
       
-      -- Generate a pattern length even for held arranger steps. This doesn't work unless Global for some reason?
-      pattern_length_gen = pattern_length[arranger_seq[i]] or pattern_length_gen
-      
-      -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
-      steps_remaining_in_pattern = math.max(pattern_length_gen - steps_elapsed, 0)  --rect_w
-      
-      steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
-      seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
-      
-      
-      -- ARRANGER page: Draw timeline. Needs to be run in this loop rather than in Arranger view section
-      if page_name == 'ARRANGER' and screen_view_name == 'Session' then
-        rect_h = 2
-        -- rect_y = 50 + (arranger_seq[i]* 2) + arranger_seq[i]
-        rect_y = arranger_seq[i] == 0 and rect_y or 50 + (arranger_seq[i]* 2) + arranger_seq[i]
+    --   -- little hack here to set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
+    --   percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
 
+    --   -- % of current chord step remaining. Kinda useful so maybe keep around just in case.
+    --   -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
+      
+    --   -- Generate a pattern length even for held arranger steps. This doesn't work unless Global for some reason?
+    --   pattern_length_gen = pattern_length[arranger_seq[i]] or pattern_length_gen
+      
+    --   -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
+    --   steps_remaining_in_pattern = math.max(pattern_length_gen - steps_elapsed, 0)  --rect_w
+      
+    --   steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
+    --   seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
+      
+      
+    --   -- ARRANGER page: Draw timeline. Needs to be run in this loop rather than in Arranger view section
+    --   if screen_view_name == 'Session' then
+    --     rect_h = 2
+    --     rect_y = arranger_seq[i] == 0 and rect_y or timeline_y + (arranger_seq[i]* 2) + arranger_seq[i]
         
-        -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
-        rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
-        screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
-        screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, rect_h)
-        screen.fill()
-        rect_x = rect_x + steps_remaining_in_pattern
-        
-        -- -- Add in arranger edit position indicator. This is broken now but keep around in case we need a timeline scrubber thing.
-        -- if arranger_menu_index == #arranger_menus + 1 then
-        --   if event_edit_pattern == i then
-        --     screen.level(15)
-        --     screen.rect(rect_x + i - rect_gap_adj - (pattern_length[arranger_seq[i]] + 1 - event_edit_step), 53, 1, 11)
-        --     screen.move_rel(0,-1)
-        --     screen.text(event_edit_pattern .. '.' .. event_edit_step)
-        --     screen.fill()
-        --   end
-        -- end
-        
-      end
-    end -- of Arranger clock and partial drawing (everything but axis reference marks)
+    --     -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
+    --     rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
+    --     screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
+    --     screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, rect_h)
+    --     screen.fill()
+    --     rect_x = rect_x + steps_remaining_in_pattern
+
+    --   end
+    -- end -- of Arranger clock and partial drawing (everything but axis reference marks)
+    
+    -- -- Axis reference marks so it's easier to distinguish the pattern position
+    -- if screen_view_name == 'Session' then
+    --   for i = 1,4 do
+    --     screen.level(i == arranger_seq[arranger_seq_position] and 15 or 2)
+    --     screen.rect(dash_x + 3, timeline_y                                                                                                                                      + i * 3, 1, 2)
+    --     screen.fill()
+    --   end
+      
+    --   -- Also add in a line on the right side of the chart where it overlaps
+    --   screen.level(4)
+    --   screen.move(dash_x + 34,timeline_y)
+    --   screen.line(dash_x + 34,timeline_y + 16)
+    --   screen.stroke()      
+    -- end
+            
+    -- --- END OF ARRANGER MINI CHART ---
     
     ---------------------------
     -- UI elements placed here will persist in all views including Events editor
@@ -2583,7 +2604,7 @@ function redraw()
       end
     
 
-    -- NON-EVENTS, not holding down Arranger segments g.keys  
+    -- SESSION VIEW (NON-EVENTS), not holding down Arranger segments g.keys  
     else
       ---------------------------
       -- UI elements placed here appear in non-Events views
@@ -2596,10 +2617,10 @@ function redraw()
       
       -- Arranger position rect
       screen.level(7)
-      screen.rect(94,0,34,11)
+      screen.rect(dash_x ,0,34,11)
       screen.fill()
       screen.level(0)
-      screen.rect(95,1,32,9)
+      screen.rect(dash_x + 1,1,32,9)
       screen.fill()
     
       -- STATE determination. To-do: move this out of Redraw
@@ -2611,7 +2632,7 @@ function redraw()
       
       -- Draw transport status glyph
       screen.level(15)
-      local x_offset = 97
+      local x_offset = dash_x + 3
       local y_offset = 3
       for i = 1, #glyphs[state] do
         screen.pixel(glyphs[state][i][1] + x_offset, glyphs[state][i][2] + y_offset)
@@ -2619,52 +2640,105 @@ function redraw()
       screen.fill()
     
       -- Arranger position readout
-      screen.move(125,8)
+      screen.move(dash_x + 31,8)
+      screen.level(15)      
       if params:string('arranger_enabled') == 'True' then
-        -- -- local length = screen.text_extents(arranger_seq_position .. '.' .. readout_chord_seq_position)
-        -- -- screen.move(118 - length,8)
-        -- screen.move(125,8)
-        -- screen.level(params:get('arranger_enabled') == 1 and arranger_synced and 15 or 4)
-        -- screen.text_right(arranger_seq_position .. '.' .. readout_chord_seq_position)
-        
         if arranger_synced then 
-          -- local length = screen.text_extents(arranger_seq_position .. '.' .. readout_chord_seq_position)
-          -- screen.move(118 - length,8)
-          -- screen.move(125,8)
-          screen.level(15)
           screen.text_right(arranger_seq_position .. '.' .. readout_chord_seq_position)
         else
-          screen.level(15)
           screen.text_right('T-' .. pattern_length[pattern] - chord_seq_position + 1)
         end
       else
-        -- screen.move(118 - length,8)
-        -- screen.move(125,8)
-        screen.level(15)
         local pattern_alphabet = pattern == 1 and 'A' or pattern == 2 and 'B' or pattern == 3 and 'C' or pattern == 4 and 'D' or '-'
         screen.text_right(pattern_alphabet .. '.' .. chord_seq_position)    
       end
 
+
+
+      --------------------------------------------
+      -- Arranger timeline v2
+      --------------------------------------------
+      -- Timeline rect
+        local timeline_y = 13
+        -- if screen_view_name == 'Session' then
+        screen.level(4)
+        screen.rect(dash_x,timeline_y,34,17)
+        screen.fill()
+        screen.level(0)
+        screen.rect(dash_x + 1 ,timeline_y + 1,32,15)
+        screen.fill()
+      -- end
+        
+      -- Calculations for 1. ARRANGEMENT TIMER and 2. ARRANGER MINI CHART
+      local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 3) -- If arranger is reset, add an initial gap to the x position
+      
+      steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
+    
+      for i = math.max(arranger_seq_position, 1), arranger_seq_length do
+        steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
+        
+        -- little hack here to set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
+        percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
+  
+        -- % of current chord step remaining. Kinda useful so maybe keep around just in case.
+        -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
+        
+        -- Generate a pattern length even for held arranger steps. This doesn't work unless Global for some reason?
+        pattern_length_gen = pattern_length[arranger_seq[i]] or pattern_length_gen
+        
+        -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
+        steps_remaining_in_pattern = math.max(pattern_length_gen - steps_elapsed, 0)  --rect_w
+        
+        steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
+        seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
+        
+        rect_h = 2
+        rect_y = arranger_seq[i] == 0 and rect_y or timeline_y + (arranger_seq[i]* 2) + arranger_seq[i]
+        
+        -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
+        rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
+        screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
+        screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, rect_h)
+        screen.fill()
+        rect_x = rect_x + steps_remaining_in_pattern
+        end -- of Arranger clock and partial drawing (everything but axis reference marks)
+      
+      -- Axis reference marks so it's easier to distinguish the pattern position
+      -- if screen_view_name == 'Session' then
+        for i = 1,4 do
+          screen.level(i == arranger_seq[arranger_seq_position] and 15 or 2)
+          screen.rect(dash_x + 3, timeline_y                                                                                                                                      + i * 3, 1, 2)
+          screen.fill()
+        -- end
+        
+        -- Also add in a line on the right side of the chart where it overlaps
+        screen.level(4)
+        screen.move(dash_x + 34,timeline_y)
+        screen.line(dash_x + 34,timeline_y + 1)
+        screen.stroke()      
+      end
+    
+
       --------------------------------------------
       -- Arranger countdown readout
       --------------------------------------------
+      local countdown_readout_y = 32
       --Arranger time rect
       screen.level(4)
-      screen.rect(94,13,34,11)
+      screen.rect(dash_x,countdown_readout_y,34,11)
       screen.fill()
       screen.level(0)
-      screen.rect(95,14,32,9)
+      screen.rect(dash_x + 1,countdown_readout_y + 1,32,9)
       screen.fill()
     
       -- Arranger time
       screen.level(params:get('arranger_enabled') == 1 and 15 or 2)
-      -- screen.move(104,21)
-      screen.move(125,21)
+      screen.move(dash_x + 31,countdown_readout_y + 8)
       screen.text_right(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
       
       -- Arranger mode glyph
-      local x_offset = 97
-      local y_offset = 16
+      local x_offset = dash_x + 3
+      local y_offset = countdown_readout_y + 3
       screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
       if params:string('playback') == 'Loop' then
         for i = 1, #glyphs[1] do
@@ -2682,24 +2756,27 @@ function redraw()
       -- Chord readout
       --------------------------------------------
       -- Chord readout rect
+      local chord_readout_y = 45
       screen.level(4)
-      screen.rect(94,26,34,20)
+      screen.rect(dash_x,chord_readout_y,34,19)
       screen.fill()
       screen.level(0)
-      screen.rect(95,27,32,18)
+      screen.rect(dash_x + 1,chord_readout_y + 1,32,17)
       screen.fill()
     
       -- Chord degree and name
       if chord_no > 0 then
-        screen.move(111,34)
+        screen.move(dash_x + 17,chord_readout_y + 8)
         screen.level(15)
         screen.text_center(chord_degree or '') -- Chord degree
-        screen.move(111,42)
+        screen.move(dash_x + 17,chord_readout_y + 15)
         screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
       end 
       
       
+      --------------------------------------------
       -- Scrolling menus
+      --------------------------------------------
       local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
       line = 1
       for i = 1,#menus[page_index] do
@@ -2725,8 +2802,8 @@ function redraw()
         end
         line = line + 1
       end
- 
-   
+      
+      
       --Sticky header
       screen.level(menu_index == 0 and 15 or 4)
       screen.rect(0,0,92,11)
@@ -2736,17 +2813,7 @@ function redraw()
       screen.text(page_name)
       screen.fill()
     
-      
-      -- Axis reference marks so it's easier to distinguish the pattern position
-      if page_name == 'ARRANGER' then
-        for i = 1,4 do
-          screen.level(i == arranger_seq[arranger_seq_position] and 15 or 2)
-          screen.rect(0,50 + i * 3, 1, 2)
-          screen.fill()
-        end  
-      end
     end -- of event vs. non-event check
-        
   end
   screen.update()
 end
