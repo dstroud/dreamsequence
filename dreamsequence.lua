@@ -62,8 +62,11 @@ function init()
     min = 0,
     max = 1,
     default = 0,
-    formatter = function(param) return t_f_string(param:get()) end,
-    action = function() grid_redraw() end}
+    formatter = function(param) return t_f_string(param:get()) end}
+    
+    -- action = function() grid_redraw() end}
+    params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_readout() end)
+    
   params:add{
   type = 'number',
   id = 'playback',
@@ -72,7 +75,9 @@ function init()
   max = 1,
   default = 1,
   formatter = function(param) return playback_string(param:get()) end}
+    params:set_action('playback', function() grid_redraw(); arranger_ending() end)
   params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
+  
 
 
   -- Event params
@@ -249,10 +254,16 @@ function init()
   params:add_number('crow_octave','Octave',-2, 4, 0)
   params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
 
-
+  
   glyphs = {
     {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}}, --repeat glyph     
-    {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}},} --one-shot glyph
+    {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}}, --one-shot glyph
+    {{0,0},{1,0},{3,0},{4,0}, {0,1},{1,1},{3,1},{4,1}, {0,2},{1,2},{3,2},{4,2}, {0,3},{1,3},{3,3},{4,3},  {0,4},{1,4},{3,4},{4,4}},  -- pause
+    {{0,0},{1,0}, {0,1},{1,1},{2,1}, {0,2},{1,2},{2,2},{3,2}, {0,3},{1,3},{2,3}, {0,4},{1,4}}, -- play
+    {{0,0},{1,0},{2,0},{3,0},{4,0}, {0,1},{1,1},{2,1},{3,1},{4,1}, {0,2},{1,2},{2,2},{3,2},{4,2}, {0,3},{1,3},{2,3},{3,3},{4,3},  {0,4},{1,4},{2,4},{3,4},{4,4}}  -- reset/stopped
+    -- {{0,0},{2,0}, {0,1},{2,1}, {0,2},{2,2}, {0,3},{2,3},{0,4},{2,4}},  -- pause (skinny)
+    -- {{0,0},{1,0}, {0,1},{1,1},{2,1}, {0,2},{1,2},{2,2},{3,2}, {0,3},{1,3},{2,3}, {0,4},{1,4}} -- play (skinny)
+    }
   
   
   clock_start_method = 'start'
@@ -297,7 +308,7 @@ function init()
   -- since this starts with a menu selected and the menu hasn't been generated, hardcoding in the first menu option
   selected_arranger_menu = 'arranger_enabled'
   transport_active = false
-  pattern_length = {4,2,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
+  pattern_length = {4,4,4,4} -- loop length for each of the 4 patterns. rename to chord_seq_length prob
   pattern = 1
   steps_remaining_in_pattern = pattern_length[pattern]
   pattern_queue = false
@@ -308,23 +319,23 @@ function init()
   arranger_seq_length = 1
   
   
-  arranger_seq_extd = {
-    {1,1,1,1},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {}}
+  -- arranger_seq_extd = {
+  --   {1,1,1,1},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {},
+  --   {}}
   
   
   automator_events = {}
@@ -353,6 +364,7 @@ function init()
   percent_step_elapsed = 0
   seconds_remaining_in_arrangement = 0
   chord_no = 0
+  arranger_synced = false
   arranger_keys = {}
   arranger_key_count = 0  
   pattern_keys = {}
@@ -371,6 +383,7 @@ function init()
     end
   end
   chord_seq_position = 0
+  readout_chord_seq_position = 0
   chord = {} --probably doesn't need to be a table but might change how chords are loaded
   chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
   current_chord_o = 0
@@ -908,6 +921,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
+  -- readout_chord_seq_position = 0
   reset_clock()
   get_next_chord()
   chord = next_chord
@@ -921,6 +935,7 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
+  readout_chord_seq_position = 0
   arranger_seq_position = 0
   pattern = arranger_seq[1]
   reset_clock()
@@ -948,7 +963,6 @@ function advance_chord_seq()
     if (arranger_seq_position == 0 and chord_seq_position == 0) or chord_seq_position >= pattern_length[pattern] then
       
       -- Check if it's the last pattern in the arrangement.
-      -- This also needs to be run after firing chord so we can catch last-minute changes to arranger_one_shot_last_pattern
       if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
         arrangement_reset = true
         reset_arrangement()
@@ -957,8 +971,13 @@ function advance_chord_seq()
         arranger_seq_position = util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)
         
         -- pattern = arranger_seq[arranger_seq_position]  -- Only updating pattern if Arranger is not holding (pattern 0)
-        if arranger_seq[arranger_seq_position] > 0 then 
+        if arranger_seq[arranger_seq_position] > 0 then
           pattern = arranger_seq[arranger_seq_position]
+          -- This is used when Arranger has blanks so we know what pattern was last selected by the arranger sequence
+          sustained_pattern = pattern
+        -- If we're on a held arranger step, we re-set the pattern to the sustained/held pattern. This is needed so we pick up the correct pattern after resuming arranger.
+        else
+          pattern = sustained_pattern
         end
       end
       -- Indicates arranger has moved to new pattern.
@@ -966,7 +985,7 @@ function advance_chord_seq()
     end
     
     -- Flag if arranger is on the last pattern of a 1-shot sequence
-    arranger_one_shot_last_pattern = arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
+    arranger_ending()
   end
   
   -- If arrangement was not just reset, update chord position. 
@@ -981,9 +1000,11 @@ function advance_chord_seq()
     else  
       chord_seq_position = util.wrap(chord_seq_position + 1, 1, pattern_length[pattern])
     end
-    
+
+    update_arranger_readout()
+
     -- Arranger automation step. Might need to move this to get_next_chord
-    if params:get('arranger_enabled') == 1 and (arranger_seq[arranger_seq_position] or 0) > 0 then
+    if params:get('arranger_enabled') == 1 and arranger_synced and (arranger_seq[arranger_seq_position] or 0) > 0 then
       automator()
     end
     
@@ -1007,6 +1028,24 @@ function advance_chord_seq()
       generate_chord_names()
     end
 
+  end
+end
+
+
+function arranger_ending()
+  arranger_one_shot_last_pattern = arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
+end
+
+
+-- Determines if arranger is in-sync with current pattern and updates the chord readout if appropriate
+-- Fires after chord advancement and when Arranger is enabled via g.key or param.
+function update_arranger_readout()
+  -- Indicates if the current pattern matches the arranger pattern. For example, it's possible for the arranger to be disabled while on pattern 2/B, then manually switch to pattern 4/D. If we were to re-enable the Arranger in this scenario, we want the current pattern to continue playing until it's finished, then move to the next segment of the Arranger. However, we don't want to fire automation events unless the current pattern matches the arranger pattern.
+  arranger_synced = arranger_seq[arranger_seq_position] == pattern or arranger_seq[arranger_seq_position] == 0 and sustained_pattern == pattern
+    
+  if arranger_synced and params:get('arranger_enabled') == 1 then
+    
+    readout_chord_seq_position = chord_seq_position 
   end
 end
 
@@ -1442,13 +1481,20 @@ function grid_redraw()
       g:led(16,6,15)
       for x = 1,16 do
         for y = 1,4 do
-          g:led(x,y, x == arranger_seq_position and 4 or (x-1) % 4 == 0 and 2 or 0)
+          -- Optional: adds light bars every 4 segments
+          -- g:led(x,y, x == arranger_seq_position and 4 or (x-1) % 4 == 0 and 2 or 0)
+          g:led(x,y, x == arranger_seq_position and 4 or 0)
           if y == arranger_seq[x] then
             g:led(x, y, 15)
           end
         end
-        g:led(x,5, x > arranger_seq_length and 4 or 15 )
+        -- g:led(x,5, x > arranger_seq_length and 4 or 15 )
+        g:led(x,5, x > arranger_seq_length and 3 or params:string('playback') == 'Loop' and 15 or 7 )
+        -- g:led(x,5, x > arranger_seq_length and 2 or 7)
       end
+      -- if params:string('playback') == 'One-shot' then
+        g:led(arranger_seq_length,5, 15)
+      -- end
       g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
       -- WIP- Arranger pages?
       -- g:led(1,8,15)
@@ -1540,11 +1586,13 @@ function g.key(x,y,z)
       if x == 1 and y == 8 then
         if params:get('arranger_enabled') == 0 then
           params:set('arranger_enabled',1)
+          if arranger_synced then readout_chord_seq_position = chord_seq_position end
         else
           params:set('arranger_enabled',0)
         end
       -- arranger_seq_length 
       elseif y == 5 then
+        if x == arranger_seq_length then params:set('playback',params:get('playback') == 0 and 1 or 0) end
         arranger_seq_length = x
         
       -- Arranger_seq updated
@@ -1687,7 +1735,7 @@ function g.key(x,y,z)
         -- elseif change_arranger_step == 'enable' then
           -- arranger_seq[x] = y
 
-          -- Deprecate arranger_seq_extd any more
+          -- Deprecate arranger_seq_extd
           -- -- Set the pattern # for each step in the arranger_seq
           -- for s = 1, pattern_length[y] do
           --   arranger_seq_extd[x][s] = y
@@ -1729,22 +1777,22 @@ end
 -- Update arranger_seq_extd to handle changes to loop length
 -- Update arranger_seq_extd which stores the extended arranger pattern
 -- If this pattern in the arranger is the same one what was just touched, check if the length grew or shrunk
-function update_arranger_pattern_length(pattern)      
-  for p = 1, 16 do
-    if arranger_seq_extd[p][1] == pattern then
-      -- Grew
-      if pattern_length[pattern] > #arranger_seq_extd[p] then
-        for s = 1, pattern_length[pattern] - #arranger_seq_extd[p] do
-          table.insert(arranger_seq_extd[p], pattern)
-        end
-      elseif pattern_length[pattern] < #arranger_seq_extd[p] then
-        for s = 1, #arranger_seq_extd[p] - pattern_length[pattern]  do
-          table.remove(arranger_seq_extd[p], #arranger_seq_extd[p])  -- not sure about this
-        end
-      end
-    end
-  end
-end
+-- function update_arranger_pattern_length(pattern)      
+--   for p = 1, 16 do
+--     if arranger_seq_extd[p][1] == pattern then
+--       -- Grew
+--       if pattern_length[pattern] > #arranger_seq_extd[p] then
+--         for s = 1, pattern_length[pattern] - #arranger_seq_extd[p] do
+--           table.insert(arranger_seq_extd[p], pattern)
+--         end
+--       elseif pattern_length[pattern] < #arranger_seq_extd[p] then
+--         for s = 1, #arranger_seq_extd[p] - pattern_length[pattern]  do
+--           table.remove(arranger_seq_extd[p], #arranger_seq_extd[p])  -- not sure about this
+--         end
+--       end
+--     end
+--   end
+-- end
 
 
 function key(n,z)
@@ -2308,14 +2356,38 @@ function chord_steps_to_seconds(steps)
 end
 
 
--- Truncates hours. Requires integer.
-function s_to_min_sec(s)
-  local m = math.floor(s/60)
-  -- local h = math.floor(m/60)
-  m = m%60
-  s = s%60
-  return string.format("%02d",m) ..":".. string.format("%02d",s)
+-- -- Truncates hours. Requires integer.
+-- function s_to_min_sec(s)
+--   local m = math.floor(s/60)
+--   -- local h = math.floor(m/60)
+--   m = m%60
+--   s = s%60
+--   return string.format("%02d",m) ..":".. string.format("%02d",s)
+-- end
+
+function s_to_min_sec(seconds)
+  local seconds = tonumber(seconds)
+  -- if seconds <= 0 then
+  --   return "00:00:00";
+  -- else
+    -- hours = (string.format("%02.f", math.floor(seconds/3600));
+    hours_raw = math.floor(seconds/3600);
+    hours = string.format("%1.f", hours_raw);
+    mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
+    secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
+    -- Modify hours if it's 2+ digits
+    -- hours = hours < 10 and string.format("%2.f",hours) or '>';
+    if hours_raw < 10 then
+      -- return '0:05:20'
+      return hours..":"..mins..":"..secs
+    else
+      return hours.." hrs"
+    end
+  -- end
 end
+
+
+
 
 
 function param_formatter(param)
@@ -2457,8 +2529,33 @@ function redraw()
     end -- of Arranger clock and partial drawing (everything but axis reference marks)
     
     
-    -- For all remaining screen views, draw arranger time and glyphs
-    --Arranger time rect
+    -- -- For all remaining screen views, draw arranger time and glyphs
+    -- --Arranger time rect
+    -- screen.level(7)
+    -- screen.rect(94,0,34,11)
+    -- screen.fill()
+    -- screen.level(0)
+    -- screen.rect(95,1,32,9)
+    -- screen.fill()
+  
+    -- -- Arranger time
+    -- screen.move(97,8)
+    -- screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
+    -- screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
+    -- local x_offset = 120
+    -- local y_offset = 3
+    -- if params:string('playback') == 'Loop' then
+    --   for i = 1, #glyphs[1] do
+    --     screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
+    --   end
+    -- else 
+    --   for i = 1, #glyphs[2] do
+    --     screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
+    --   end
+    -- end
+    -- screen.fill()
+    
+    -- Arranger position rect
     screen.level(7)
     screen.rect(94,0,34,11)
     screen.fill()
@@ -2466,12 +2563,32 @@ function redraw()
     screen.rect(95,1,32,9)
     screen.fill()
   
-    -- Arranger time
-    screen.move(97,8)
-    screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
-    screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
+      -- STATE determination. To-do: move this out of Redraw
+    if arranger_seq_position == 0 and chord_seq_position == 0 then
+      state = 5 --stopped/reset
+    else
+      state = transport_active == true and stop ~= true and 4 or 3 --play or pause
+    end
+    
+    -- Draw transport status glyph
+    screen.level(15)
+    local x_offset = 97
+    local y_offset = 3
+    for i = 1, #glyphs[state] do
+      screen.pixel(glyphs[state][i][1] + x_offset, glyphs[state][i][2] + y_offset)
+    end
+    screen.fill()
+  
+    -- Arranger position readout
+    local length = screen.text_extents(arranger_seq_position .. '.' .. readout_chord_seq_position)
+    screen.move(118 - length,8)
+    screen.level(params:get('arranger_enabled') == 1 and arranger_synced and 15 or 4)
+    screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position) 
+
+    -- Draw arranger mode glyph
     local x_offset = 120
     local y_offset = 3
+    screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
     if params:string('playback') == 'Loop' then
       for i = 1, #glyphs[1] do
         screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
@@ -2482,7 +2599,6 @@ function redraw()
       end
     end
     screen.fill()
-
 
     -- Events screen
     if screen_view_name == 'Events' then
@@ -2575,28 +2691,78 @@ function redraw()
 
     -- NON-EVENTS, not holding down Arranger segments g.keys  
     else
-       -- Chord readout rect
+      
+      -- -- Chord readout rect
+      -- screen.level(4)
+      -- screen.rect(94,13,34,20)
+      -- screen.fill()
+      -- screen.level(0)
+      -- screen.rect(95,14,32,18)
+      -- screen.fill()
+    
+      -- -- Chord degree and name
+      -- if chord_no > 0 then
+      --   screen.move(111,21)
+      --   screen.level(15)
+      --   screen.text_center(chord_degree or '') -- Chord degree
+      --   screen.move(111,29)
+      --   screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
+      -- end 
+
+      -- --Arranger time rect
+      -- screen.level(4)
+      -- screen.rect(94,35,34,11)
+      -- screen.fill()
+      -- screen.level(0)
+      -- screen.rect(95,36,32,9)
+      -- screen.fill()
+    
+      -- -- Arranger time
+      -- screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
+      -- screen.move(97,43)
+      -- screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
+
+-----------------------------------------------------
+
+      -- Switching chord readout and arranger time position
+      
+      -- Chord readout rect
       screen.level(4)
-      screen.rect(94,13,34,20)
+      screen.rect(94,26,34,20)
       screen.fill()
       screen.level(0)
-      screen.rect(95,14,32,18)
+      screen.rect(95,27,32,18)
       screen.fill()
     
       -- Chord degree and name
       if chord_no > 0 then
-        screen.move(111,21)
+        screen.move(111,34)
         screen.level(15)
         screen.text_center(chord_degree or '') -- Chord degree
-        screen.move(111,29)
+        screen.move(111,42)
         screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
       end 
+
+      --Arranger time rect
+      screen.level(4)
+      screen.rect(94,13,34,11)
+      screen.fill()
+      screen.level(0)
+      screen.rect(95,14,32,9)
+      screen.fill()
     
+      -- Arranger time
+      screen.level(params:get('arranger_enabled') == 1 and 15 or 2)
+      screen.move(97,21)
+      screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
+      
+      
+      
       -- Scrolling menus
       local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
       line = 1
       for i = 1,#menus[page_index] do
-        screen.move(2, line * 10 + 8 - menu_offset)    --exp
+        screen.move(2, line * 10 + 8 - menu_offset)
         screen.level(menu_index == i and 15 or 3)
         
         -- Generate menu and draw <> indicators for scroll range
