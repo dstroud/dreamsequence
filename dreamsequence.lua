@@ -319,25 +319,6 @@ function init()
   arranger_seq_length = 1
   
   
-  -- arranger_seq_extd = {
-  --   {1,1,1,1},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {},
-  --   {}}
-  
-  
   automator_events = {}
   for patt = 1,16 do
     automator_events[patt] = {}
@@ -1041,8 +1022,12 @@ end
 -- Fires after chord advancement and when Arranger is enabled via g.key or param.
 function update_arranger_readout()
   -- Indicates if the current pattern matches the arranger pattern. For example, it's possible for the arranger to be disabled while on pattern 2/B, then manually switch to pattern 4/D. If we were to re-enable the Arranger in this scenario, we want the current pattern to continue playing until it's finished, then move to the next segment of the Arranger. However, we don't want to fire automation events unless the current pattern matches the arranger pattern.
-  arranger_synced = arranger_seq[arranger_seq_position] == pattern or arranger_seq[arranger_seq_position] == 0 and sustained_pattern == pattern
-    
+  arranger_synced = arranger_seq[arranger_seq_position] == pattern 
+  -- Sustained arranger segment
+  or arranger_seq[arranger_seq_position] == 0 and sustained_pattern == pattern
+  -- Reset arrangement
+  or arranger_seq_position == 0
+  
   if arranger_synced and params:get('arranger_enabled') == 1 then
     
     readout_chord_seq_position = chord_seq_position 
@@ -1645,7 +1630,6 @@ function g.key(x,y,z)
         generate_chord_names()
       elseif x == 15 then
         pattern_length[pattern] = y
-        update_arranger_pattern_length(pattern)
 
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
         pattern_key_count = pattern_key_count + 1 -- Fix: issue with this not firing resulting in negative key count?
@@ -1661,7 +1645,6 @@ function g.key(x,y,z)
             chord_seq[y][i].o = chord_seq[pattern_copy_source][i].o
           end
           pattern_length[y] = pattern_length[pattern_copy_source]
-          update_arranger_pattern_length(y)
         end
       end
       if transport_active == false then -- Pre-load chord for when play starts
@@ -1771,28 +1754,6 @@ end
 redraw()
 grid_redraw()
 end
-
-
-
--- Update arranger_seq_extd to handle changes to loop length
--- Update arranger_seq_extd which stores the extended arranger pattern
--- If this pattern in the arranger is the same one what was just touched, check if the length grew or shrunk
--- function update_arranger_pattern_length(pattern)      
---   for p = 1, 16 do
---     if arranger_seq_extd[p][1] == pattern then
---       -- Grew
---       if pattern_length[pattern] > #arranger_seq_extd[p] then
---         for s = 1, pattern_length[pattern] - #arranger_seq_extd[p] do
---           table.insert(arranger_seq_extd[p], pattern)
---         end
---       elseif pattern_length[pattern] < #arranger_seq_extd[p] then
---         for s = 1, #arranger_seq_extd[p] - pattern_length[pattern]  do
---           table.remove(arranger_seq_extd[p], #arranger_seq_extd[p])  -- not sure about this
---         end
---       end
---     end
---   end
--- end
 
 
 function key(n,z)
@@ -2356,38 +2317,31 @@ function chord_steps_to_seconds(steps)
 end
 
 
--- -- Truncates hours. Requires integer.
--- function s_to_min_sec(s)
---   local m = math.floor(s/60)
---   -- local h = math.floor(m/60)
---   m = m%60
---   s = s%60
---   return string.format("%02d",m) ..":".. string.format("%02d",s)
--- end
-
-function s_to_min_sec(seconds)
-  local seconds = tonumber(seconds)
-  -- if seconds <= 0 then
-  --   return "00:00:00";
-  -- else
-    -- hours = (string.format("%02.f", math.floor(seconds/3600));
-    hours_raw = math.floor(seconds/3600);
-    hours = string.format("%1.f", hours_raw);
-    mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
-    secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
-    -- Modify hours if it's 2+ digits
-    -- hours = hours < 10 and string.format("%2.f",hours) or '>';
-    if hours_raw < 10 then
-      -- return '0:05:20'
-      return hours..":"..mins..":"..secs
-    else
-      return hours.." hrs"
-    end
-  -- end
+-- Truncates hours. Requires integer.
+function s_to_min_sec(s)
+  local m = math.floor(s/60)
+  -- local h = math.floor(m/60)
+  m = m%60
+  s = s%60
+  return string.format("%02d",m) ..":".. string.format("%02d",s)
 end
 
-
-
+-- Alternative for more digits up to 9 hours
+-- function s_to_min_sec(seconds)
+--   local seconds = tonumber(seconds)
+--     -- hours = (string.format("%02.f", math.floor(seconds/3600));
+--     hours_raw = math.floor(seconds/3600);
+--     hours = string.format("%1.f", hours_raw);
+--     mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
+--     secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
+--     -- Modify hours if it's 2+ digits
+--     -- hours = hours < 10 and string.format("%2.f",hours) or '>';
+--     if hours_raw < 10 then
+--       return hours..":"..mins..":"..secs
+--     else
+--       return hours.." hrs"
+--     end
+-- end
 
 
 function param_formatter(param)
@@ -2443,7 +2397,8 @@ function redraw()
   
   
   -- KEY 1 Fn screen  
-  elseif keys[1] == 1 and (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
+  elseif keys[1] == 1 then
+   if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
       screen.level(15)
       screen.move(2,8)
       screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
@@ -2458,18 +2413,25 @@ function redraw()
       screen.level(3)      
       screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
       screen.text('(K3) GENERATOR')    
-    -- elseif grid_view_name == 'Arranger' then
-    --   -- Alternate grid functions for Arranger TBD
-    --   -- screen.level(15)
-    --   -- screen.move(2,8)
-    --   -- screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
-    --   -- screen.move(2,28)
-    --   -- screen.text('KEY 3: ')
-    --   -- screen.move(2,48)
-    --   -- screen.text('ENC 2: ')
-    --   -- screen.move(2,58)
-    --   -- screen.text('ENC 3: Playhead ←→')      
-    -- end
+
+    -- Alternate grid functions for Arranger TBD
+    elseif grid_view_name == 'Arranger' then
+      screen.level(15)
+      screen.move(2,8)
+      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+      -- screen.move(2,28)
+      -- screen.text('ENC 2: ')
+      -- screen.move(2,38)
+      -- screen.text('ENC 3: Transpose seq ←→')
+      -- screen.text('ENC 3: Playhead ←→')   
+      screen.level(4)
+      screen.move(1,54)
+      screen.line(128,54)
+      screen.stroke()
+      screen.level(3)      
+      screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
+      screen.text('(K3) GENERATOR')         
+    end
  
     
   -- Standard priority (not momentary) menus---------------------------------  
@@ -2528,77 +2490,9 @@ function redraw()
       end
     end -- of Arranger clock and partial drawing (everything but axis reference marks)
     
-    
-    -- -- For all remaining screen views, draw arranger time and glyphs
-    -- --Arranger time rect
-    -- screen.level(7)
-    -- screen.rect(94,0,34,11)
-    -- screen.fill()
-    -- screen.level(0)
-    -- screen.rect(95,1,32,9)
-    -- screen.fill()
-  
-    -- -- Arranger time
-    -- screen.move(97,8)
-    -- screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
-    -- screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
-    -- local x_offset = 120
-    -- local y_offset = 3
-    -- if params:string('playback') == 'Loop' then
-    --   for i = 1, #glyphs[1] do
-    --     screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
-    --   end
-    -- else 
-    --   for i = 1, #glyphs[2] do
-    --     screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
-    --   end
-    -- end
-    -- screen.fill()
-    
-    -- Arranger position rect
-    screen.level(7)
-    screen.rect(94,0,34,11)
-    screen.fill()
-    screen.level(0)
-    screen.rect(95,1,32,9)
-    screen.fill()
-  
-      -- STATE determination. To-do: move this out of Redraw
-    if arranger_seq_position == 0 and chord_seq_position == 0 then
-      state = 5 --stopped/reset
-    else
-      state = transport_active == true and stop ~= true and 4 or 3 --play or pause
-    end
-    
-    -- Draw transport status glyph
-    screen.level(15)
-    local x_offset = 97
-    local y_offset = 3
-    for i = 1, #glyphs[state] do
-      screen.pixel(glyphs[state][i][1] + x_offset, glyphs[state][i][2] + y_offset)
-    end
-    screen.fill()
-  
-    -- Arranger position readout
-    local length = screen.text_extents(arranger_seq_position .. '.' .. readout_chord_seq_position)
-    screen.move(118 - length,8)
-    screen.level(params:get('arranger_enabled') == 1 and arranger_synced and 15 or 4)
-    screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position) 
-
-    -- Draw arranger mode glyph
-    local x_offset = 120
-    local y_offset = 3
-    screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
-    if params:string('playback') == 'Loop' then
-      for i = 1, #glyphs[1] do
-        screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
-      end
-    else 
-      for i = 1, #glyphs[2] do
-        screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
-      end
-    end
-    screen.fill()
+    ---------------------------
+    -- UI elements placed here will persist in all views including Events editor
+    ---------------------------
 
     -- Events screen
     if screen_view_name == 'Events' then
@@ -2691,41 +2585,102 @@ function redraw()
 
     -- NON-EVENTS, not holding down Arranger segments g.keys  
     else
+      ---------------------------
+      -- UI elements placed here appear in non-Events views
+      ---------------------------
+
+
+      --------------------------------------------
+      -- Transport state and Arranger position readout
+      --------------------------------------------
       
-      -- -- Chord readout rect
-      -- screen.level(4)
-      -- screen.rect(94,13,34,20)
-      -- screen.fill()
-      -- screen.level(0)
-      -- screen.rect(95,14,32,18)
-      -- screen.fill()
+      -- Arranger position rect
+      screen.level(7)
+      screen.rect(94,0,34,11)
+      screen.fill()
+      screen.level(0)
+      screen.rect(95,1,32,9)
+      screen.fill()
     
-      -- -- Chord degree and name
-      -- if chord_no > 0 then
-      --   screen.move(111,21)
-      --   screen.level(15)
-      --   screen.text_center(chord_degree or '') -- Chord degree
-      --   screen.move(111,29)
-      --   screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
-      -- end 
-
-      -- --Arranger time rect
-      -- screen.level(4)
-      -- screen.rect(94,35,34,11)
-      -- screen.fill()
-      -- screen.level(0)
-      -- screen.rect(95,36,32,9)
-      -- screen.fill()
-    
-      -- -- Arranger time
-      -- screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
-      -- screen.move(97,43)
-      -- screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
-
------------------------------------------------------
-
-      -- Switching chord readout and arranger time position
+      -- STATE determination. To-do: move this out of Redraw
+      if arranger_seq_position == 0 and chord_seq_position == 0 then
+        state = 5 --stopped/reset
+      else
+        state = transport_active == true and stop ~= true and 4 or 3 --play or pause
+      end
       
+      -- Draw transport status glyph
+      screen.level(15)
+      local x_offset = 97
+      local y_offset = 3
+      for i = 1, #glyphs[state] do
+        screen.pixel(glyphs[state][i][1] + x_offset, glyphs[state][i][2] + y_offset)
+      end
+      screen.fill()
+    
+      -- Arranger position readout
+      screen.move(125,8)
+      if params:string('arranger_enabled') == 'True' then
+        -- -- local length = screen.text_extents(arranger_seq_position .. '.' .. readout_chord_seq_position)
+        -- -- screen.move(118 - length,8)
+        -- screen.move(125,8)
+        -- screen.level(params:get('arranger_enabled') == 1 and arranger_synced and 15 or 4)
+        -- screen.text_right(arranger_seq_position .. '.' .. readout_chord_seq_position)
+        
+        if arranger_synced then 
+          -- local length = screen.text_extents(arranger_seq_position .. '.' .. readout_chord_seq_position)
+          -- screen.move(118 - length,8)
+          -- screen.move(125,8)
+          screen.level(15)
+          screen.text_right(arranger_seq_position .. '.' .. readout_chord_seq_position)
+        else
+          screen.level(15)
+          screen.text_right('T-' .. pattern_length[pattern] - chord_seq_position + 1)
+        end
+      else
+        -- screen.move(118 - length,8)
+        -- screen.move(125,8)
+        screen.level(15)
+        local pattern_alphabet = pattern == 1 and 'A' or pattern == 2 and 'B' or pattern == 3 and 'C' or pattern == 4 and 'D' or '-'
+        screen.text_right(pattern_alphabet .. '.' .. chord_seq_position)    
+      end
+
+      --------------------------------------------
+      -- Arranger countdown readout
+      --------------------------------------------
+      --Arranger time rect
+      screen.level(4)
+      screen.rect(94,13,34,11)
+      screen.fill()
+      screen.level(0)
+      screen.rect(95,14,32,9)
+      screen.fill()
+    
+      -- Arranger time
+      screen.level(params:get('arranger_enabled') == 1 and 15 or 2)
+      -- screen.move(104,21)
+      screen.move(125,21)
+      screen.text_right(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
+      
+      -- Arranger mode glyph
+      local x_offset = 97
+      local y_offset = 16
+      screen.level(params:get('arranger_enabled') == 1 and 15 or 4)
+      if params:string('playback') == 'Loop' then
+        for i = 1, #glyphs[1] do
+          screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
+        end
+      else 
+        for i = 1, #glyphs[2] do
+          screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
+        end
+      end
+      screen.fill()
+      
+
+      --------------------------------------------
+      -- Chord readout
+      --------------------------------------------
       -- Chord readout rect
       screen.level(4)
       screen.rect(94,26,34,20)
@@ -2742,20 +2697,6 @@ function redraw()
         screen.move(111,42)
         screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name
       end 
-
-      --Arranger time rect
-      screen.level(4)
-      screen.rect(94,13,34,11)
-      screen.fill()
-      screen.level(0)
-      screen.rect(95,14,32,9)
-      screen.fill()
-    
-      -- Arranger time
-      screen.level(params:get('arranger_enabled') == 1 and 15 or 2)
-      screen.move(97,21)
-      screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
-      
       
       
       -- Scrolling menus
@@ -2784,6 +2725,7 @@ function redraw()
         end
         line = line + 1
       end
+ 
    
       --Sticky header
       screen.level(menu_index == 0 and 15 or 4)
@@ -2793,7 +2735,7 @@ function redraw()
       screen.level(0)
       screen.text(page_name)
       screen.fill()
-      
+    
       
       -- Axis reference marks so it's easier to distinguish the pattern position
       if page_name == 'ARRANGER' then
