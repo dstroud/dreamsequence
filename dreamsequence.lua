@@ -638,7 +638,7 @@ function generate_arranger_seq_padded()
     elseif (arranger_seq[i] or 0) > 0 then
       patt = arranger_seq[i]
       arranger_seq_padded[i] = patt
-      -- if i == 1 then print('b') end
+      -- if i == 1 then print('b patt ' .. patt) end
     else
       arranger_seq_padded[i] = (patt or pattern)
       -- if i == 1 then print('c, patt ' .. (patt or 'nil')) end
@@ -1645,7 +1645,7 @@ function g.key(x,y,z)
           params:set('arranger_enabled',0)
         end
         
-      -- arranger_seq_length 
+      -- arranger_seq_length key down
       elseif y == 5 then
         if x == arranger_seq_length then params:set('playback',params:get('playback') == 0 and 1 or 0) end
         arranger_seq_length = x
@@ -1660,14 +1660,19 @@ function g.key(x,y,z)
         else
           change_arranger_step = nil
           arranger_seq[x] = y
+          -- Update immediately if it's a new pattern being set (if it's being turned off, that is handled on the key up)
           generate_arranger_seq_padded()
         end
         
-        --To-do: See if this still makes sense
-        -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
-        if params:string('arranger_enabled') == 'True' and arranger_seq_position == 0 and chord_seq_position == 0 then  
-          pattern = arranger_seq[1]
-        end
+        -- --To-do: See if this still makes sense
+        -- -- Jump to first pattern in arranger if it's changed while arranger is reset (not paused). Might be confusing?
+        -- if params:string('arranger_enabled') == 'True' and arranger_seq_position == 0 and chord_seq_position == 0 then
+        --   pattern = arranger_seq[1]
+        --   -- -- 2022.11.20 Setting this to padded variant since we're picking up Pattern == 0 otherwise
+        --   -- -- But using _padded does weird stuff when trying to insert gaps ffffffff
+        --   -- pattern = arranger_seq_padded[1]
+          
+        -- end
         
         arranger_key_count = arranger_key_count + 1
         -- add record to arranger_keys
@@ -1738,8 +1743,10 @@ function g.key(x,y,z)
         arp_pattern_length[arp_pattern] = y
       end
     end
-  
-  --KEY RELEASED
+    
+  --------------
+  --G.KEY RELEASED
+  --------------
   elseif z == 0 then
     if grid_view_name == 'Chord' then
       if x == 16 and y <5 then
@@ -1787,7 +1794,9 @@ function g.key(x,y,z)
         -- This can get a little weird with multi-presses but that needs to be addressed with segment copy+paste anyway
         if change_arranger_step == 'disable' then
           arranger_seq[x] = 0
+          -- print('pattern release a == ' .. pattern or 'nil')
           generate_arranger_seq_padded()
+          -- print('pattern release b == ' .. pattern or 'nil')
         end
         
         -- -- Disable arranger step 
@@ -1797,6 +1806,12 @@ function g.key(x,y,z)
         --   arranger_seq[x] = y
         -- end
         
+      -- -- arranger_seq_length key up
+      -- elseif y == 5 then
+      --   if x == arranger_seq_length then params:set('playback',params:get('playback') == 0 and 1 or 0) end
+      --   arranger_seq_length = x
+      --   generate_arranger_seq_padded()
+      
       end
     end
     
@@ -2211,7 +2226,8 @@ function enc(n,d)
 
           -- Shifting pattern to the right and opening up blank(s)
           if d > 0 then
-            for i = 16, 1, -1 do -- Process in reverse. Will need to be variable once Arranger can be extended beyond 16 segments
+            local d = 1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
+            for i = max_arranger_seq_length, 1, -1 do -- Process in reverse.
               if i >= event_edit_pattern_og + d_cuml then
                 arranger_seq[i] = arranger_seq_og[i - d_cuml]
                 automator_events[i] = deepcopy(automator_events_og[i - d_cuml])
@@ -2220,6 +2236,8 @@ function enc(n,d)
                 arranger_seq[i] = 0
                 -- automator_events[i] = {}  -- sus
                 for s = 1,8 do -- To-do: hardcoded number of Event slots
+                  -- print('i = ' .. i)
+                  -- print('s = ' .. s)
                   automator_events[i][s] = {} 
                 end
                 
@@ -2231,6 +2249,7 @@ function enc(n,d)
             end
             
           elseif d < 0 then
+            local d = -1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
             for i = 1, max_arranger_seq_length do
               if i >= event_edit_pattern_og + d_cuml then
                 arranger_seq[i] = arranger_seq_og[i - d_cuml]
@@ -2596,157 +2615,64 @@ function redraw()
       
       
       --------------------------------------------
-      -- Arranger timeline v2
+      -- Arranger timeline mini chart
       --------------------------------------------
       -- Timeline rect
       -- To-do: Modify this to just draw 4 lines and move this after the chart diagram
       local timeline_y = 13
-      screen.level(4)
-      screen.rect(dash_x,timeline_y,34,17)
-      screen.fill()
-      screen.level(0)
-      screen.rect(dash_x + 1 ,timeline_y + 1,32,15)
-      screen.fill()
-
-      -- -- Calculations for 1. ARRANGEMENT TIMER and 2. ARRANGER MINI CHART
-      -- local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 3) -- If arranger is reset, add an initial gap to the x position
+      -- screen.level(4)
+      -- screen.rect(dash_x,timeline_y,34,17)
+      -- screen.fill()
+      -- screen.level(0)
+      -- screen.rect(dash_x + 1 ,timeline_y + 1,32,15)
+      -- screen.fill()
       
-      -- steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
-    
-      -- for i = math.max(arranger_seq_position, 1), arranger_seq_length do
-      --   steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0 -- steps elapsed in current pattern  -- MAKE LOCAL
-        
-      --   -- little hack here to set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
-      --   percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
-  
-      --   -- % of current chord step remaining. Kinda useful so maybe keep around just in case.
-      --   -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
-        
-      --   -- Generate a pattern length even for held arranger steps. This doesn't work unless Global for some reason?
-      --   pattern_length_gen = pattern_length[arranger_seq[i]] or pattern_length_gen
-        
-      --   -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
-      --   steps_remaining_in_pattern = math.max(pattern_length_gen - steps_elapsed, 0)  --rect_w
-        
-      --   steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
-      --   seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
-        
-      --   rect_h = 2
-      --   rect_y = arranger_seq[i] == 0 and rect_y or timeline_y + (arranger_seq[i]* 2) + arranger_seq[i]
-        
-      --   -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
-      --   rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
-      --   screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
-      --   screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, rect_h)
-      --   screen.fill()
-      --   rect_x = rect_x + steps_remaining_in_pattern
-      --   end -- of Arranger clock and partial drawing (everything but axis reference marks)
-
-
-
-
-      -- -- Calculations for 1. ARRANGEMENT TIMER and 2. ARRANGER MINI CHART
-      -- local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 3) -- If arranger is reset, add an initial gap to the x position
-      
-      -- steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
-    
-      -- for i = math.max(arranger_seq_position, 1), arranger_seq_length do
-        
-
-      --   -- if params:string('arranger_enabled') == 'True' and arranger_synced then
-      --   if arranger_enabled then
-        
-      --     steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0
-          
-      --     -- little hack here to set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
-      --     percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1)) -- % of current chord step elapsed
-    
-      --     -- % of current chord step remaining. Kinda useful so maybe keep around just in case.
-      --     -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
-          
-      --     -- Generate a pattern length even for held arranger steps. Doesn't work if currently on a held segment
-      --     -- To-do: FIX
-      --     -- pattern_length_gen = arranger_seq[i] > 0 and pattern_length[arranger_seq[i]] or pattern_length_gen
-          
-      --     -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
-      --     -- steps_remaining_in_pattern = math.max(pattern_length_gen - steps_elapsed, 0)  --rect_w
-      --     steps_remaining_in_pattern = math.max(pattern_length[arranger_seq_padded[i]] - steps_elapsed, 0)  --rect_w
-
-          
-      --     steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
-      --     seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
-          
-      --   -- Arranger disabled or not synced
-      --   else
-      --     -- Updated 2022.11.18
-      --     -- steps_elapsed = (i == arranger_seq_position and math.max(1,1) or 0) or 0
-          
-      --     -- Uses readout_chord_seq_position which is updated when chord advances and arranger_enabled == true
-      --     steps_elapsed = (i == arranger_seq_position and math.max(readout_chord_seq_position,1) or 0) or 0
-
-      --     -- little hack here to set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
-      --     -- Updated 2022.11.18
-          
-      --     -- Don't update this when arranger_enabled == false
-      --     -- percent_step_elapsed = arranger_seq_position == 0 and 1 or 0
-    
-      --     -- % of current chord step remaining. Kinda useful so maybe keep around just in case.
-      --     -- percent_step_remaining = 1-(math.max(clock_step,0) % params:get('chord_div_index') / (params:get('chord_div_index')-1))
-          
-      --     -- Generate a pattern length even for held arranger steps. Doesn't work if currently on a held segment
-      --     -- To-do: FIX
-      --     -- pattern_length_gen = arranger_seq[i] > 0 and pattern_length[arranger_seq[i]] or pattern_length_gen
-          
-      --     -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
-      --     -- steps_remaining_in_pattern = math.max(pattern_length_gen - steps_elapsed, 0)  --rect_w
-      --     steps_remaining_in_pattern = math.max(pattern_length[arranger_seq_padded[i]] - steps_elapsed, 0)  --rect_w
-
-      --     steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
-      --     seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
-      --   end
-        
-      --   rect_h = 2
-      --   -- rect_y = arranger_seq[i] == 0 and rect_y or timeline_y + (arranger_seq[i]* 2) + arranger_seq[i]
-      --   rect_y = timeline_y + (arranger_seq_padded[i]* 2) + arranger_seq_padded[i]
-        
-      --   -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
-      --   rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
-
-
+      -- Axis reference marks
+      for i = 1,4 do
+        screen.level(2)
+        screen.rect(dash_x + 3, timeline_y + i * 3, 1, 2)
+        screen.fill()
+      end  
 
       -- Calculations for 1. ARRANGEMENT TIMER and 2. ARRANGER MINI CHART
-      local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 3) -- If arranger is reset, add an initial gap to the x position
+      local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 2) -- If arranger is reset, add an initial gap to the x position
       steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
     
       for i = math.max(arranger_seq_position, 1), arranger_seq_length do
 
         -- if params:string('arranger_enabled') == 'True' and arranger_synced then
         if arranger_enabled then
-          steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0
+          -- steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position,1) or 0) or 0
+          steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position - 1,0) or 0) or 0
           
           -- Set to 1 if arranger_seq_position == 0 (reset). Otherwise it adds an extra step at reset.
-          percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1))
+          -- percent_step_elapsed = arranger_seq_position == 0 and 1 or (math.max(clock_step,0) % chord_div / (chord_div-1))
+          
+          percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
         else
           -- Uses readout_chord_seq_position which is updated when chord advances and arranger_enabled == true
-          steps_elapsed = (i == arranger_seq_position and math.max(readout_chord_seq_position,1) or 0) or 0          
+          steps_elapsed = (i == arranger_seq_position and math.max(readout_chord_seq_position - 1,0) or 0) or 0          
         end
         
         -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative
         -- To-do: Adding OR 0 here fucks it all up somehow. But it's necessary for some reason I forgot yaaaaaaaaaaa
         -- steps_remaining_in_pattern = math.max(pattern_length[arranger_seq_padded[i]] or 0 - steps_elapsed, 0)  --rect_w
+        -- print('i = ' .. i)
         steps_remaining_in_pattern = math.max(pattern_length[arranger_seq_padded[i]] - steps_elapsed, 0)  --rect_w
-
-        -- print(pattern_length[arranger_seq_padded[i]] or 0 .. ' ' .. steps_elapsed .. ' ' .. steps_remaining_in_pattern)
-        -- print(steps_elapsed)
         steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
-        seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement + 1-percent_step_elapsed )
+        -- print('steps_remaining_in_arrangement ' .. steps_remaining_in_arrangement or nil)
+        seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
       
-        local rect_h = 2
-        local rect_y = timeline_y + (arranger_seq_padded[i]* 2) + arranger_seq_padded[i]
-        
+        -- Replacing this with an extra step to lock in the currently-playing pattern even if it's changed on Grid
+        -- local rect_y = timeline_y + (arranger_seq_padded[i] * 2) + arranger_seq_padded[i]
+        local pattern_y = arranger_seq_position == i and pattern or arranger_seq_padded[i]
+        local rect_y = timeline_y + (pattern_y * 2) + pattern_y
+        -- if arranger_seq_position == i then pattern_y = pattern_y end
+        -- if arranger_seq_position == i then print('pattern_yy = ' .. pattern_yy) end
+
+
         -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
         local rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
-        
         
         -- Dim interrupted segment if Arranger is re-syncing
         if params:get('arranger_enabled') == 1 then
@@ -2754,24 +2680,18 @@ function redraw()
         else
           screen.level(3)
         end
-        screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, rect_h)
+        screen.rect(rect_x + i - rect_gap_adj, rect_y, steps_remaining_in_pattern, 2)
         screen.fill()
         rect_x = rect_x + steps_remaining_in_pattern
       end
       
-      -- Axis reference marks
-      -- To-do: Fix timeline to draw the previously played pattern so we can drop the screen.level stuff and simply run this before the timeline is drawn
-      for i = 1,4 do
-        screen.level(arranger_enabled and i == arranger_seq_padded[arranger_seq_position] and 15 or 2)
-        screen.rect(dash_x + 3, timeline_y + i * 3, 1, 2)
-        screen.fill()
-      end  
-
-      -- Also add in a line on the right side of the chart where the timeline overlaps the border
-      -- Should probably just revisit how this particula rect is drawn so it can be done in one chunk.
+      -- Arranger mini chart rect (rendered after chart to cover chart edge overlap)
       screen.level(4)
-      screen.move(dash_x + 34,timeline_y)
-      screen.line(dash_x + 34,timeline_y + 1)
+      screen.move(dash_x, timeline_y)
+      screen.line(dash_x + 34, timeline_y + 1)
+      screen.line(dash_x + 34, timeline_y + 17)
+      screen.line(dash_x, timeline_y + 17)
+      screen.line(dash_x + 1, timeline_y)
       screen.stroke()      
 
 
