@@ -1559,7 +1559,8 @@ function grid_redraw()
       
     elseif grid_view_name == 'Chord' then
       if params:string('arranger_enabled') == 'True' and arranger_one_shot_last_pattern == false then
-        next_pattern_indicator = arranger_seq[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
+        -- 2022.11.21 switching to arranger_seq_padded so we pick up propagated arranger pattern changes (didn't test for side-effects because YOLO)
+        next_pattern_indicator = arranger_seq_padded[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
       else
         next_pattern_indicator = pattern_queue or pattern
       end
