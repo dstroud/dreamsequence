@@ -2369,31 +2369,31 @@ function chord_steps_to_seconds(steps)
 end
 
 
--- Truncates hours. Requires integer.
-function s_to_min_sec(s)
-  local m = math.floor(s/60)
-  -- local h = math.floor(m/60)
-  m = m%60
-  s = s%60
-  return string.format("%02d",m) ..":".. string.format("%02d",s)
-end
-
--- Alternative for more digits up to 9 hours
--- function s_to_min_sec(seconds)
---   local seconds = tonumber(seconds)
---     -- hours = (string.format("%02.f", math.floor(seconds/3600));
---     hours_raw = math.floor(seconds/3600);
---     hours = string.format("%1.f", hours_raw);
---     mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
---     secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
---     -- Modify hours if it's 2+ digits
---     -- hours = hours < 10 and string.format("%2.f",hours) or '>';
---     if hours_raw < 10 then
---       return hours..":"..mins..":"..secs
---     else
---       return hours.." hrs"
---     end
+-- -- Truncates hours. Requires integer.
+-- function s_to_min_sec(s)
+--   local m = math.floor(s/60)
+--   -- local h = math.floor(m/60)
+--   m = m%60
+--   s = s%60
+--   return string.format("%02d",m) ..":".. string.format("%02d",s)
 -- end
+
+-- Alternative for more digits up to 9 hours -- LOL
+function s_to_min_sec(seconds)
+  local seconds = tonumber(seconds)
+    -- hours = (string.format("%02.f", math.floor(seconds/3600));
+    hours_raw = math.floor(seconds/3600);
+    hours = string.format("%1.f", hours_raw);
+    mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
+    secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
+    -- Modify hours if it's 2+ digits
+    -- hours = hours < 10 and string.format("%2.f",hours) or '>';
+    if hours_raw < 10 then
+      return hours..":"..mins..":"..secs
+    else
+      return hours.." hrs"
+    end
+end
 
 
 function param_formatter(param)
@@ -2594,13 +2594,6 @@ function redraw()
       --------------------------------------------
       -- Transport state, pattern, chord readout
       --------------------------------------------
-      -- -- rect
-      -- screen.level(7)
-      -- screen.rect(dash_x ,0,34,22)
-      -- screen.fill()
-      -- screen.level(0)
-      -- screen.rect(dash_x + 1,1,32,20)
-      -- screen.fill()
       
       -- Rect is split into two halves to adjust for Norns display brightness weirdness (variable-level menu affects the rect)
       screen.level(menu_index == 0 and 10 or 7)
@@ -2639,6 +2632,8 @@ function redraw()
       screen.move(dash_x + 31, y_offset + 5)
       screen.level(15)      
       screen.text_right(pattern_name[pattern] .. '.' .. chord_seq_position)
+      -- Alt with stepcountdown
+      -- screen.text_right(pattern_name[pattern] .. '-' .. math.min(pattern_length[pattern] - chord_seq_position +1,pattern_length[pattern]))
       
       
       --------------------------------------------
@@ -2658,6 +2653,10 @@ function redraw()
       -- Arranger dash
       --------------------------------------------
       local arranger_dash_y = 24
+      
+      screen.level(12)
+      screen.rect(dash_x+1, arranger_dash_y+1,33,11)
+      screen.fill()
       
       -- Axis reference marks
       for i = 1,4 do
@@ -2698,7 +2697,6 @@ function redraw()
           if params:get('arranger_enabled') == 1 then
             -- Dim the interrupted segment upon resume
             if arranger_enabled == false and i == arranger_seq_position then
-              -- This sucks and has to be done in generate_arranger_seq_padded because events is not being regenerated when shifted left
               screen.level((automator_events[i] ~= nil and automator_events[i][s].populated or 0 > 0) and 4 or 1)
               else
               screen.level((automator_events[i] ~= nil and automator_events[i][s].populated or 0 > 0) and 15 or 1)
@@ -2726,13 +2724,8 @@ function redraw()
 
       -- Arranger mini chart rect (rendered after chart to cover chart edge overlap)
       screen.level(4)
-      screen.move(dash_x, arranger_dash_y)
-      screen.line(dash_x + 34, arranger_dash_y + 1)
-      screen.line(dash_x + 34, 64)
-      screen.line(dash_x, 64)
-      screen.line(dash_x + 1, arranger_dash_y)
+      screen.rect(dash_x+1, arranger_dash_y+1,33,39)
       screen.stroke()      
-
 
       --------------------------------------------
       -- Arranger countdown timer readout
@@ -2740,9 +2733,17 @@ function redraw()
     
       -- Arranger time
       screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
-      screen.move(dash_x + 31,arranger_dash_y + 9)
-      screen.text_right(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
+
+      -- -- Top right
+      -- screen.move(dash_x + 31,arranger_dash_y + 9)
+      -- screen.text_right(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
       
+      -- Bottom left
+      screen.move(dash_x +3, arranger_dash_y + 36)
+      screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))      
+      
+      -- Only needed if inverting levels in header
+      -- screen.level(params:get('arranger_enabled') == 1 and 0 or 1)
       -- Arranger mode glyph
       local x_offset = dash_x + 3
       local y_offset = arranger_dash_y + 4
@@ -2759,14 +2760,22 @@ function redraw()
       --------------------------------------------
       -- Arranger position readout
       --------------------------------------------      
-      screen.move(dash_x +3, arranger_dash_y + 36)
+      -- -- bottom left
+      -- screen.move(dash_x +3, arranger_dash_y + 36)
+      -- if params:string('arranger_enabled') == 'True' and arranger_enabled == false then
+      --   screen.text('T-' .. pattern_length[pattern] - chord_seq_position + 1)
+      -- else          
+      --   screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
+      -- end
+ 
+      -- Top right
+      screen.move(dash_x + 31,arranger_dash_y + 9)
       if params:string('arranger_enabled') == 'True' and arranger_enabled == false then
-        screen.text('T-' .. pattern_length[pattern] - chord_seq_position + 1)
+        screen.text_right('T-' .. pattern_length[pattern] - chord_seq_position + 1)
       else          
-        screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
-        -- screen.text('55.55')
-      end
-   
+        screen.text_right(arranger_seq_position .. '.' .. readout_chord_seq_position)
+      end   
+      
       screen.fill()
       
       
@@ -2808,7 +2817,7 @@ function redraw()
       screen.level(0)
       screen.text(page_name)
       screen.fill()
-    
+
     end -- of event vs. non-event check
   end
   screen.update()
