@@ -317,6 +317,7 @@ function init()
   pattern_name = {'A','B','C','D'}
   steps_remaining_in_pattern = pattern_length[pattern]
   pattern_queue = false
+  arranger_queue = false
   pattern_copy_performed = false
   arranger_seq_retrig = false
   -- Raw arranger_seq which can contain 0 patterns
@@ -1008,23 +1009,10 @@ function advance_chord_seq()
         reset_arrangement()
         clock.transport.stop()
         
-      -- Original logic when we didn't have arranger_seq_padded. Now we just read the padded values  
-      -- else  -- If not the last pattern in the arrangement, update the arranger sequence position
-      --   arranger_seq_position = util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)
-        
-      --   -- pattern = arranger_seq[arranger_seq_position]  -- Only updating pattern if Arranger is not holding (pattern 0)
-      --   if arranger_seq[arranger_seq_position] > 0 then
-      --     pattern = arranger_seq[arranger_seq_position]
-      --     -- This is used when Arranger has blanks so we know what pattern was last selected by the arranger sequence
-      --     sustained_pattern = pattern
-      --   -- If we're on a held arranger step, we re-set the pattern to the sustained/held pattern. This is needed so we pick up the correct pattern after resuming arranger.
-      --   else
-      --     pattern = sustained_pattern
-      --   end
-      
       else
-        arranger_seq_position = util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)
+        arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)
         pattern = arranger_seq_padded[arranger_seq_position]
+        arranger_queue = nil
         
       end
       -- Indicates arranger has moved to new pattern.
@@ -1218,8 +1206,9 @@ function get_next_chord()
       if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
         pre_arrangement_reset = true
       else
-        pre_arranger_seq_position = util.wrap(pre_arranger_seq_position + 1, 1, arranger_seq_length)
+        pre_arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or util.wrap(pre_arranger_seq_position + 1, 1, arranger_seq_length)
         pre_pattern = arranger_seq_padded[pre_arranger_seq_position]
+        
       end
       
       -- Indicates arranger has moved to new pattern.
@@ -1534,7 +1523,7 @@ function grid_redraw()
       
       for x = 1, max_arranger_seq_length do
         for y = 1,4 do
-          g:led(x,y, x == arranger_seq_position and 5 or x <= arranger_seq_length and 2 or 0)
+          g:led(x,y, x == arranger_seq_position and 6 or x == arranger_queue and 4 or x <= arranger_seq_length and 2 or 0)
           if y == arranger_seq_padded[x] then g:led(x, y, x == arranger_seq_position and 9 or 7) end
           if y == arranger_seq[x] then g:led(x, y, 15) end
         end
@@ -1654,7 +1643,7 @@ function g.key(x,y,z)
           params:set('arranger_enabled',0)
         end
         
-      -- arranger_seq_length key down
+      -- arranger loop/events display key down
       elseif y == 5 then
         -- if x == arranger_seq_length then params:set('playback',params:get('playback') == 0 and 1 or 0) end
         -- arranger_seq_length = x
@@ -1871,6 +1860,11 @@ function key(n,z)
       if keys[1] == 1 then
         -- FN+K2. Enable Arranger maybe?
         
+      -- Arranger loop strip held down
+      elseif arranger_loop_key_count > 0 then        
+        arranger_queue = event_edit_pattern
+        grid_redraw()
+      
       elseif screen_view_name == 'Events' then
         -- Use event_edit_step to determine if we are editing an event slot or just viewing them all
         if event_edit_step ~= 0 then
@@ -2452,8 +2446,10 @@ function redraw()
     screen.line(128,54)
     screen.stroke()
     screen.level(3)
-    screen.move(61,62)  -- 128 - screen.text_extents(EVENTS K3 >')
-    screen.text('(K3) EDIT EVENTS')  
+    screen.move(1,62)
+    screen.text('(K2) JUMP TO')    
+    screen.move(82,62)  -- 128 - screen.text_extents(EVENTS K3 >')
+    screen.text('(K3) EVENTS')  
   
   
   -- KEY 1 Fn screen  
