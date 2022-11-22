@@ -43,11 +43,11 @@ function init()
     formatter = function(param) return mode_index_to_name(param:get()) end,}
     -- moving action to post-bang
     -- params:set_action('mode', function() update_chord() end)
-  params:add_number('dedupe_threshold', 'Repeat window', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
+  params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)     
-  params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end) --JF = chord only
+  params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end)
     params:set_action("crow_pullup",function() crow_pullup() end)    
   -- params:add_number('count_in', 'Count-in', 0, 8, 0)
   -- params:add_number('clock_offset', 'Clock offset', -999, 999, 0)
@@ -67,19 +67,12 @@ function init()
     -- action = function() grid_redraw() end}
     -- params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_enabled(); update_arranger_readout() end)
     params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_enabled() end)
-
     
-  params:add{
-  type = 'number',
-  id = 'playback',
-  name = 'Arranger',
-  min = 0,
-  max = 1,
-  default = 1,
-  formatter = function(param) return playback_string(param:get()) end}
-    params:set_action('playback', function() grid_redraw(); arranger_ending() end)
+    params:add_option('playback', 'Arranger', {'Loop','One-shot'}, 1)
+      params:set_action('playback', function() grid_redraw(); arranger_ending() end)
+    
   params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
-  
+
 
 
   -- Event params
@@ -576,9 +569,9 @@ function t_f_bool(x)
   return(x == 1 and true or false)
 end
 
-function playback_string(x)
-  return(x == 1 and 'Loop' or 'One-shot')
-end
+-- function playback_string(x)
+--   return(x == 1 and 'Loop' or 'One-shot')
+-- end
 
 function div_10(x)
   return(x / 10)
@@ -965,6 +958,7 @@ end
 
 -- Does not set start = true since this can be called by clock.transport.stop() when pausing
 function reset_arrangement() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
+  arranger_queue = nil
   arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
   pattern_queue = false
   arp_seq_position = 0
@@ -1215,8 +1209,6 @@ function get_next_chord()
       pre_arranger_seq_retrig = true
     end
     
-    -- Flag if arranger is on the last pattern of a 1-shot sequence
-    -- arranger_one_shot_last_pattern = pre_arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
   end
   
   -- If arrangement was not just reset, update chord position. 
@@ -1645,7 +1637,7 @@ function g.key(x,y,z)
         
       -- arranger loop/events display key down
       elseif y == 5 then
-        -- if x == arranger_seq_length then params:set('playback',params:get('playback') == 0 and 1 or 0) end
+        -- if x == arranger_seq_length then params:set('playback',params:get('playback') == 1 and 2 or 1) end
         -- arranger_seq_length = x
         -- generate_arranger_seq_padded()
 
@@ -1826,7 +1818,7 @@ function g.key(x,y,z)
         
       -- -- arranger_seq_length key up
       -- elseif y == 5 then
-      --   if x == arranger_seq_length then params:set('playback',params:get('playback') == 0 and 1 or 0) end
+      --   if x == arranger_seq_length then params:set('playback',params:get('playback') == 1 and 2 or 1) end
       --   arranger_seq_length = x
       --   generate_arranger_seq_padded()
       
@@ -2419,7 +2411,7 @@ end
 
 function redraw()
   screen.clear()
-  screen.aa(0)
+  -- screen.aa(0)
   local dash_x = 94
   
   -- Screens that pop up when g.keys are being held down take priority--------
@@ -2447,7 +2439,7 @@ function redraw()
     screen.stroke()
     screen.level(3)
     screen.move(1,62)
-    screen.text('(K2) JUMP TO')    
+    screen.text('(K2) PLAY NEXT')    
     screen.move(82,62)  -- 128 - screen.text_extents(EVENTS K3 >')
     screen.text('(K3) EVENTS')  
   
@@ -2519,11 +2511,13 @@ function redraw()
       else
         -- Events sticky header
         screen.level(4)
-        screen.rect(0,0,92,11)
+        screen.rect(0,0,128,11)
         screen.fill()
         screen.move(2,8)
         screen.level(0)
-        screen.text('SEG. ' .. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT #' .. event_edit_slot) 
+        screen.text('SEGMENT ' .. event_edit_pattern .. '.' .. event_edit_step)
+        screen.move(126,8)
+        screen.text_right('EVENT ' .. event_edit_slot .. '/8') 
 
   
         -- Scrolling events menu
@@ -2596,19 +2590,28 @@ function redraw()
       --------------------------------------------
       
       -- Rect is split into two halves to adjust for Norns display brightness weirdness (variable-level menu affects the rect)
-      screen.level(menu_index == 0 and 10 or 7)
-      screen.move(dash_x+1, 11)
-      screen.line(dash_x+1, 1)
-      screen.line(dash_x + 34, 1)
-      screen.line(dash_x + 34, 11)
+      -- screen.level(menu_index == 0 and 10 or 7)
+      -- screen.move(dash_x+1, 11)
+      -- screen.line(dash_x+1, 1)
+      -- screen.line(dash_x + 34, 1)
+      -- screen.line(dash_x + 34, 11)
+      -- screen.stroke()
+      -- screen.level(4)
+      -- screen.move(dash_x+34, 11)
+      -- screen.line(dash_x + 34, 22)
+      -- screen.line(dash_x, 22)
+      -- screen.line(dash_x + 1, 11)
+      -- screen.stroke()     
+
+
+      screen.level(9)
+      screen.rect(dash_x+1,11,33,12)
       screen.stroke()
-      screen.level(4)
-      screen.move(dash_x+34, 11)
-      screen.line(dash_x + 34, 22)
-      screen.line(dash_x, 22)
-      screen.line(dash_x + 1, 11)
-      screen.stroke()            
-    
+      
+      screen.level(menu_index == 0 and 15 or 13)
+      screen.rect(dash_x,0,34,11)
+      screen.fill()
+
       -- STATE determination. To-do: move this out of Redraw
       if arranger_seq_position == 0 and chord_seq_position == 0 then
         state = 5 --stopped/reset
@@ -2617,9 +2620,9 @@ function redraw()
       end
       
       -- Draw transport status glyph
-      screen.level(15)
-      local x_offset = dash_x + 3
-      local y_offset = 4
+      screen.level(0)
+      local x_offset = dash_x + 26
+      local y_offset = 3
       for i = 1, #glyphs[state] do
         screen.pixel(glyphs[state][i][1] + x_offset, glyphs[state][i][2] + y_offset)
       end
@@ -2629,9 +2632,10 @@ function redraw()
       --------------------------------------------    
       -- Pattern position readout
       --------------------------------------------      
-      screen.move(dash_x + 31, y_offset + 5)
-      screen.level(15)      
-      screen.text_right(pattern_name[pattern] .. '.' .. chord_seq_position)
+      -- screen.move(dash_x + 31, y_offset + 5)
+      -- screen.text_right(pattern_name[pattern] .. '.' .. chord_seq_position)
+      screen.move(dash_x + 3, y_offset + 5)
+      screen.text(pattern_name[pattern] .. '.' .. chord_seq_position)
       -- Alt with stepcountdown
       -- screen.text_right(pattern_name[pattern] .. '-' .. math.min(pattern_length[pattern] - chord_seq_position +1,pattern_length[pattern]))
       
@@ -2639,12 +2643,9 @@ function redraw()
       --------------------------------------------
       -- Chord readout
       --------------------------------------------
-      -- Chord name (optionally, degree)
+      screen.level(15)
       if chord_no > 0 then
-        screen.move(dash_x + 17,y_offset + 14)
-        -- screen.level(15)
-        -- screen.text_center(chord_degree or '') -- Chord degree
-        -- screen.move(dash_x + 17,chord_readout_y + 15)
+        screen.move(dash_x + 17,y_offset + 16)
         screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name. To-do: param to switch between this and chord_degree ?
       end
       
@@ -2654,16 +2655,13 @@ function redraw()
       --------------------------------------------
       local arranger_dash_y = 24
       
-      screen.level(12)
-      screen.rect(dash_x+1, arranger_dash_y+1,33,11)
-      screen.fill()
       
       -- Axis reference marks
       for i = 1,4 do
-        screen.level(2)
-        screen.rect(dash_x + 3, arranger_dash_y + 10 + i * 3, 1, 2)
+        screen.level(1)
+        screen.rect(dash_x + 3, arranger_dash_y + 12 + i * 3, 1, 2)
       end  
-      screen.pixel(dash_x + 3, arranger_dash_y + 26)
+      screen.pixel(dash_x + 3, arranger_dash_y + 27)
       screen.fill()
       
       -- Calculations for 1. ARRANGEMENT TIMER and 2. ARRANGER MINI CHART
@@ -2705,27 +2703,35 @@ function redraw()
             screen.level((automator_events[i] ~= nil and automator_events[i][s].populated or 0 > 0) and 4 or 1)
           end
 
-          screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 26, 1, 1)
+          screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
           screen.fill()
           events_rect_x = events_rect_x + 1
         end
         
         -- Dim interrupted segment if Arranger is re-syncing
         if params:get('arranger_enabled') == 1 then
-          screen.level(arranger_enabled == false and i == arranger_seq_position and 3 or 15)
+          screen.level(arranger_enabled == false and i == arranger_seq_position and 2 or 15)
         else
-          screen.level(3)
+          screen.level(2)
         end
-        screen.rect(rect_x + i - rect_gap_adj, rect_y + 10, steps_remaining_in_pattern, 2)
+        screen.rect(rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2)
         screen.fill()
         
         rect_x = rect_x + steps_remaining_in_pattern
       end
 
-      -- Arranger mini chart rect (rendered after chart to cover chart edge overlap)
-      screen.level(4)
-      screen.rect(dash_x+1, arranger_dash_y+1,33,39)
-      screen.stroke()      
+      -- Arranger dash rect (rendered after chart to cover chart edge overlap)
+      -- screen.level(12)
+      screen.level(params:get('arranger_enabled') == 1 and 9 or 2)
+      
+      screen.rect(dash_x+1, arranger_dash_y+2,33,38)
+      screen.stroke()
+      
+      
+      -- Header
+      screen.level(params:get('arranger_enabled') == 1 and 10 or 2)
+      screen.rect(dash_x, arranger_dash_y+1,34,11)
+      screen.fill()
 
       --------------------------------------------
       -- Arranger countdown timer readout
@@ -2734,18 +2740,13 @@ function redraw()
       -- Arranger time
       screen.level(params:get('arranger_enabled') == 1 and 15 or 3)
 
-      -- -- Top right
-      -- screen.move(dash_x + 31,arranger_dash_y + 9)
-      -- screen.text_right(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))
-      
       -- Bottom left
       screen.move(dash_x +3, arranger_dash_y + 36)
       screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))      
       
-      -- Only needed if inverting levels in header
-      -- screen.level(params:get('arranger_enabled') == 1 and 0 or 1)
       -- Arranger mode glyph
-      local x_offset = dash_x + 3
+      screen.level(0)
+      local x_offset = dash_x + 26
       local y_offset = arranger_dash_y + 4
       if params:string('playback') == 'Loop' then
         for i = 1, #glyphs[1] do
@@ -2760,21 +2761,21 @@ function redraw()
       --------------------------------------------
       -- Arranger position readout
       --------------------------------------------      
-      -- -- bottom left
-      -- screen.move(dash_x +3, arranger_dash_y + 36)
-      -- if params:string('arranger_enabled') == 'True' and arranger_enabled == false then
-      --   screen.text('T-' .. pattern_length[pattern] - chord_seq_position + 1)
-      -- else          
-      --   screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
-      -- end
  
       -- Top right
-      screen.move(dash_x + 31,arranger_dash_y + 9)
+      -- screen.move(dash_x + 31,arranger_dash_y + 9)
+      -- if params:string('arranger_enabled') == 'True' and arranger_enabled == false then
+      --   screen.text_right('T-' .. pattern_length[pattern] - chord_seq_position + 1)
+      -- else          
+      --   screen.text_right(arranger_seq_position .. '.' .. readout_chord_seq_position)
+      -- end   
+      
+      screen.move(dash_x + 3,arranger_dash_y + 9)
       if params:string('arranger_enabled') == 'True' and arranger_enabled == false then
-        screen.text_right('T-' .. pattern_length[pattern] - chord_seq_position + 1)
+        screen.text('T-' .. pattern_length[pattern] - chord_seq_position + 1)
       else          
-        screen.text_right(arranger_seq_position .. '.' .. readout_chord_seq_position)
-      end   
+        screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
+      end         
       
       screen.fill()
       
