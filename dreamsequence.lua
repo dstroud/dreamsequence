@@ -323,7 +323,7 @@ function init()
   generate_arranger_seq_padded()  
   
   automator_events = {}
-  for patt = 1,16 do
+  for patt = 1,max_arranger_seq_length do
     automator_events[patt] = {}
     for step = 1,8 do
       automator_events[patt][step] = {}
@@ -333,7 +333,7 @@ function init()
   selected_automator_events_menu = 'event_category'
   
   -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
-  -- Also should be called when K3 opens events menu and when recalling a populated event slot
+  -- Also should be called when K3 opens events menu and when recalling a populated event lane
   event_categories = {} -- to-do: make local after debug
   for i = 1, #events_lookup do
     event_categories[i] = events_lookup[i].category
@@ -342,7 +342,7 @@ function init()
   params:set('event_name', event_category_min_index)  -- Overwrites initial value
   event_edit_pattern = 0
   event_edit_step = 0
-  event_edit_slot = 0
+  event_edit_lane = 0
   steps_remaining_in_arrangement = 0
   elapsed = 0
   percent_step_elapsed = 0
@@ -1079,13 +1079,9 @@ end
 function automator()
   if automator_events[arranger_seq_position] ~= nil and arranger_seq_position ~= 0 and chord_seq_position ~= 0 then
     if automator_events[arranger_seq_position][chord_seq_position].populated or 0 > 0 then
-      for i = 1,8 do
-        -- Cheesy
+      for i = 1,16 do
+        -- To-do: Cheesy check if each automation event lane has something. This sucks.
         if automator_events[arranger_seq_position][chord_seq_position][i] ~= nil  then
-        -- generator_and_reset sets chord_seq_position back to 0 which breaks on i 2+ so I'm maxing it here.
-        -- if automator_events[arranger_seq_position][math.max(chord_seq_position,1)][i] ~= nil  then
-        
-          -- print('Firing event slot ' .. i)
           local event_type = automator_events[arranger_seq_position][chord_seq_position][i].event_type
           local event_name = events_lookup[automator_events[arranger_seq_position][chord_seq_position][i].event_index].id
           local value = automator_events[arranger_seq_position][chord_seq_position][i].event_value or ''
@@ -1495,12 +1491,12 @@ function grid_redraw()
   -- Events supercedes other views
   if screen_view_name == 'Events' then
     
-  -- Draw grid with 8 event slots (columns) for each step in the selected pattern  
+  -- Draw grid with 16 event lanes (columns) for each step in the selected pattern 
     local event_pattern_length = pattern_length[arranger_seq[event_edit_pattern]] or 0
-    for x = 1, 8 do -- event slots (prob expand beyond 8)
+    for x = 1, 16 do -- event lanes
       for y = 1,8 do -- pattern steps
         g:led(x, y, (automator_events[event_edit_pattern][y][x] ~= nil and 7 or (y > event_pattern_length and 1 or 2)))
-        if y == event_edit_step and x == event_edit_slot then
+        if y == event_edit_step and x == event_edit_lane then
           g:led(x, y, 15)
         end  
       end
@@ -1523,7 +1519,7 @@ function grid_redraw()
         
         -- To-do: find a more efficient way to generate a populated flag at the Arranger segment level rather than at the segment:step level
         populated = false
-        -- Iterate through all the event slots
+        -- Iterate through all the event lanes
         for i = 1, 8 do if (automator_events[x] ~= nil and automator_events[x][i].populated or 0) > 0 then populated = true end end
         g:led(x, 5, populated and 15 or x > arranger_seq_length and 3 or 7)
       end
@@ -1597,9 +1593,9 @@ function g.key(x,y,z)
         -- First touched event is the one we edit, effectively resetting on key_count = 0
         if event_key_count == 1 then
           event_edit_step = y
-          event_edit_slot = x
+          event_edit_lane = x
 
-          -- If the event slot is populated, Load the Event vars back to the displayed param
+          -- If the event lane is populated, Load the Event vars back to the displayed param
           if automator_events[event_edit_pattern][y][x] ~= nil then
             local event_category_options = params.params[params.lookup['event_category']].options
             params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))
@@ -1622,19 +1618,30 @@ function g.key(x,y,z)
           
           -- But first check if the events we're working with are populated
           local og_event_populated = automator_events[event_edit_pattern][y][x] ~= nil
-          local copied_event_populated = automator_events[event_edit_pattern][event_edit_step][event_edit_slot] ~= nil
+          local copied_event_populated = automator_events[event_edit_pattern][event_edit_step][event_edit_lane] ~= nil
 
           -- Then copy
-          automator_events[event_edit_pattern][y][x] = deepcopy(automator_events[event_edit_pattern][event_edit_step][event_edit_slot])
+          automator_events[event_edit_pattern][y][x] = deepcopy(automator_events[event_edit_pattern][event_edit_step][event_edit_lane])
           
           -- Adjust populated events count at the step level. To-do: also set at the segment level once implemented
           if og_event_populated and not copied_event_populated then
             automator_events[event_edit_pattern][y].populated = automator_events[event_edit_pattern][y].populated - 1
+            
+            -- If the step's new populated count == 0, decrement count of populated event STEPS in the segment
+            if (automator_events[event_edit_pattern][y].populated or 0) == 0 then 
+              automator_events[event_edit_pattern].populated = (automator_events[event_edit_pattern].populated or 0) - 1
+            end
           elseif not og_event_populated and copied_event_populated then
             automator_events[event_edit_pattern][y].populated = (automator_events[event_edit_pattern][y].populated or 0) + 1
+
+            -- If this is the first event to be added to this step, increment count of populated event STEPS in the segment
+            if (automator_events[event_edit_pattern][y].populated or 0) == 1 then
+              print('incrementing segment populated')
+              automator_events[event_edit_pattern].populated = (automator_events[event_edit_pattern].populated or 0) + 1
+            end
           end
           
-          print('Copy+paste event from segment ' .. event_edit_pattern .. '.' .. event_edit_step .. ' lane ' .. event_edit_slot  .. ' to ' .. event_edit_pattern .. '.' .. y .. ' lane ' .. x)
+          print('Copy+paste event from segment ' .. event_edit_pattern .. '.' .. event_edit_step .. ' lane ' .. event_edit_lane  .. ' to ' .. event_edit_pattern .. '.' .. y .. ' lane ' .. x)
         end
 
     -- view switcher buttons  
@@ -1887,35 +1894,43 @@ function key(n,z)
         grid_redraw()
       
       elseif screen_view_name == 'Events' then
-        -- Use event_edit_step to determine if we are editing an event slot or just viewing them all
+        
+        -- Use event_edit_step to determine if we are editing an event lane or just viewing them all
+        
+        -- K2 here deletes event
         if event_edit_step ~= 0 then
-          -- Check if slot is populated and needs to be deleted
+          -- print('Deleting event')
+          
+          -- Record the count of events on this step
           local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
-          if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] ~= nil then
+          
+          -- Check if event is populated and needs to be deleted
+          if automator_events[event_edit_pattern][event_edit_step][event_edit_lane] ~= nil then
+            
+            -- Decrement populated count at the step level
             automator_events[event_edit_pattern][event_edit_step].populated = event_count - 1
-            automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = nil
+            
+            -- If the step's new populated count == 0, update the segment level populated count
+            if automator_events[event_edit_pattern][event_edit_step].populated == 0 then 
+              automator_events[event_edit_pattern].populated = automator_events[event_edit_pattern].populated - 1 
+            end
+            
+            -- Delete the event
+            automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = nil
           end
+          
           event_edit_step = 0
-          event_edit_slot = 0
+          event_edit_lane = 0
           redraw()
-        -- Option to delete arranger step and ALL events
+          
+        -- K2 here deletes ALL events in arranger SEGMENT
         else
-          -- -- Disable arranger step 
-          -- if y == arranger_seq[x] and x > 1 then
-          --   arranger_seq[x] = 0
-          -- else 
-          --   arranger_seq[x] = y
-          -- end
+          for step = 1,8 do
+            automator_events[event_edit_pattern][step] = {}
+          end
+            automator_events[event_edit_pattern].populated = 0
           
-          -- Changed from 'Back' using K2 to 'Done' using K3 so this is not necessary (but optional)
-          -- Might want to set it to Back: K2 on initial load and Done: K3 after setting an event
-          
-          -- arranger_seq[event_edit_pattern] = 0
-          
-          -- Delete all: KEY 2
-          for p = 1,8 do
-            automator_events[event_edit_pattern][p] = {}
-          end    
+            
           screen_view_name = 'Session'
         end      
         grid_redraw()
@@ -1965,95 +1980,103 @@ function key(n,z)
         -- arranger_loop_keys = {}
         arranger_loop_key_count = 0        
         event_edit_step = 0 -- indicates one has not been selected yet
-        event_edit_slot = 0 -- Not sure if necessary
+        event_edit_lane = 0 -- Not sure if necessary
         screen_view_name = 'Events'
         
         -- Forces redraw but it's kinda awkward because user is now pressing on a key in the event edit view
         grid_redraw()
   
   
-        -- K3 saves event to automator_events
-        -- To-do: rewrite this garbagle LOL
-        elseif screen_view_name == 'Events' then
-          if event_edit_slot > 0 then
-            local event_index = params:get('event_name')
-            local event_id = events_lookup[event_index].id
-            local event_type = events_lookup[event_index].event_type
-            local event_value = params:get('event_value')
-            local value_type = events_lookup[event_index].value_type
-            local action = events_lookup[event_index].action
-            local action_var = events_lookup[event_index].action_var          
-            local event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
-            
-            -- Keep track of how many event slots are populated so we don't have to iterate through them all later
-            if automator_events[event_edit_pattern][event_edit_step][event_edit_slot] == nil then
-              automator_events[event_edit_pattern][event_edit_step].populated = event_count + 1
-            end
+      -- K3 saves event to automator_events
+      -- To-do: rewrite this garbage LOL
+      elseif screen_view_name == 'Events' then
+        if event_edit_lane > 0 then
+          local event_index = params:get('event_name')
+          local event_id = events_lookup[event_index].id
+          local event_type = events_lookup[event_index].event_type
+          local event_value = params:get('event_value')
+          local value_type = events_lookup[event_index].value_type
+          local action = events_lookup[event_index].action
+          local action_var = events_lookup[event_index].action_var
+          
+          -- Keep track of how many events are populated in this step so we don't have to iterate through them all later
+          local step_event_count = automator_events[event_edit_pattern][event_edit_step].populated or 0
 
-            -- Wipe existing events, write the event vars to automator_events
-            if value_type == 'trigger' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index}
-            elseif value_type == 'set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value}
-            elseif value_type == 'inc, set' then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value, event_value_type = params:get('event_value_type')}
+          -- If we're saving over a previously-nil event, increment the step populated count          
+          if automator_events[event_edit_pattern][event_edit_step][event_edit_lane] == nil then
+            automator_events[event_edit_pattern][event_edit_step].populated = step_event_count + 1
+
+            -- Also check to see if we need to increment the count of populated event STEPS in the SEGMENT
+            if (automator_events[event_edit_pattern].populated or 0) == 0 then
+              automator_events[event_edit_pattern].populated = (automator_events[event_edit_pattern].populated or 0) + 1
             end
-            if action ~= nil then
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action = action
-              automator_events[event_edit_pattern][event_edit_step][event_edit_slot].action_var = action_var
-            end            
-            
-            -- Back to event overview
-            event_edit_step = 0
-            event_edit_slot = 0
-            grid_redraw()
-          
-          else -- event_edit_slot == 0
-            screen_view_name = 'Session'
-            grid_redraw()
+            -- print('incrementing segment populated count')
           end
+
+          -- Wipe existing events, write the event vars to automator_events
+          if value_type == 'trigger' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index}
+          elseif value_type == 'set' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value}
+          elseif value_type == 'inc, set' then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value, event_value_type = params:get('event_value_type')}
+          end
+          if action ~= nil then
+            automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action = action
+            automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action_var = action_var
+          end            
           
-          
+          -- Back to event overview
+          event_edit_step = 0
+          event_edit_lane = 0
+          grid_redraw()
+        
+        else -- event_edit_lane == 0
+          screen_view_name = 'Session'
+          grid_redraw()
+        end
+        
+        
+      else
+        -- -- K3 in Generator immediately randomizes and resets, other views just reset
+        -- if screen_view_name == 'Generator' then
+        --   generator()
+        -- end
+        
+        -- Reset pattern/arp/arranger for standard K3 functionality-----------------
+        -- If we're sending MIDI clock out, send a stop msg
+        -- Tell the transport to Start on the next sync of sequence_clock
+        if params:get('clock_midi_out') ~= 1 then
+          if transport_active then
+            transport_midi:stop()
+          end
+          -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+          clock_start_method = 'start'
+          start = true
+        end    
+  
+        -- To-do: think about this some. What behavior makes sense if a reset occurs while waiting for Arranger to re-sync?
+        if params:get('arranger_enabled') == 1 then
+          reset_arrangement()
         else
-          -- -- K3 in Generator immediately randomizes and resets, other views just reset
-          -- if screen_view_name == 'Generator' then
-          --   generator()
-          -- end
-          
-          -- Reset pattern/arp/arranger for standard K3 functionality-----------------
-          -- If we're sending MIDI clock out, send a stop msg
-          -- Tell the transport to Start on the next sync of sequence_clock
-          if params:get('clock_midi_out') ~= 1 then
-            if transport_active then
-              transport_midi:stop()
-            end
-            -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
-            clock_start_method = 'start'
-            start = true
-          end    
-    
-          -- To-do: think about this some. What behavior makes sense if a reset occurs while waiting for Arranger to re-sync?
-          if params:get('arranger_enabled') == 1 then
-            reset_arrangement()
-          else
-            reset_pattern()       
-          end
-          
-    
-          
-          -- -- KEEP THIS AROUND: Logic for enabling/disabling/resetting arranger
-    
-          -- Enable/disable Arranger. Switching out with Reset key.
-          -- if params:get('arranger_enabled') == 1 then  -- If follow is on, turn off
-          --   params:set('arranger_enabled', 0)
-          -- elseif transport_active == true then  -- If follow is off but we're playing, pick up arrangement
-          --   print('Resuming arrangement on next pattern advance')
-          --   params:set('arranger_enabled', 1)
-          -- else 
-          --   print('Transport stopped; resetting arrangement')
-          --   params:set('arranger_enabled', 1)  -- If follow is off and transport is stopped, reset arrangement
-          --   reset_arrangement()
-          -- end
+          reset_pattern()       
+        end
+        
+  
+        
+        -- -- KEEP THIS AROUND: Logic for enabling/disabling/resetting arranger
+  
+        -- Enable/disable Arranger. Switching out with Reset key.
+        -- if params:get('arranger_enabled') == 1 then  -- If follow is on, turn off
+        --   params:set('arranger_enabled', 0)
+        -- elseif transport_active == true then  -- If follow is off but we're playing, pick up arrangement
+        --   print('Resuming arrangement on next pattern advance')
+        --   params:set('arranger_enabled', 1)
+        -- else 
+        --   print('Transport stopped; resetting arrangement')
+        --   params:set('arranger_enabled', 1)  -- If follow is off and transport is stopped, reset arrangement
+        --   reset_arrangement()
+        -- end
           
       end
     end
@@ -2546,7 +2569,7 @@ function redraw()
         screen.level(0)
         screen.text('SEGMENT ' .. event_edit_pattern .. '.' .. event_edit_step)
         screen.move(126,8)
-        screen.text_right('EVENT ' .. event_edit_slot .. '/8') 
+        screen.text_right('EVENT ' .. event_edit_lane .. '/16') 
 
   
         -- Scrolling events menu
