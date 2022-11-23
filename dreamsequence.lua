@@ -351,12 +351,13 @@ function init()
   -- arranger_synced = false
   arranger_keys = {}
   arranger_key_count = 0  
-  arranger_loop_keys = {}
+  -- arranger_loop_keys = {}
   arranger_loop_key_count = 0    
   pattern_keys = {}
   pattern_key_count = 0
   chord_key_count = 0
   view_key_count = 0
+  event_key_count = 0
   keys = {}
   key_count = 0
   global_clock_div = 48
@@ -1591,34 +1592,53 @@ function g.key(x,y,z)
   if z == 1 then
     
     if screen_view_name == 'Events' then
-      -- Setting of events past the pattern length is permitted. To restrict: if x <= event_pattern_length then       
-      if x < 9 then
-        event_edit_step = y
-        event_edit_slot = x
+      -- Setting of events past the pattern length is permitted
+      event_key_count = event_key_count + 1
+        -- First touched event is the one we edit, effectively resetting on key_count = 0
+        if event_key_count == 1 then
+          event_edit_step = y
+          event_edit_slot = x
 
-        -- If the event slot is populated, Load the Event vars back to the displayed param
-        if automator_events[event_edit_pattern][y][x] ~= nil then
-          local event_category_options = params.params[params.lookup['event_category']].options
-          params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))
-          set_event_category_min_max()
-          params:set('event_name', automator_events[event_edit_pattern][y][x].event_index)
-          if automator_events[event_edit_pattern][y][x].event_value ~= nil then
-            params:set('event_value', automator_events[event_edit_pattern][y][x].event_value)
-            if automator_events[event_edit_pattern][y][x].event_value_type ~= nil then
-              params:set('event_value_type', automator_events[event_edit_pattern][y][x].event_value_type)
+          -- If the event slot is populated, Load the Event vars back to the displayed param
+          if automator_events[event_edit_pattern][y][x] ~= nil then
+            local event_category_options = params.params[params.lookup['event_category']].options
+            params:set('event_category', tab.key(event_category_options, automator_events[event_edit_pattern][y][x].category))
+            set_event_category_min_max()
+            params:set('event_name', automator_events[event_edit_pattern][y][x].event_index)
+            if automator_events[event_edit_pattern][y][x].event_value ~= nil then
+              params:set('event_value', automator_events[event_edit_pattern][y][x].event_value)
+              if automator_events[event_edit_pattern][y][x].event_value_type ~= nil then
+                params:set('event_value_type', automator_events[event_edit_pattern][y][x].event_value_type)
+              end
             end
+            event_name = events_lookup[params:get('event_name')].id
+          else
+            event_name = events_lookup[params:get('event_name')].id
+            set_event_range()
+            init_event_value()
           end
-          event_name = events_lookup[params:get('event_name')].id
-        else
-          event_name = events_lookup[params:get('event_name')].id
-          set_event_range()
-          init_event_value()
+          
+        else -- Subsequent keys down paste event
+          
+          -- But first check if the events we're working with are populated
+          local og_event_populated = automator_events[event_edit_pattern][y][x] ~= nil
+          local copied_event_populated = automator_events[event_edit_pattern][event_edit_step][event_edit_slot] ~= nil
+
+          -- Then copy
+          automator_events[event_edit_pattern][y][x] = deepcopy(automator_events[event_edit_pattern][event_edit_step][event_edit_slot])
+          
+          -- Adjust populated events count at the step level. To-do: also set at the segment level once implemented
+          if og_event_populated and not copied_event_populated then
+            automator_events[event_edit_pattern][y].populated = automator_events[event_edit_pattern][y].populated - 1
+          elseif not og_event_populated and copied_event_populated then
+            automator_events[event_edit_pattern][y].populated = (automator_events[event_edit_pattern][y].populated or 0) + 1
+          end
+          
+          print('Copy+paste event from segment ' .. event_edit_pattern .. '.' .. event_edit_step .. ' lane ' .. event_edit_slot  .. ' to ' .. event_edit_pattern .. '.' .. y .. ' lane ' .. x)
         end
-        
-      end
-      
-      
-    elseif x == 16 and y > 5 then --view switcher buttons
+
+    -- view switcher buttons  
+    elseif x == 16 and y > 5 then
       view_key_count = view_key_count + 1
       grid_view_index = y - 5
       grid_view_name = grid_views[grid_view_index]
@@ -1635,25 +1655,26 @@ function g.key(x,y,z)
           params:set('arranger_enabled',0)
         end
         
-      -- arranger loop/events display key down
+      -- Automator events strip key down
       elseif y == 5 then
-        -- if x == arranger_seq_length then params:set('playback',params:get('playback') == 1 and 2 or 1) end
-        -- arranger_seq_length = x
-        -- generate_arranger_seq_padded()
-
-        -- Copying this from arranger rows 1-4 to use for arranger loop strip
         arranger_loop_key_count = arranger_loop_key_count + 1
-        table.insert(arranger_loop_keys, x)
-        event_edit_pattern = x  -- Last touched pattern is the one we edit
 
-        -- Store original arranger sequence values so we can have non-destructive pattern shifting using ENC 3
-        d_cuml = 0
-        arranger_seq_length_og = arranger_seq_length
-        arranger_seq_og = deepcopy(arranger_seq)
-        automator_events_og = deepcopy(automator_events)
-        event_edit_pattern_og = event_edit_pattern
-        -- End of copy        
-                
+        -- Initial key down copies stuff. First touched pattern is the one we edit, effectively resetting on key_count = 0
+        if arranger_loop_key_count == 1 then
+          event_edit_pattern = x
+
+          -- Store original arranger sequence values so we can have non-destructive pattern shifting using ENC 3
+          d_cuml = 0
+          arranger_seq_length_og = arranger_seq_length
+          arranger_seq_og = deepcopy(arranger_seq)
+          automator_events_og = deepcopy(automator_events)
+          event_edit_pattern_og = event_edit_pattern
+
+        -- Subsequent keys down paste all automator events in segment, but not the segment pattern
+        else
+          automator_events[x] = deepcopy(automator_events[event_edit_pattern])
+          print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
+        end
         
       -- Arranger_seq patterns
       elseif y < 5 then
@@ -1671,6 +1692,7 @@ function g.key(x,y,z)
         -- Enabling a segment happens immediately but need to consider copy+paste usage to see if this should remain
         -- Disabling a segment occurs at key UP and will be interrupted if user does a copy+paste
         if y == arranger_seq[x]then
+          -- To-do: revisit if we need this (copying segment patterns) or if we can simplify
           change_arranger_step = 'disable'
         else
           change_arranger_step = nil
@@ -1716,13 +1738,14 @@ function g.key(x,y,z)
         pattern_length[pattern] = y
 
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
-        pattern_key_count = pattern_key_count + 1 -- Fix: issue with this not firing resulting in negative key count?
+        pattern_key_count = pattern_key_count + 1
         pattern_keys[y] = 1
         if pattern_key_count == 1 then
           pattern_copy_source = y
         elseif pattern_key_count > 1 then
           print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
           pattern_copy_performed = true
+          -- To-do: deepcopy
           for i = 1,8 do
             chord_seq[y][i].x = chord_seq[pattern_copy_source][i].x
             chord_seq[y][i].c = chord_seq[pattern_copy_source][i].c
@@ -1754,9 +1777,14 @@ function g.key(x,y,z)
   --G.KEY RELEASED
   --------------
   elseif z == 0 then
-    if grid_view_name == 'Chord' then
+    -- Events key up
+    if screen_view_name == 'Events' then
+      event_key_count = math.max(event_key_count - 1,0)
+          
+    -- Chord key up      
+    elseif grid_view_name == 'Chord' then
       if x == 16 and y <5 then
-        pattern_key_count = pattern_key_count - 1 --        pattern_key_count = math.max( 0, pattern_key_count - 1)
+        pattern_key_count = math.max(pattern_key_count - 1,0)
         pattern_keys[y] = nil
         if pattern_key_count == 0 and pattern_copy_performed == false then
           if y == pattern then
@@ -1796,11 +1824,12 @@ function g.key(x,y,z)
       -- Arranger loop strip
       if y == 5 then
         arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
-        arranger_loop_keys[y] = nil
+        -- arranger_loop_keys[y] = nil
 
       -- Arranger segment keys 1-4
       elseif y < 5 then
         arranger_key_count = math.max(arranger_key_count - 1, 0)
+        -- Pretty sure this is fucked up. Arranger_keys just inserts x so y isn't going to delete the correct index. Copy what we do for events loop strip
         arranger_keys[y] = nil
         
         -- This can get a little weird with multi-presses but that needs to be addressed with segment copy+paste anyway
@@ -1933,7 +1962,7 @@ function key(n,z)
         
         -- arranger_keys = {}
         -- arranger_key_count = 0
-        arranger_loop_keys = {}
+        -- arranger_loop_keys = {}
         arranger_loop_key_count = 0        
         event_edit_step = 0 -- indicates one has not been selected yet
         event_edit_slot = 0 -- Not sure if necessary
@@ -2439,7 +2468,7 @@ function redraw()
     screen.stroke()
     screen.level(3)
     screen.move(1,62)
-    screen.text('(K2) PLAY NEXT')    
+    screen.text('(K2) JUMP TO')    
     screen.move(82,62)  -- 128 - screen.text_extents(EVENTS K3 >')
     screen.text('(K3) EVENTS')  
   
