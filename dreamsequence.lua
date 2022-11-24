@@ -1492,10 +1492,10 @@ function grid_redraw()
   if screen_view_name == 'Events' then
     
   -- Draw grid with 16 event lanes (columns) for each step in the selected pattern 
-    local event_pattern_length = pattern_length[arranger_seq[event_edit_pattern]] or 0
+    -- local event_pattern_length = pattern_length[arranger_seq_padded[event_edit_pattern]] or 0
     for x = 1, 16 do -- event lanes
       for y = 1,8 do -- pattern steps
-        g:led(x, y, (automator_events[event_edit_pattern][y][x] ~= nil and 7 or (y > event_pattern_length and 1 or 2)))
+        g:led(x, y, (automator_events[event_edit_pattern][y][x] ~= nil and 7 or (y > (pattern_length[arranger_seq_padded[event_edit_pattern]] or 0) and 0 or 2)))
         if y == event_edit_step and x == event_edit_lane then
           g:led(x, y, 15)
         end  
@@ -1587,8 +1587,10 @@ function g.key(x,y,z)
       event_key_count = event_key_count + 1
         -- First touched event is the one we edit, effectively resetting on key_count = 0
         if event_key_count == 1 then
+
           event_edit_step = y
           event_edit_lane = x
+          event_saved = false
 
           -- If the event lane is populated, Load the Event vars back to the displayed param
           if automator_events[event_edit_pattern][y][x] ~= nil then
@@ -1608,6 +1610,8 @@ function g.key(x,y,z)
             set_event_range()
             init_event_value()
           end
+          
+          event_edit_active = true
           
         else -- Subsequent keys down paste event
           
@@ -1791,7 +1795,13 @@ function g.key(x,y,z)
     -- Events key up
     if screen_view_name == 'Events' then
       event_key_count = math.max(event_key_count - 1,0)
-          
+      
+      -- Reset event_edit_step/lane when last key is released (if it was skipped when doing a K3 save to allow for copy+paste)
+      if event_key_count == 0 and event_saved then
+        event_edit_step = 0
+        event_edit_lane = 0
+      end
+
     -- Chord key up      
     elseif grid_view_name == 'Chord' then
       if x == 16 and y <5 then
@@ -1899,10 +1909,15 @@ function key(n,z)
       
       elseif screen_view_name == 'Events' then
         
-        -- Use event_edit_step to determine if we are editing an event lane or just viewing them all
         
-        -- K2 here deletes event
-        if event_edit_step ~= 0 then
+        --Obsolete
+        -- Use event_edit_step to determine if we are editing an event lane or just viewing them all
+        ------------------------
+        -- K2 DELETE EVENT
+        ------------------------
+        -- Replacing this with event_edit_active
+        -- if event_edit_step ~= 0 then
+        if event_edit_active then
           -- print('Deleting event')
           
           -- Record the count of events on this step
@@ -1923,8 +1938,16 @@ function key(n,z)
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = nil
           end
           
-          event_edit_step = 0
-          event_edit_lane = 0
+          -- Back to event overview
+          event_edit_active = false
+          
+          -- If the event key is still being held (so user can copy and paste immediatly after saving it), preserve these vars, otherwise zero
+          if event_key_count == 0 then
+            event_edit_step = 0
+            event_edit_lane = 0
+          end
+          event_saved = true
+          
           redraw()
           
         -- K2 here deletes ALL events in arranger SEGMENT
@@ -1934,7 +1957,6 @@ function key(n,z)
           end
             automator_events[event_edit_pattern].populated = 0
           
-            
           screen_view_name = 'Session'
         end      
         grid_redraw()
@@ -1971,13 +1993,12 @@ function key(n,z)
         -- To-do: think about this some. What behavior makes sense if a reset occurs while waiting for Arranger to re-sync?
         if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end        
         
+      ---------------------------------------------------------------------------  
       -- Arranger loop strip held down. Was previously used on arranger rows 1-4
+      ---------------------------------------------------------------------------        
       -- elseif arranger_key_count > 0 then
       elseif arranger_loop_key_count > 0 then
-      
-          
-        -- Interrupts the disabling of the arranger segment on g.key up if we're entering event edit mode
-        change_arranger_step = nil
+        -- change_arranger_step = nil
         
         -- arranger_keys = {}
         -- arranger_key_count = 0
@@ -1985,8 +2006,11 @@ function key(n,z)
         arranger_loop_key_count = 0        
         
         -- To-do: Need a new indicator that we're entering the event edit menu. Resetting these immediately can result in errors when key is held and another is pressed to paste.
+        
+      
         event_edit_step = 0 -- indicates one has not been selected yet
         event_edit_lane = 0 -- Not sure if necessary
+        event_edit_active = false
         screen_view_name = 'Events'
         
         -- Forces redraw but it's kinda awkward because user is now pressing on a key in the event edit view
@@ -1994,9 +2018,17 @@ function key(n,z)
   
   
       -- K3 saves event to automator_events
+      
       -- To-do: rewrite this garbage LOL
       elseif screen_view_name == 'Events' then
-        if event_edit_lane > 0 then
+        
+        ---------------------------------------
+        -- K3 TO SAVE EVENT
+        ---------------------------------------
+        -- WAG
+        -- if event_edit_lane > 0 then
+        if event_edit_active then --and event_edit_lane > 0 then
+          
           local event_index = params:get('event_name')
           local event_id = events_lookup[event_index].id
           local event_type = events_lookup[event_index].event_type
@@ -2030,11 +2062,17 @@ function key(n,z)
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action = action
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action_var = action_var
           end            
-          
-        -- To-do: Need a new indicator that we're entering the event edit menu. Resetting these immediately can result in errors when key is held and another is pressed to paste.          
+    
           -- Back to event overview
-          event_edit_step = 0
-          event_edit_lane = 0
+          event_edit_active = false
+          
+          -- If the event key is still being held (so user can copy and paste immediatly after saving it), preserve these vars, otherwise zero
+          if event_key_count == 0 then
+            event_edit_step = 0
+            event_edit_lane = 0
+          end
+          event_saved = true
+          
           grid_redraw()
         
         else -- event_edit_lane == 0
@@ -2293,7 +2331,7 @@ function enc(n,d)
           -- event_edit_pattern_og = event_edit_pattern
           
           -- Cancel the disabling of touched step on g.key up
-          change_arranger_step = nil
+          -- change_arranger_step = nil
           d_cuml = d_cuml + d
           
           arranger_seq_length = util.clamp(arranger_seq_length_og + d_cuml, 1, max_arranger_seq_length)
@@ -2468,6 +2506,7 @@ function redraw()
   local dash_x = 94
   
   -- Screens that pop up when g.keys are being held down take priority--------
+  
   -- POP-up g.key tip always takes priority
   if view_key_count > 0 then
     screen.level(7)
@@ -2494,7 +2533,6 @@ function redraw()
     screen.text('(K2) JUMP TO')    
     screen.move(82,62)  -- 128 - screen.text_extents(EVENTS K3 >')
     screen.text('(K3) EVENTS')  
-  
   
   -- KEY 1 Fn screen  
   elseif keys[1] == 1 then
@@ -2544,7 +2582,8 @@ function redraw()
     if screen_view_name == 'Events' then
       screen.level(4)
       screen.move(2,8)
-      if event_edit_step == 0 then
+      -- if event_edit_step == 0 then
+      if event_edit_active == false then
         screen.text('Editing segment ' .. event_edit_pattern)
         screen.move(2,28)
         screen.level(15)
