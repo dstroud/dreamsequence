@@ -403,7 +403,7 @@ function init()
 end
 
 
--- UPDATE_MENUS. Probably can be improved by only calculating on the current view+page
+-- UPDATE_MENUS. To-do: Probably can be improved by only calculating on the current view+page
 function update_menus()
 
   -- Events menu
@@ -417,13 +417,10 @@ function update_menus()
     automator_events_menus =  {'event_category', 'event_name'}
   end
 
-  -- Global menu
+  -- global menu
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'playback', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
   
-  -- -- Arrange menus
-  -- menus[2] = {'arranger_enabled', 'playback'}
-
-  --chord menus   
+  -- chord menus   
   if params:string('chord_dest') == 'None' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
@@ -1516,7 +1513,7 @@ function grid_redraw()
           if y == arranger_seq_padded[x] then g:led(x, y, x == arranger_seq_position and 9 or 7) end
           if y == arranger_seq[x] then g:led(x, y, 15) end
         end
-        g:led(x, 5, (automator_events[x].populated or 0) > 0 and 15 or x > arranger_seq_length and 3 or 7)
+        g:led(x, 5, (automator_events[x] ~= nil and automator_events[x].populated or 0) > 0 and 15 or x > arranger_seq_length and 3 or 7)
       end
         
       g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
@@ -2578,7 +2575,10 @@ function redraw()
     -- UI elements placed here will persist in all views including Events editor
     ---------------------------
 
+
+    ----------------
     -- Events screen
+    ----------------    
     if screen_view_name == 'Events' then
       screen.level(4)
       screen.move(2,8)
