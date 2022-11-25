@@ -6,22 +6,6 @@ Optional: Crow, Just Friends, MIDI sequencer/controller
 Dreamsequence is an intuitive chord sequencer, arpeggiator, harmonizer, and arranger. 
 
 
-## NORNS INTERFACE
-- KEY 1: Grid functions (hold)
-- KEY 2: Play/pause
-- KEY 3: Reset
-- ENC 2: Select
-- ENC 3: Edit 
-
-
-## CROW
-- Crow IN 1: CV in
-- Crow IN 2: Trigger in
-- Crow OUT 1: V/oct out
-- Crow OUT 2: Trigger/envelope out
-- Crow OUT 3: Clock out
-- Crow OUT 4: Events
-
 # Overview
 
 Dreamsequence takes a walled-garden approach to composition by first limiting the available chords to a given mode and key, then limiting the output of the arpeggiator and harmonizers to only notes in the currently-playing chord. It will make you sound like a musical genius (or at least vaguely competent).
@@ -91,4 +75,10 @@ To understand Dreamsequence, let's take a look at its five linked components:
 
 ## Menus
 
-
+## CROW
+- Crow IN 1: CV in
+- Crow IN 2: Trigger in
+- Crow OUT 1: V/oct out
+- Crow OUT 2: Trigger/envelope out
+- Crow OUT 3: Clock out
+- Crow OUT 4: Events
