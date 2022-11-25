@@ -1,9 +1,11 @@
 # Dreamsequence
 
+Intuitive chord sequencer, arpeggiator, harmonizer, and arranger. 
+
 Requirements: Monome Norns and Grid
+
 Optional: Crow, Just Friends, MIDI sequencer/controller
 
-Dreamsequence is an intuitive chord sequencer, arpeggiator, harmonizer, and arranger. 
 
 
 # Overview
@@ -74,6 +76,19 @@ To understand Dreamsequence, let's take a look at its five linked components:
 ## Norns screen
 
 ## Menus
+- Global: General settings that affect the entire script
+- Mode: 9 primary modes
+- Key: Global transposition of +/- 12 semitones
+- Tempo: sets Norns system clock tempo in BPM
+- Arranger: loop the Arranger continuously or run one time before stopping (One-shot)
+- Clock: System clock setting. Internal is recommended, but MIDI will work assuming you are syncing to a delay/latency-compensated clock source. Link is not recommended (can introduce latency which can not be compensated for with the current Norns clock). Crow clock source is not supported at this time.
+- Out: System MIDI out parameter
+- Crow clock: This parameter controls the frequency of the clock pulse from Crow out port 3. Options include note-style divisions or Pulses Per Quarter Note (PPQN). Note that higher PPQN settings are likely to result in instability. _At launch, Dreamsequence sets the Norns system clock "crow out" parameter to 'off'. Instead, of using the system clock, Dreamsequence has its own clock that only runs when the script's transport is playing. _
+- Dedupe <: This enables and sets the threshold for detecting and de-duplicating repeat notes at each destination. This can be particularly helpful when merging sequences from different sources (say arp and harmonizer). Rather than trying to send the same note twice (resulting in truncated notes or phasing issues), this will let the initial note pass and filter out the second note if it arrives within the defined period of time.
+- Chord preload: This setting enables the sequencer to fetch upcoming chord changes slightly early for processing the harmonizer inputs. This compensates for situations where the incoming note may arrive slightly before the chord change it's intended to harmonize with. This does not change when the Chord and Arp sequences fire, it's only for background processing.
+- Crow pullup: enable or disable Crow's i2c pullup resistors.
+- C-gen: Which algorithm is used for generating _chord_ patterns (K1+K3 or events). The default value of Random picks an algorighm randomly each time.
+- A-gen: Which algorithm is used for generating _arp_ patterns (K1+K3 or events). The default value of Random picks an algorighm randomly each time.
 
 ## CROW
 - Crow IN 1: CV in
