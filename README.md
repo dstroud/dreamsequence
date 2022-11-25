@@ -76,7 +76,7 @@ To understand Dreamsequence, let's take a look at its five linked components:
 ## Norns screen
 
 ## Menus
-- Global: General settings that affect the entire script
+### Global menu: General settings that affect the entire script
 - Mode: 9 primary modes
 - Key: Global transposition of +/- 12 semitones
 - Tempo: sets Norns system clock tempo in BPM
@@ -90,10 +90,104 @@ To understand Dreamsequence, let's take a look at its five linked components:
 - C-gen: Which algorithm is used for generating _chord_ patterns (K1+K3 or events). The default value of Random picks an algorighm randomly each time.
 - A-gen: Which algorithm is used for generating _arp_ patterns (K1+K3 or events). The default value of Random picks an algorighm randomly each time.
 
-## CROW
+### Chord menu: Settings for the chord sequencer
+- Destination: Where the output of the chord sequence is sent for playback. Some menu items are destination-specific.
+  - None: Selecting 'none' will still send chords to the arp and harmonizers, they just won't play directly. 
+  - Engine: Norns' PolyPerc engine
+  - MIDI: Output on MIDI port 1
+  - ii-JF: Just Friends Eurorack module requires Crow connected to Just Friends via i2c
+- Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently
+- Octave: Octave -2 to +4 octaves
+- Step length: the length of each step/row in the chord pattern, relative to 1 measure. Values ending in T are tuplets
+- Duration (_Engine, MIDI_): chord note duration relative to 1 measure 
+- Amp: (_Engine_): Norns engine amplitude
+- Cutoff (_Engine_): Norns engine filter frequency offset
+- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept)
+- Gain (_Engine_): I don't actually know what this is. Filter Q?
+- Pulse width (_Engine_): PolyPerc's square-wave based pulse width
+- Channel (_MIDI_): MIDI channel
+- Velocity (_MIDI_: MIDI note velocity
+- Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping
+
+### Arp menu: Setting for the built-in arpeggiator
+- Destination: Where the output of the arpeggio is sent for playback. Some menu items are destination-specific.
+  - None: Selecting 'none' will mute the arp
+  - Engine: Norns' PolyPerc engine
+  - MIDI: Output on MIDI port 1
+  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear
+    - Crow out 1: 1v/oct pitch CV 
+    - Crow out 2: Trigger or 10v Attack Release (AR) envelope
+  - ii-JF: Just Friends Eurorack module requires Crow connected to Just Friends via i2c
+- Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently
+- Octave: Octave -2 to +4 octaves
+- Mode: Loop will repeat the arp pattern indefinitely. One-shot will fire the arp pattern once per chord step
+- Step length: the length of each step/row in the arp pattern, relative to 1 measure. Values ending in T are tuplets
+- Duration (_Engine, Crow, MIDI_): arp note duration relative to 1 measure 
+- Amp: (_Engine_): Norns engine amplitude
+- Cutoff (_Engine_): Norns engine filter frequency offset
+- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept)
+- Gain (_Engine_): I don't actually know what this is. Filter Q?
+- Pulse width (_Engine_): PolyPerc's square-wave based pulse width
+- Channel (_MIDI_): MIDI channel
+- Velocity (_MIDI_: MIDI note velocity
+- Output (_Crow_): Select between trigger or Attack Release (AR) envelope to be sent from Crow out 3
+- AR env. skew: Amount the AR envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only 
+- Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping
+
+### MIDI in menu: Setting for the MIDI harmonizer
+- Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
+  - None: Selecting 'none' will mute the harmonizer
+  - Engine: Norns' PolyPerc engine
+  - MIDI: Output on MIDI port 1
+  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear
+    - Crow out 1: 1v/oct pitch CV 
+    - Crow out 2: Trigger or 10v Attack Release (AR) envelope
+  - ii-JF: Just Friends Eurorack module requires Crow connected to Just Friends via i2c
+- Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently
+- Octave: Octave -2 to +4 octaves
+- Duration (_Engine, Crow, MIDI_): note duration relative to 1 measure 
+- Amp: (_Engine_): Norns engine amplitude
+- Cutoff (_Engine_): Norns engine filter frequency offset
+- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept)
+- Gain (_Engine_): I don't actually know what this is. Filter Q?
+- Pulse width (_Engine_): PolyPerc's square-wave based pulse width
+- Channel (_MIDI_): MIDI channel
+- Pass velocity: Option to use the incoming MIDI velocity on the outgoing note
+- Velocity (_MIDI_: If pass velocity is false, use this MIDI note velocity
+- Output (_Crow_): Select between trigger or Attack Release (AR) envelope to be sent from Crow out 3
+- AR env. skew: Amount the AR envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only 
+- Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping
+
+
+### CV in menu: Setting for the CV harmonizer
+- Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
+  - None: Selecting 'none' will mute the harmonizer
+  - Engine: Norns' PolyPerc engine
+  - MIDI: Output on MIDI port 1
+  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear
+    - Crow out 1: 1v/oct pitch CV 
+    - Crow out 2: Trigger or 10v Attack Release (AR) envelope
+  - ii-JF: Just Friends Eurorack module requires Crow connected to Just Friends via i2c
+- Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently
+- Octave: Octave -2 to +4 octaves
+- Duration (_Engine, Crow, MIDI_): note duration relative to 1 measure
+- Auto-rest: When true, this function will suppress the same note when it is repeated within one chord step, resulting in a rest.
+- Amp: (_Engine_): Norns engine amplitude
+- Cutoff (_Engine_): Norns engine filter frequency offset
+- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept)
+- Gain (_Engine_): I don't actually know what this is. Filter Q?
+- Pulse width (_Engine_): PolyPerc's square-wave based pulse width
+- Channel (_MIDI_): MIDI channel
+- Velocity (_MIDI_: MIDI note velocity
+- Output (_Crow_): Select between trigger or Attack Release (AR) envelope to be sent from Crow out 3
+- AR env. skew: Amount the AR envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only 
+- Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping
+
+
+## CROW patching
 - Crow IN 1: CV in
 - Crow IN 2: Trigger in
 - Crow OUT 1: V/oct out
 - Crow OUT 2: Trigger/envelope out
 - Crow OUT 3: Clock out
-- Crow OUT 4: Events
+- Crow OUT 4: A trigger can be sent from this output by scheduling an Event in the Arranger
