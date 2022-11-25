@@ -1,14 +1,16 @@
 -- Lookup table for events
 events_lookup = {
   
+  {	category= 'Global', 	event_type= 'function', 	id= 'crow_event_trigger', 	name= 'Crow trigger', 	value_type= 'trigger', 				},
   {	category= 'Global', 	event_type= 'function', 	id= 'generator_and_reset', 	name= 'Generate patterns', 	value_type= 'trigger', 				},
+  {	category= 'Chord', 	event_type= 'param', 	id= 'chord_generator', 	name= 'Chord gen algo', 	value_type= 'inc, set', 				},
+  {	category= 'Arp', 	event_type= 'param', 	id= 'arp_generator', 	name= 'Arp gen algo', 	value_type= 'inc, set', 				},
   {	category= 'Global', 	event_type= 'param', 	id= 'mode', 	name= 'Mode', 	value_type= 'set', 	formatter= 'mode_index_to_name', 			},
   {	category= 'Global', 	event_type= 'param', 	id= 'transpose', 	name= 'Key', 	value_type= 'inc, set', 	formatter= 'transpose_string', 			},
   {	category= 'Global', 	event_type= 'param', 	id= 'clock_tempo', 	name= 'Tempo', 	value_type= 'inc, set', 				},
   {	category= 'Global', 	event_type= 'param', 	id= 'crow_clock_index', 	name= 'Crow clock', 	value_type= 'inc, set', 	formatter= 'crow_clock_string', 	action= 'set_crow_clock', 		},
                     
   {	category= 'Chord', 	event_type= 'function', 	id= 'transpose_chord_pattern', 	name= 'Transpose pattern', 	value_type= 'set', 				},
-  {	category= 'Chord', 	event_type= 'param', 	id= 'chord_generator', 	name= 'Generator algo', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_dest', 	name= 'Destination', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'set', 	formatter= 'chord_type', 			},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_octave', 	name= 'Octave', 	value_type= 'inc, set', 				},
@@ -26,7 +28,6 @@ events_lookup = {
   {	category= 'Arp', 	event_type= 'function', 	id= 'shuffle_arp', 	name= 'Shuffle Arp', 	value_type= 'trigger', 				},
   {	category= 'Arp', 	event_type= 'function', 	id= 'rotate_arp', 	name= 'Rotate Arp', 	value_type= 'set', 				},
   {	category= 'Arp', 	event_type= 'function', 	id= 'transpose_arp_pattern', 	name= 'Transpose pattern', 	value_type= 'set', 				},
-  {	category= 'Arp', 	event_type= 'param', 	id= 'arp_generator', 	name= 'Generator algo', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_dest', 	name= 'Destination', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_chord_type', 	name= 'Chord type', 	value_type= 'set', 	formatter= 'chord_type', 			},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_octave', 	name= 'Octave', 	value_type= 'inc, set', 				},
@@ -60,7 +61,6 @@ events_lookup = {
   {	category= 'MIDI in', 	event_type= 'param', 	id= 'midi_ar_skew', 	name= 'Crow AR skew', 	value_type= 'inc, set', 				},
   {	category= 'MIDI in', 	event_type= 'param', 	id= 'midi_jf_amp', 	name= 'Just Friends amp', 	value_type= 'inc, set', 				},
                     
-  {	category= 'CV in', 	event_type= 'function', 	id= 'crow_event_trigger', 	name= 'Trigger to Crow out 4', 	value_type= 'trigger', 				},
   {	category= 'CV in', 	event_type= 'param', 	id= 'crow_dest', 	name= 'Destination', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'CV in', 	event_type= 'param', 	id= 'crow_chord_type', 	name= 'Chord type', 	value_type= 'set', 	formatter= 'chord_type', 			},
   {	category= 'CV in', 	event_type= 'param', 	id= 'crow_octave', 	name= 'Octave', 	value_type= 'inc, set', 				},
