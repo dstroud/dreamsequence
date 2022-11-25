@@ -97,7 +97,7 @@ function init()
   
   --Chord params
   params:add_separator ('Chord')
-  params:add_option('chord_generator', 'Chord', chord_algos['name'], 1) 
+  params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1) 
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
 
@@ -140,7 +140,7 @@ function init()
 
   --Arp params
   params:add_separator ('Arp')
-  params:add_option('arp_generator', 'Arp', arp_algos['name'], 1)
+  params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
@@ -418,7 +418,7 @@ function update_menus()
   end
 
   -- global menu
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'playback', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'playback', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
   
   -- chord menus   
   if params:string('chord_dest') == 'None' then

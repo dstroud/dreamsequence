@@ -447,7 +447,7 @@ function arp_generator(mode)
   end)
   
   
-  local arp_algo_name = 'ER 1-note +rests'
+  local arp_algo_name = 'ER 1-note'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()
     
@@ -523,7 +523,7 @@ function arp_generator(mode)
   end)
 
 
-  local arp_algo_name = 'ER drunk +rests'
+  local arp_algo_name = 'ER drunk+rest'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function() 
 
@@ -537,7 +537,7 @@ function arp_generator(mode)
   end)
 
 
-  local arp_algo_name = 'Sequential up'
+  local arp_algo_name = 'Seq. up'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()
   
@@ -568,7 +568,7 @@ function arp_generator(mode)
   end)
 
 
-  local arp_algo_name = 'Sequential down'
+  local arp_algo_name = 'Seq. down'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()  
   
@@ -621,7 +621,7 @@ function arp_generator(mode)
   end)
   
   
-  local arp_algo_name = 'Random +ER rest'
+  local arp_algo_name = 'Rnd. +ER rest'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()  
     
