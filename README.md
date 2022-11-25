@@ -4,7 +4,7 @@ Intuitive chord sequencer, arpeggiator, harmonizer, and arranger.
 
 Requirements: Monome Norns and Grid
 
-Optional: Crow, Just Friends, MIDI sequencer/controller
+Optional: Crow, Just Friends, CV and/or MIDI sequencers/controllers
 
 
 
