@@ -23,7 +23,6 @@ function generator()
   end
   
   params:set('mode', math.random(1,9))
-  -- params:set('mode', 1)
 
   
   --ENGINE BASED RANDOMIZATIONS
@@ -41,45 +40,108 @@ chord_reroll_attempt = 0  -- same
 chord_generator('run')
 
 
-  if sketchy_chords == true then
+if sketchy_chords == true then
     
-    while (chord_reroll_attempt < 100) == true do
-    
-      chord_reroll_attempt = chord_reroll_attempt + 1
-      -- print('Sketchy chords. Reroll attempt ' .. chord_reroll_attempt .. ', Mode ' .. params:get('mode'))
-        chord_generator('run')
-        -- load(chord_algos['func'][chord_algo])
-        
-        
-      -- for i = 1, pattern_length[pattern] do
-      --   if chord_seq[pattern][i].c > 0 then
-      --     local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_seq[pattern][i].c]
-      --     -- chord_check[i] = get_chord_name(2, params:get('mode'), chord_degree)
-      --     if get_chord_name(2, params:get('mode'), chord_degree) == 'dim' then
-      --       sketchy_chords = true
-      --     end
-      --   end
-      -- end
-    
-    end
-    if chord_reroll_attempt <100 then
-      print('Mode ' .. params:get('mode') .. ' passed ' .. chord_algos['name'][chord_algo] .. ' after ' .. chord_reroll_attempt .. ' attempts')
-      chord_reroll_attempt = 0
-    else
-    print(chord_reroll_attempt .. ' reroll attempts. Exclude mode ' .. params:get('mode') .. ' from ' .. chord_algos['name'][chord_algo])
-      params:set('mode', math.random(1,9))
-      chord_reroll_attempt = 0
-      print('Trying with mode ' .. params:get('mode'))
-      -- chord_generator('run')
-      generator()
+  while (chord_reroll_attempt < 100) == true do
+  
+    chord_reroll_attempt = chord_reroll_attempt + 1
+    -- print('Sketchy chords. Reroll attempt ' .. chord_reroll_attempt .. ', Mode ' .. params:get('mode'))
+      chord_generator('run')
+      -- load(chord_algos['func'][chord_algo])
+      
+      
+    -- for i = 1, pattern_length[pattern] do
+    --   if chord_seq[pattern][i].c > 0 then
+    --     local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_seq[pattern][i].c]
+    --     -- chord_check[i] = get_chord_name(2, params:get('mode'), chord_degree)
+    --     if get_chord_name(2, params:get('mode'), chord_degree) == 'dim' then
+    --       sketchy_chords = true
+    --     end
+    --   end
+    -- end
+  
+  end
+  if chord_reroll_attempt <100 then
+    print('Mode ' .. params:get('mode') .. ' passed ' .. chord_algos['name'][chord_algo] .. ' after ' .. chord_reroll_attempt .. ' attempts')
+    chord_reroll_attempt = 0
+  else
+  print(chord_reroll_attempt .. ' reroll attempts. Exclude mode ' .. params:get('mode') .. ' from ' .. chord_algos['name'][chord_algo])
+    params:set('mode', math.random(1,9))
+    chord_reroll_attempt = 0
+    print('Trying with mode ' .. params:get('mode'))
+    generator()
 
-    end
+  end
+end
+  
+print('Chord algo: ' .. chord_algos['name'][chord_algo])
+arp_generator('run')
+grid_redraw()
+redraw()
+end
+
+
+-- Hacky stripped-down version of full chord+arp generator to be used for Events and Chord grid view gen
+function chord_generator_lite()
+  
+  params:set('chord_octave', math.random(0,1))
+  -- params:set('arp_octave', math.random(-1,1))
+    
+    
+  --SEQUENCE RANDOMIZATION
+  
+  params:set('transpose', math.random(-12,12))
+  
+  -- 7ths are still kida risky and might be better left to the arp section
+  params:set('chord_type', percent_chance(20) and 4 or 3)
+
+  if params:get('clock_source') == 1 then 
+    params:set('clock_tempo', math.random(50,140))
   end
   
-  print('Chord algo: ' .. chord_algos['name'][chord_algo])
-  arp_generator('run')
-  grid_redraw()
-  redraw()
+  params:set('mode', math.random(1,9))
+
+  
+  --ENGINE BASED RANDOMIZATIONS
+  -- May be overwritten depending on algo type
+  params:set('chord_pp_amp', 50)
+  params:set('chord_pp_gain', math.random(0,350))
+  params:set('chord_pp_pw', math.random(10,90))
+  params:set('chord_div_index', 15)
+  params:set('chord_duration_index', params:get('chord_div_index'))
+  
+
+-- sketchy_chords = false  -- reset this once per generator
+chord_reroll_attempt = 0  -- same
+
+chord_generator('run')
+
+
+if sketchy_chords == true then
+    
+  while (chord_reroll_attempt < 100) == true do
+    chord_reroll_attempt = chord_reroll_attempt + 1
+      chord_generator('run')
+  end
+  
+  if chord_reroll_attempt <100 then
+    print('Mode ' .. params:get('mode') .. ' passed ' .. chord_algos['name'][chord_algo] .. ' after ' .. chord_reroll_attempt .. ' attempts')
+    chord_reroll_attempt = 0
+  else
+  print(chord_reroll_attempt .. ' reroll attempts. Exclude mode ' .. params:get('mode') .. ' from ' .. chord_algos['name'][chord_algo])
+    params:set('mode', math.random(1,9))
+    chord_reroll_attempt = 0
+    print('Trying with mode ' .. params:get('mode'))
+    -- chord_generator('run')
+    -- generator()
+    chord_generator_lite()
+  end
+end
+  
+print('Chord algo: ' .. chord_algos['name'][chord_algo])
+-- arp_generator('run')
+grid_redraw()
+redraw()
 end
 
 

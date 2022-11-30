@@ -2,7 +2,9 @@
 events_lookup = {
   
   {	category= 'Global', 	event_type= 'function', 	id= 'crow_event_trigger', 	name= 'Crow trigger', 	value_type= 'trigger', 				},
-  {	category= 'Global', 	event_type= 'function', 	id= 'generator_and_reset', 	name= 'Generate patterns', 	value_type= 'trigger', 				},
+  {	category= 'Global', 	event_type= 'function', 	id= 'event_chord_gen', 	name= 'Generate chords', 	value_type= 'trigger', 				},
+  {	category= 'Global', 	event_type= 'function', 	id= 'event_arp_gen', 	name= 'Generate arp', 	value_type= 'trigger', 				},
+  {	category= 'Global', 	event_type= 'function', 	id= 'event_gen', 	name= 'Generate c+a', 	value_type= 'trigger', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_generator', 	name= 'Chord gen algo', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_generator', 	name= 'Arp gen algo', 	value_type= 'inc, set', 				},
   {	category= 'Global', 	event_type= 'param', 	id= 'mode', 	name= 'Mode', 	value_type= 'set', 	formatter= 'mode_index_to_name', 			},

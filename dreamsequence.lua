@@ -286,8 +286,9 @@ function init()
   screen_view_name = screen_views[screen_view_index]
   grid_dirty = true
   grid_views = {'Arranger','Chord','Arp'} -- grid "views" are decoupled from screen "pages"
-  grid_view_index = 2
-  grid_view_name = grid_views[grid_view_index]
+  grid_view_keys = {}
+  -- grid_view_index = 2
+  grid_view_name = grid_views[2]
   -- flicker = 3
   -- pages = {'GLOBAL', 'ARRANGER', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
   pages = {'GLOBAL', 'CHORD', 'ARP', 'MIDI IN', 'CV IN'}
@@ -1504,6 +1505,17 @@ function grid_redraw()
       g:led(16,i,4)
     end
     
+    for i = 1, #grid_view_keys do
+      g:led(16,grid_view_keys[i], 7)
+    end  
+      -- elseif x == 16 and y > 5 then
+      -- view_key_count = math.max(view_key_count - 1, 0)
+      -- table.remove(grid_view_keys, tab.key(grid_view_keys, grid_views[y - 5]))
+      
+      -- if tab.contains(grid_view_keys, 'Chord') then 
+
+      
+    
     if grid_view_name == 'Arranger' then
       g:led(16,6,15)
       
@@ -1519,11 +1531,11 @@ function grid_redraw()
       g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
       -- Optionally: Arranger enable/disable key has 3 states. on/re-sync/off
       if params:get('arranger_enabled') == 1 then
-        if arranger_enabled == false then
-          g:led(1,8, math.random(12,15))
-        else
+        -- if arranger_enabled == false then
+        --   g:led(1,8, math.random(12,15))
+        -- else
           g:led(1,8, 15)
-        end
+        -- end
       else
         g:led(1,8, 4)
       end
@@ -1640,11 +1652,18 @@ function g.key(x,y,z)
           print('Copy+paste event from segment ' .. event_edit_pattern .. '.' .. event_edit_step .. ' lane ' .. event_edit_lane  .. ' to ' .. event_edit_pattern .. '.' .. y .. ' lane ' .. x)
         end
 
-    -- view switcher buttons  
+    -- view_key buttons  
     elseif x == 16 and y > 5 then
       view_key_count = view_key_count + 1
-      grid_view_index = y - 5
-      grid_view_name = grid_views[grid_view_index]
+      -- table.insert(grid_view_keys, grid_views[y - 5])
+      table.insert(grid_view_keys, y)
+      if view_key_count == 1 then 
+        grid_view_name = grid_views[y - 5] 
+      elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
+          screen_view_name = 'Chord+arp'
+      end
+      -- if (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
+
       
       
     --ARRANGER KEY DOWN-------------------------------------------------------
@@ -1799,6 +1818,22 @@ function g.key(x,y,z)
         event_edit_lane = 0
       end
 
+    -- view_key buttons
+    elseif x == 16 and y > 5 then
+      view_key_count = math.max(view_key_count - 1, 0)
+      table.remove(grid_view_keys, tab.key(grid_view_keys, y))
+      if view_key_count > 0 then
+        grid_view_name = grid_views[grid_view_keys[1] - 5]
+        
+        if view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
+          screen_view_name = 'Chord+arp'
+        else
+          screen_view_name = 'Session'  
+        end
+      else
+        screen_view_name = 'Session'
+      end
+
     -- Chord key up      
     elseif grid_view_name == 'Chord' then
       if x == 16 and y <5 then
@@ -1872,10 +1907,11 @@ function g.key(x,y,z)
       end
     end
     
-  -- GRID VIEW SWITCHER KEYS  
-  if x == 16 and y > 5 then
-    view_key_count = view_key_count - 1
-  end
+  -- -- GRID VIEW SWITCHER KEYS  
+  -- if x == 16 and y > 5 then
+  --   view_key_count = view_key_count - 1
+  -- end
+  
   if pattern_key_count == 0 then
     pattern_copy_performed = false
   end
@@ -1896,6 +1932,7 @@ function key(n,z)
       
     -- KEY 2  
     elseif n == 2 then
+  
       if keys[1] == 1 then
         -- FN+K2. Enable Arranger maybe?
         
@@ -1971,25 +2008,37 @@ function key(n,z)
       
     -- KEY 3  
     elseif n == 3 then
-      if keys[1] == 1 then
+      -- if keys[1] == 1 then
+      
+      if view_key_count > 0 then -- Grid view key held down
+        if screen_view_name == 'Chord+arp' then
         
-        -- FN menu + K3 runs Generator and resets pattern/arp/arranger
-        generator()
-        -- If we're sending MIDI clock out, send a stop msg
-        -- Tell the transport to Start on the next sync of sequence_clock
-        if params:string('clock_midi_out') ~= 'off' then
-          if transport_active then
-            transport_midi:stop()
-          end
+          -- When Chord+Arp Grid View keys are held down, K3 runs Generator and resets pattern+arp
+          generator()
+          -- If we're sending MIDI clock out, send a stop msg
+          -- Tell the transport to Start on the next sync of sequence_clock
+          if params:string('clock_midi_out') ~= 'off' then
+            if transport_active then
+              transport_midi:stop()
+            end
+            
+          -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
+          clock_start_method = 'start'
+          start = true
+          end    
+    
+          -- For now, doing a pattern reset but not an arranger reset since it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
+          -- if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end
+          reset_pattern()
           
-        -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
-        clock_start_method = 'start'
-        start = true
-        end    
-  
-        -- To-do: think about this some. What behavior makes sense if a reset occurs while waiting for Arranger to re-sync?
-        if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end        
+        elseif grid_view_name == 'Chord' then       
+          -- chord_generator('run')
+          chord_generator_lite()
+        elseif grid_view_name == 'Arp' then       
+          arp_generator('run')
         
+        end
+      grid_redraw()  
       ---------------------------------------------------------------------------  
       -- Arranger loop strip held down. Was previously used on arranger rows 1-4
       ---------------------------------------------------------------------------        
@@ -2165,13 +2214,24 @@ end
 
 -- EVENT FUNCTIONS -----
 
--- This is a variation on the standard generator that will reset the pattern and arp but not the arranger
-function generator_and_reset()
+-- Variation on the standard generators that will just run the algos and reset arp (but not pattern or arranger)
+-- function generator_and_reset()
+function event_gen()
   generator()
   arp_seq_position = 0
 end    
-        
-        
+
+function event_chord_gen()
+  chord_generator_lite()
+  arp_seq_position = 0
+end   
+
+function event_arp_gen()
+  arp_generator('run')
+  arp_seq_position = 0
+end    
+
+
 -- Event Crow trigger out
 function crow_event_trigger()
   crow.output[4].action = 'pulse(.001,10,1)' -- (time,level,polarity)
@@ -2231,18 +2291,19 @@ end
        
           
 function enc(n,d)
-  if keys[1] == 1 then -- fn key (KEY1) held down mode
-    if n == 2 then
-      rotate_pattern(grid_view_name, d)
-    elseif n == 3 then
-      if grid_view_name == 'Chord' then
-        transpose_pattern('Chord', d)
-      elseif grid_view_name == 'Arp' then
-        transpose_pattern('Arp', d)
-      end
-    end
-    grid_redraw()
-  else
+  -- if keys[1] == 1 then -- fn key (KEY1) held down mode
+  --   if n == 2 then
+  --     rotate_pattern(grid_view_name, d)
+  --   elseif n == 3 then
+  --     if grid_view_name == 'Chord' then
+  --       transpose_pattern('Chord', d)
+  --     elseif grid_view_name == 'Arp' then
+  --       transpose_pattern('Arp', d)
+  --     end
+  --   end
+  --   grid_redraw()
+  -- else
+  
       -- Reserved for scrolling/extending Arranger, Chord, Arp sequences
       if n == 1 then
       -- menu_index = 0
@@ -2253,7 +2314,13 @@ function enc(n,d)
       
       -- N == ENC 2 ------------------------------------------------
       elseif n == 2 then
-        if screen_view_name == 'Events' then
+        if view_key_count > 0 then
+          if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
+            rotate_pattern(grid_view_name, d)
+            grid_redraw()            
+          end
+       
+        elseif screen_view_name == 'Events' then
           -- Scroll through the Events menus (name, type, val)
           automator_events_index = util.clamp(automator_events_index + d, 1, #automator_events_menus)
           selected_automator_events_menu = automator_events_menus[automator_events_index]
@@ -2265,8 +2332,15 @@ function enc(n,d)
         
     -- n == ENC 3 -------------------------------------------------------------  
     else
+      
+      if view_key_count > 0 then
+        if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
+          transpose_pattern(grid_view_name, d)
+          grid_redraw()
+        end
+          
       -- Change event value
-      if screen_view_name == 'Events' then
+      elseif screen_view_name == 'Events' then
 
         if selected_automator_events_menu == 'event_category' then
           params:delta(selected_automator_events_menu, d)
@@ -2384,7 +2458,7 @@ function enc(n,d)
         end
       end
     end
-  end
+  -- end
   redraw()
 end
 
@@ -2506,12 +2580,78 @@ function redraw()
   
   -- POP-up g.key tip always takes priority
   if view_key_count > 0 then
-    screen.level(7)
-    screen.move(64,32)
-    screen.font_size(16)
-    screen.text_center(grid_view_name)
-    screen.font_size(8)
+    -- screen.level(7)
+    -- screen.move(64,32)
+    -- screen.font_size(16)
+    -- screen.text_center(grid_view_name)
+    -- screen.font_size(8)
     
+    -- if (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
+    if screen_view_name == 'Chord+arp' then
+      screen.level(15)
+      screen.move(2,8)
+      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+      screen.move(2,28)
+      screen.text('ENC 2: Rotate seq ↑↓')
+      screen.move(2,38)
+      screen.text('ENC 3: Transpose seq ←→')
+      screen.level(4)
+      screen.move(1,54)
+      screen.line(128,54)
+      screen.stroke()
+      screen.level(3)      
+      screen.move(128,62)
+      screen.text_right('(K3) GEN. CHORDS+ARP')      
+
+    elseif grid_view_name == 'Arranger' then --or grid_view_name == 'Arp') then-- Chord/Arp 
+      screen.level(15)
+      screen.move(2,8)
+      screen.text(string.upper(grid_view_name) .. ' GRID')-- FUNCTIONS')
+      -- screen.move(2,28)
+      -- screen.text('ENC 2: Rotate seq ↑↓')
+      -- screen.move(2,38)
+      -- screen.text('ENC 3: Transpose seq ←→')
+      screen.level(4)
+      screen.move(1,54)
+      screen.line(128,54)
+      screen.stroke()
+      -- screen.level(3)      
+      -- screen.move(128,62)
+      -- screen.text_right('(K3) GENERATE SONG')
+        
+    elseif grid_view_name == 'Chord' then --or grid_view_name == 'Arp') then-- Chord/Arp 
+      screen.level(15)
+      screen.move(2,8)
+      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+      screen.move(2,28)
+      screen.text('ENC 2: Rotate seq ↑↓')
+      screen.move(2,38)
+      screen.text('ENC 3: Transpose seq ←→')
+      screen.level(4)
+      screen.move(1,54)
+      screen.line(128,54)
+      screen.stroke()
+      screen.level(3)      
+      screen.move(128,62)
+      screen.text_right('(K3) GEN. CHORDS')     
+        
+     elseif grid_view_name == 'Arp' then --or grid_view_name == 'Arp') then-- Chord/Arp 
+      screen.level(15)
+      screen.move(2,8)
+      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+      screen.move(2,28)
+      screen.text('ENC 2: Rotate seq ↑↓')
+      screen.move(2,38)
+      screen.text('ENC 3: Transpose seq ←→')
+      screen.level(4)
+      screen.move(1,54)
+      screen.line(128,54)
+      screen.stroke()
+      screen.level(3)      
+      screen.move(128,62)
+      screen.text_right('(K3) GEN. ARP')  
+      end
+      
     
   -- Events editor intro
   elseif arranger_loop_key_count > 0 then
@@ -2531,42 +2671,42 @@ function redraw()
     screen.move(82,62)  -- 128 - screen.text_extents(EVENTS K3 >')
     screen.text('(K3) EVENTS')  
   
-  -- KEY 1 Fn screen  
-  elseif keys[1] == 1 then
-   if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
-      screen.level(15)
-      screen.move(2,8)
-      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
-      screen.move(2,28)
-      screen.text('ENC 2: Rotate seq ↑↓')
-      screen.move(2,38)
-      screen.text('ENC 3: Transpose seq ←→')
-      screen.level(4)
-      screen.move(1,54)
-      screen.line(128,54)
-      screen.stroke()
-      screen.level(3)      
-      screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
-      screen.text('(K3) GENERATOR')    
+  -- -- KEY 1 Fn screen  
+  -- elseif keys[1] == 1 then
+  -- if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
+  --     screen.level(15)
+  --     screen.move(2,8)
+  --     screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+  --     screen.move(2,28)
+  --     screen.text('ENC 2: Rotate seq ↑↓')
+  --     screen.move(2,38)
+  --     screen.text('ENC 3: Transpose seq ←→')
+  --     screen.level(4)
+  --     screen.move(1,54)
+  --     screen.line(128,54)
+  --     screen.stroke()
+  --     screen.level(3)      
+  --     screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
+  --     screen.text('(K3) GENERATOR')    
 
-    -- Alternate grid functions for Arranger TBD
-    elseif grid_view_name == 'Arranger' then
-      screen.level(15)
-      screen.move(2,8)
-      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
-      -- screen.move(2,28)
-      -- screen.text('ENC 2: ')
-      -- screen.move(2,38)
-      -- screen.text('ENC 3: Transpose seq ←→')
-      -- screen.text('ENC 3: Playhead ←→')   
-      screen.level(4)
-      screen.move(1,54)
-      screen.line(128,54)
-      screen.stroke()
-      screen.level(3)      
-      screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
-      screen.text('(K3) GENERATOR')         
-    end
+  --   -- Alternate grid functions for Arranger TBD
+  --   elseif grid_view_name == 'Arranger' then
+  --     screen.level(15)
+  --     screen.move(2,8)
+  --     screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+  --     -- screen.move(2,28)
+  --     -- screen.text('ENC 2: ')
+  --     -- screen.move(2,38)
+  --     -- screen.text('ENC 3: Transpose seq ←→')
+  --     -- screen.text('ENC 3: Playhead ←→')   
+  --     screen.level(4)
+  --     screen.move(1,54)
+  --     screen.line(128,54)
+  --     screen.stroke()
+  --     screen.level(3)      
+  --     screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
+  --     screen.text('(K3) GENERATOR')         
+  --   end
  
     
   -- Standard priority (not momentary) menus---------------------------------  
