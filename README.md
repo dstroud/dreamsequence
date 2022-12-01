@@ -40,7 +40,76 @@ To understand Dreamsequence, let's take a look at its five linked components:
 - Harmonizer sequences the chord patterns (A, B, C, D) and handles the scheduling of automation events.
 - Automation events can introduce parameter changes, transform or generate chord/arp patterns, send CV triggers from Crow, etc...
 
+
 # Grid interface
+
+### Arranger view
+![ds_arranger_grid](https://user-images.githubusercontent.com/435570/205140359-95a72fb4-a905-4a6c-a025-3b6bdc7d85aa.svg)
+
+The Arranger view is used to sequence chord patterns and enter the Events editor.
+
+- Rows 1-4 correspond to chord patterns A-D and columns 1-16 represent Arranger segments, or one playthrough of a pattern. The Arranger length automatically resizes to the rightmost selected key and any gaps in the sequence are filled in lighter colors to indicate that the previous chord pattern will be held.
+
+- Row 5 is the Events Timeline, which indicates if one or more events are present on a segment. Holding down a key on the Events Timeline will enable alternate functions:
+  - E3 shifts the selected segment and subsequent segments to the right or left depending on the direction of rotation
+  - K2 will jump the playhead to the selected segment after the current segment is finished
+  - K3 enters the Events Editor (see below)
+  - Holding one segment and tapping on another will copy and paste events from the held segment
+
+- Key 1 (bottom left) will enable or disable the Arranger
+- Key 2 (bottom, second from left) switches between Loop (bright) and One-shot (dim) Arranger modes
+
+- The three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views 
+
+
+
+### Chord view
+![ds_chord_grid](https://user-images.githubusercontent.com/435570/205140357-8cf54869-e00c-4991-aefd-77bc8f69672e.svg)
+
+The Chord view is used to sequence chord patterns A-D
+
+- Chords are selected using columns 1-14 which represent chord degrees I-VII across two octaves
+- Sequence plays from top to bottom and sequence length is set using column 15
+- Rows 1-4 of column 16 represent 4 chord patterns: A, B, C, D.
+  - Tapping a pattern will disable the Arranger and cue the pattern to play once the current pattern is completed.
+  - Tapping a pattern twice will immediately jump to the pattern.
+  - Holding one pattern and tapping on another will copy and paste chords from the held segment
+- The three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views
+  - Holding the Chord view key enables alternate functions
+    - E2 rotates the looped portion of the chord sequence
+    - E3 shifts the chord pattern left or right, decreasing or increasing chord degrees
+    - K3 generates a new chord sequence and also randomizes some related parameters like mode, key, and tempo
+  - Holding the Chord+Arp view keys enables K3 to generate both a new chord sequence and a new arp
+
+
+### Arp view
+![ds_events_grid](https://user-images.githubusercontent.com/435570/205140348-9ca26128-de84-44ca-bf74-afa3ca21bec6.svg)
+
+The Arp view is used to create an arpeggio based on the currently-playing chord
+
+- Notes from the current chord are sequenced using columns 1-14. Ex: if playing a Cmaj chord, columns 1-3 would result in the notes C, E, G. Columns 4-6 would result in the same notes one octave higher. Chord Type in the Arp menu can result in 4 notes/columns per octave.
+- Arp plays from top to bottom and sequence length is set using column 15. Playback will either loop or wait until the next chord step depending on the Mode setting in the Arp menu.
+- The three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views
+  - Holding the Arp view key enables alternate functions
+    - E2 rotates the looped portion of the arp pattern
+    - E3 shifts the arp pattern left or right
+    - K3 generates a new arp pattern
+  - Holding the Arp+Chord view keys enables K3 to generate both a new chord sequence and a new arp
+
+
+### Events view
+![ds_events_grid](https://user-images.githubusercontent.com/435570/205140348-9ca26128-de84-44ca-bf74-afa3ca21bec6.svg)
+
+The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement. For instance, you can create a dynamic crescendo/accelerando, schedule a Barry-Manilow key change or two, and even generate and transform chord/arp patterns.
+
+- Events view is entered by holding down an Arranger segment on row 5 of the Arranger view, then pressing Norns key 3
+- Each key represents on event, which fire from left to right then top to bottom.
+  - Columns 1-16 are 'event lanes' although you can mix event types if you prefer
+  - Rows 1-8 represent each step in the chord pattern for the selected Arranger segment and the keys will be dimly-illuminated to indicate the length of the pattern. Note that you can create events beyond the range of the chord pattern's length- they just won't fire
+- If an event is present (brightly illuminated), tapping the key will show the event settings.
+- Events are set using E2 and E3, and are saved using K3
+- K2 deletes the selected event or all events if none is selected
+- K3 is used to return to the Arranger view once finished
 
 
 # Norns interface
