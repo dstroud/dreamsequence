@@ -104,6 +104,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
 - If an event is present (brightly illuminated), tapping the key will show the event settings.
 - Events are set using E2 and E3, and are saved using K3
 - K2 deletes the selected event or all events if none is selected
+- Holding one event and tapping on another will copy and paste events from the held segment
 - K3 is used to return to the Arranger view once finished
 
 
