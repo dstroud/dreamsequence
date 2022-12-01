@@ -419,7 +419,7 @@ function update_menus()
   end
 
   -- global menu
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'playback', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
   
   -- chord menus   
   if params:string('chord_dest') == 'None' then
@@ -1530,15 +1530,18 @@ function grid_redraw()
         
       g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
       -- Optionally: Arranger enable/disable key has 3 states. on/re-sync/off
-      if params:get('arranger_enabled') == 1 then
+      -- if params:get('arranger_enabled') == 1 then
         -- if arranger_enabled == false then
         --   g:led(1,8, math.random(12,15))
         -- else
-          g:led(1,8, 15)
+          -- g:led(1,8, 15)
         -- end
-      else
-        g:led(1,8, 4)
-      end
+      -- else
+        -- g:led(1,8, 4)
+      -- end
+
+        g:led(2,8, params:get('playback') == 1 and 15 or 4)
+
       
       -- WIP- Arranger pages?
       -- g:led(1,8,15)
@@ -1675,6 +1678,14 @@ function g.key(x,y,z)
           params:set('arranger_enabled',1)
         else
           params:set('arranger_enabled',0)
+        end
+
+      -- enable/disable Arranger playback Loop mode
+      elseif x == 2 and y == 8 then
+        if params:get('playback') == 1 then
+          params:set('playback',2)
+        else
+          params:set('playback',1)
         end
         
       -- Automator events strip key down
@@ -1995,6 +2006,13 @@ function key(n,z)
         end      
         grid_redraw()
       
+      elseif screen_view_name == 'Session' and grid_view_name == 'Arranger' then
+        if params:get('arranger_enabled') == 0 then
+          params:set('arranger_enabled',1)
+        else 
+          params:set('arranger_enabled', 0)
+        end
+        
       -- Start/resume  
       elseif params:string('clock_source') == 'internal' then
         if transport_active then
@@ -2031,11 +2049,18 @@ function key(n,z)
           -- if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end
           reset_pattern()
           
+        elseif grid_view_name == 'Arranger' then       
+          -- Toggle Arranger playback mode
+          if params:get('playback') == 1 then
+            params:set('playback', 2)
+          else
+            params:set('playback', 1)            
+          end
         elseif grid_view_name == 'Chord' then       
-          -- chord_generator('run')
           chord_generator_lite()
         elseif grid_view_name == 'Arp' then       
           arp_generator('run')
+
         
         end
       grid_redraw()  
@@ -2606,7 +2631,7 @@ function redraw()
     elseif grid_view_name == 'Arranger' then --or grid_view_name == 'Arp') then-- Chord/Arp 
       screen.level(15)
       screen.move(2,8)
-      screen.text(string.upper(grid_view_name) .. ' GRID')-- FUNCTIONS')
+      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
       -- screen.move(2,28)
       -- screen.text('ENC 2: Rotate seq ↑↓')
       -- screen.move(2,38)
@@ -2615,9 +2640,19 @@ function redraw()
       screen.move(1,54)
       screen.line(128,54)
       screen.stroke()
-      -- screen.level(3)      
-      -- screen.move(128,62)
-      -- screen.text_right('(K3) GENERATE SONG')
+      screen.level(3)      
+      screen.move(1,62)
+      if params:get('arranger_enabled') == 0 then
+        screen.text('(K2) ENABLE')
+      else
+        screen.text('(K2) DISABLE')
+      end
+      screen.move(128,62)
+      if params:get('playback') == 1 then
+        screen.text_right('(K3) ONE-SHOT')
+      else
+        screen.text_right('(K3) LOOP')
+      end
         
     elseif grid_view_name == 'Chord' then --or grid_view_name == 'Arp') then-- Chord/Arp 
       screen.level(15)
@@ -2798,8 +2833,8 @@ function redraw()
         screen.level(3)
         screen.move(1,62)
         screen.text('(K2) DELETE')
-        screen.move(90,62)  -- 128 - screen.text_extents('DONE K3 >')
-        screen.text('(K3) DONE')
+        screen.move(128,62)  -- 128 - screen.text_extents('DONE K3 >')
+        screen.text_right('(K3) SAVE')
       end
     
 
