@@ -45,7 +45,6 @@ To understand Dreamsequence, let's take a look at its five linked components:
 
 ### Arranger view
 ![ds_arranger_grid](https://user-images.githubusercontent.com/435570/205140359-95a72fb4-a905-4a6c-a025-3b6bdc7d85aa.svg)
-
 The Arranger view is used to sequence chord patterns and enter the Events editor.
 
 - Rows 1-4 correspond to chord patterns A-D and columns 1-16 represent Arranger segments, or one playthrough of a pattern. The Arranger length automatically resizes to the rightmost selected key and any gaps in the sequence are filled in lighter colors to indicate that the previous chord pattern will be held.
@@ -61,11 +60,9 @@ The Arranger view is used to sequence chord patterns and enter the Events editor
 
 - The three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views 
 
-
-
+----------------------------------------------------------------------------------------------------------------------
 ### Chord view
 ![ds_chord_grid](https://user-images.githubusercontent.com/435570/205140357-8cf54869-e00c-4991-aefd-77bc8f69672e.svg)
-
 The Chord view is used to sequence chord patterns A-D
 
 - Chords are selected using columns 1-14 which represent chord degrees I-VII across two octaves
@@ -81,10 +78,9 @@ The Chord view is used to sequence chord patterns A-D
     - K3 generates a new chord sequence and also randomizes some related parameters like mode, key, and tempo
   - Holding the Chord+Arp view keys enables K3 to generate both a new chord sequence and a new arp
 
-
+----------------------------------------------------------------------------------------------------------------------
 ### Arp view
-![ds_events_grid](https://user-images.githubusercontent.com/435570/205140348-9ca26128-de84-44ca-bf74-afa3ca21bec6.svg)
-
+![ds_arp_grid](https://user-images.githubusercontent.com/435570/205157464-555400fc-a94d-43d7-86d6-1d877d23561d.svg)
 The Arp view is used to create an arpeggio based on the currently-playing chord
 
 - Notes from the current chord are sequenced using columns 1-14. Ex: if playing a Cmaj chord, columns 1-3 would result in the notes C, E, G. Columns 4-6 would result in the same notes one octave higher. Chord Type in the Arp menu can result in 4 notes/columns per octave.
@@ -96,10 +92,9 @@ The Arp view is used to create an arpeggio based on the currently-playing chord
     - K3 generates a new arp pattern
   - Holding the Arp+Chord view keys enables K3 to generate both a new chord sequence and a new arp
 
-
+----------------------------------------------------------------------------------------------------------------------
 ### Events view
 ![ds_events_grid](https://user-images.githubusercontent.com/435570/205140348-9ca26128-de84-44ca-bf74-afa3ca21bec6.svg)
-
 The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement. For instance, you can create a dynamic crescendo/accelerando, schedule a Barry-Manilow key change or two, and even generate and transform chord/arp patterns.
 
 - Events view is entered by holding down an Arranger segment on row 5 of the Arranger view, then pressing Norns key 3
