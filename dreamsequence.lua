@@ -63,9 +63,6 @@ function init()
     max = 1,
     default = 0,
     formatter = function(param) return t_f_string(param:get()) end}
-    
-    -- action = function() grid_redraw() end}
-    -- params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_enabled(); update_arranger_readout() end)
     params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_enabled() end)
     
     params:add_option('playback', 'Arranger', {'Loop','One-shot'}, 1)
@@ -977,9 +974,22 @@ end
 function reset_clock()
   clock_step = -1
   -- Immediately update this so if Arranger is zeroed we can use the current-set pattern (even if paused)
-  generate_arranger_seq_padded()  
+  generate_arranger_seq_padded()
 end
 
+-- Used when resetting view K3 or when jumping to chord pattern immediately via g.key press
+function reset_external_clock()
+  -- If we're sending MIDI clock out, send a stop msg
+  -- Tell the transport to Start on the next sync of sequence_clock
+  if params:get('clock_midi_out') ~= 1 then
+    if transport_active then
+      transport_midi:stop()
+    end
+    -- Tell sequence_clock to send a MIDI start/continue message after initial clock sync
+    clock_start_method = 'start'
+    start = true
+  end    
+end
 
 function advance_chord_seq()
   chord_seq_retrig = true -- indicates when we're on a new chord seq step for crow auto-rest logic.
@@ -1063,14 +1073,16 @@ function arranger_ending()
   arranger_one_shot_last_pattern = arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
 end
 
+
 -- Checks each time arrange_enabled param changes to see if we need to also immediately set the corresponding var to false
+-- Also sets pattern_queue to false to clear anything previously set
 function update_arranger_enabled()
   if params:string('arranger_enabled') == 'False' then 
     arranger_enabled = false
-  elseif params:string('arranger_enabled') == 'True' and chord_seq_position == 0 then
-    arranger_enabled = true
+  elseif params:string('arranger_enabled') == 'True' then
+    if chord_seq_position == 0 then arranger_enabled = true end
+    pattern_queue = false
   end
-  
 end  
 
 
@@ -1711,43 +1723,6 @@ function g.key(x,y,z)
         
       -- Arranger_seq patterns
       elseif y < 5 then
-        -- -- Enabling a segment happens immediately since it's common to want to then K3 to edit the events.
-        -- -- Disabling a segment occurs at key UP and can be interrupted if user enters event edit mode or ENC3 shift
-        -- if y == arranger_seq[x]then
-        --   change_arranger_step = 'disable'
-        -- else
-        --   change_arranger_step = nil
-        --   arranger_seq[x] = y
-        --   -- Update immediately if it's a new pattern being set (if it's being turned off, that is handled on the key up)
-        --   generate_arranger_seq_padded()
-        -- end
-        
-        -- --Enabling a segment happens immediately but need to consider copy+paste usage to see if this should remain
-        -- -- Disabling a segment occurs at key UP and will be interrupted if user does a copy+paste
-        -- if y == arranger_seq[x]then
-        --   -- To-do: revisit if we need this (copying segment patterns) or if we can simplify
-        --   change_arranger_step = 'disable'
-        -- else
-        --   change_arranger_step = nil
-        --   arranger_seq[x] = y
-        --   -- Update immediately if it's a new pattern being set (if it's being turned off, that is handled on the key up)
-        --   generate_arranger_seq_padded()
-        -- end       
-        
-
-        -- -- Copying this to use for arranger loop strip. Not sure if this will still be needed. Copy+paste probably but maybe this can be done on strip.
-        -- arranger_key_count = arranger_key_count + 1
-        -- table.insert(arranger_keys, x)
-        -- event_edit_pattern = x  -- Last touched pattern is the one we edit
-
-        -- -- Store original arranger sequence values so we can have non-destructive pattern shifting using ENC 3
-        -- d_cuml = 0
-        -- arranger_seq_length_og = arranger_seq_length
-        -- arranger_seq_og = deepcopy(arranger_seq)
-        -- automator_events_og = deepcopy(automator_events)
-        -- event_edit_pattern_og = event_edit_pattern
-        -- -- End of copy
-        
         if y == arranger_seq[x]then
           arranger_seq[x] = 0
         else
@@ -1851,21 +1826,35 @@ function g.key(x,y,z)
         pattern_key_count = math.max(pattern_key_count - 1,0)
         pattern_keys[y] = nil
         if pattern_key_count == 0 and pattern_copy_performed == false then
+          
+          -- Resets current pattern immediately
           if y == pattern then
             print('a - manual reset of current pattern')
             params:set('arranger_enabled', 0)
             pattern_queue = false
             arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
             chord_seq_position = 0
-            reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
-          elseif y == pattern_queue then -- Manual jump to queued pattern
+            -- reset_clock()            
+            -- Fix: Should be a reset flag that is executed on the next beat, maybe.
+            reset_external_clock()
+            reset_pattern()
+            
+          -- Manual jump to queued pattern  
+          elseif y == pattern_queue then
             print('b - manual jump to queued pattern')
+            
             pattern_queue = false
             pattern = y
             arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
             chord_seq_position = 0
-            reset_clock()             -- Fix: Should be a reset flag that is executed on the next beat
-          else                        -- Queue up a new pattern
+            -- reset_clock()            
+            -- Fix: Should be a reset flag that is executed on the next beat, maybe.
+            reset_external_clock()
+            reset_pattern()
+            
+
+          -- Cue up a new pattern        
+          else                       
             print('c - new pattern queued')
             if pattern_copy_performed == false then
               pattern_queue = y
@@ -1960,8 +1949,6 @@ function key(n,z)
         ------------------------
         -- K2 DELETE EVENT
         ------------------------
-        -- Replacing this with event_edit_active
-        -- if event_edit_step ~= 0 then
         if event_edit_active then
           -- print('Deleting event')
           
@@ -2005,13 +1992,6 @@ function key(n,z)
           screen_view_name = 'Session'
         end      
         grid_redraw()
-      
-      elseif screen_view_name == 'Session' and grid_view_name == 'Arranger' then
-        if params:get('arranger_enabled') == 0 then
-          params:set('arranger_enabled',1)
-        else 
-          params:set('arranger_enabled', 0)
-        end
         
       -- Start/resume  
       elseif params:string('clock_source') == 'internal' then
@@ -2049,56 +2029,33 @@ function key(n,z)
           -- if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end
           reset_pattern()
           
-        elseif grid_view_name == 'Arranger' then       
-          -- Toggle Arranger playback mode
-          if params:get('playback') == 1 then
-            params:set('playback', 2)
-          else
-            params:set('playback', 1)            
-          end
         elseif grid_view_name == 'Chord' then       
           chord_generator_lite()
         elseif grid_view_name == 'Arp' then       
           arp_generator('run')
-
-        
         end
-      grid_redraw()  
-      ---------------------------------------------------------------------------  
-      -- Arranger loop strip held down. Was previously used on arranger rows 1-4
-      ---------------------------------------------------------------------------        
-      -- elseif arranger_key_count > 0 then
-      elseif arranger_loop_key_count > 0 then
-        -- change_arranger_step = nil
-        
-        -- arranger_keys = {}
-        -- arranger_key_count = 0
-        -- arranger_loop_keys = {}
-        arranger_loop_key_count = 0        
-        
-        -- To-do: Need a new indicator that we're entering the event edit menu. Resetting these immediately can result in errors when key is held and another is pressed to paste.
-        
+      grid_redraw()
       
-        event_edit_step = 0 -- indicates one has not been selected yet
-        event_edit_lane = 0 -- Not sure if necessary
+      ---------------------------------------------------------------------------  
+      -- K3 with Event Timeline key held down enters Event editor
+      ---------------------------------------------------------------------------        
+      elseif arranger_loop_key_count > 0 then
+        arranger_loop_key_count = 0        
+        event_edit_step = 0
+        event_edit_lane = 0
         event_edit_active = false
         screen_view_name = 'Events'
-        
-        -- Forces redraw but it's kinda awkward because user is now pressing on a key in the event edit view
         grid_redraw()
   
-  
       -- K3 saves event to automator_events
-      
-      -- To-do: rewrite this garbage LOL
       elseif screen_view_name == 'Events' then
         
         ---------------------------------------
         -- K3 TO SAVE EVENT
         ---------------------------------------
-        -- WAG
-        -- if event_edit_lane > 0 then
-        if event_edit_active then --and event_edit_lane > 0 then
+        -- Intermittent occurred here (one time, really) where event appeared to save but was not overwritten. Printing a bunch of stuff for when it happens again.
+        print('event_edit_active ' .. (event_edit_active and 'true' or 'false'))
+        if event_edit_active then
           
           local event_index = params:get('event_name')
           local event_id = events_lookup[event_index].id
@@ -2124,15 +2081,30 @@ function key(n,z)
           -- Wipe existing events, write the event vars to automator_events
           if value_type == 'trigger' then
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index}
+            
+            print('Saving Trigger event to automator_events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')
+            print('category = ' .. events_lookup[event_index].category .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index)
+            
+            
           elseif value_type == 'set' then
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value}
+            
+         print('Saving Set event to automator_events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')            print('category = ' .. events_lookup[event_index].category .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index .. ', event_value = ' .. event_value)
+  
           elseif value_type == 'inc, set' then
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value, event_value_type = params:get('event_value_type')}
+            
+         print('Saving Inc/Set event to automator_events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')              print('category = ' .. events_lookup[event_index].category .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index .. ', event_value = ' .. event_value .. ' event_value_type = ' .. params:get('event_value_type'))
           end
+          
+          -- Extra fields are added if action is assigned to param/function
           if action ~= nil then
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action = action
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action_var = action_var
-          end            
+            
+            print('Action = ' .. action .. '(' .. action_var .. ')')
+          end
+          
     
           -- Back to event overview
           event_edit_active = false
@@ -2155,16 +2127,7 @@ function key(n,z)
       else
         
         -- Reset pattern/arp/arranger for standard K3 functionality-----------------
-        -- If we're sending MIDI clock out, send a stop msg
-        -- Tell the transport to Start on the next sync of sequence_clock
-        if params:get('clock_midi_out') ~= 1 then
-          if transport_active then
-            transport_midi:stop()
-          end
-          -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
-          clock_start_method = 'start'
-          start = true
-        end    
+          reset_external_clock()
   
         -- To-do: think about this some. What behavior makes sense if a reset occurs while waiting for Arranger to re-sync?
         if params:get('arranger_enabled') == 1 then
@@ -2641,18 +2604,18 @@ function redraw()
       screen.line(128,54)
       screen.stroke()
       screen.level(3)      
-      screen.move(1,62)
-      if params:get('arranger_enabled') == 0 then
-        screen.text('(K2) ENABLE')
-      else
-        screen.text('(K2) DISABLE')
-      end
-      screen.move(128,62)
-      if params:get('playback') == 1 then
-        screen.text_right('(K3) ONE-SHOT')
-      else
-        screen.text_right('(K3) LOOP')
-      end
+      -- screen.move(1,62)
+      -- if params:get('arranger_enabled') == 0 then
+      --   screen.text('(K2) ENABLE')
+      -- else
+      --   screen.text('(K2) DISABLE')
+      -- end
+      -- screen.move(128,62)
+      -- if params:get('playback') == 1 then
+      --   screen.text_right('(K3) ONE-SHOT')
+      -- else
+      --   screen.text_right('(K3) LOOP')
+      -- end
         
     elseif grid_view_name == 'Chord' then --or grid_view_name == 'Arp') then-- Chord/Arp 
       screen.level(15)
