@@ -12,34 +12,52 @@ Optional: Crow, Just Friends, CV and/or MIDI sequencers/controllers
 
 Dreamsequence takes a walled-garden approach to composition by first limiting the available chords to a given mode and key, then limiting the output of the arpeggiator and harmonizers to only notes in the currently-playing chord. It will make you sound like a musical genius (or at least vaguely competent).
 
-To understand Dreamsequence, let's take a look at its five linked components:
+To understand Dreamsequence, let's take a look at its core components:
 
 ### Grid-based chord sequencer
 - Available chords are based on the global mode and key setting and are referenced by chord degrees 1-7.
 - Create up to 4 chord patterns (A, B, C, D) by entering a pattern on Grid.
-- Chords can be directly output to one of several destinations: Norns engine, MIDI, or Just-Friends (Norns USB>>Crow>>i2c>>JF)
+- Chords can be directly output to one of several destinations: 
+  - Norns engine
+  - MIDI
+  - Just-Friends (Norns USB>>Crow>>i2c>>JF)
 - Currently-playing chord is sent to the linked arpeggiator and harmonizers where it will define behavior.
 
 ### Grid-based arpeggiator
 - Arpeggiate or strum notes from the current chord by entering a pattern on Grid.
-- Outgoing sequence can be sent to one of several destinations: Norns engine, CV (Norns USB>>Crow), MIDI, or Just-Friends (Norns USB>>Crow>>i2c>>JF)
+- Destinations: 
+  - Norns engine
+  - CV (Norns USB>>Crow)
+  - MIDI
+  - Just-Friends (Norns USB>>Crow>>i2c>>JF)
 
 ### MIDI harmonizer
 - Harmonizer transforms an incoming MIDI sequence to play notes from the current chord across a wide range of octaves.
 - +/- 1 change in incoming semitone relative to C1 results in a +/- 1 change in note selection from the current chord (across range of octaves).
 - Ex when the chord sequencer is currently playing a Cmaj chord (_note in_>>_note out_): _C1_>>_C1_, _C#1_>>_E1_, _D1_>>_G1_, _D#1_>>_C2_
-- Outgoing sequence can be sent to one of several destinations: Norns engine, CV (Norns USB>>Crow), MIDI, or Just-Friends (Norns USB>>Crow>>i2c>>JF)
+- Destinations: 
+  - Norns engine
+  - CV (Norns USB>>Crow)
+  - MIDI
+  - Just-Friends (Norns USB>>Crow>>i2c>>JF)
 
 ### CV harmonizer (requires Crow)
 - Harmonizer transforms an incoming control voltage (CV) sequence to play notes from the current chord across a wide range of octaves.
 - + 1/12v (1 semitone @ 1v/oct) change in incoming voltage results in a + 1 change in note selection from the current chord (across range of octaves).
-- Ex when the chord sequencer is currently playing a Cmaj chord (_volts in_>>_note out_): _0v_>>_C1_, _1/12v_>>_E1_, _2/12v_>>_G1_, _3/12v_>>_C2_
-- Outgoing sequence can be sent to one of several destinations: Norns engine, CV (Norns USB>>Crow), MIDI, or Just-Friends (Norns USB>>Crow>>i2c>>JF)
+- Ex: when the chord sequencer is currently playing a Cmaj chord: (_volts in_>>_note out_): _0v_>>_C1_, _1/12v_>>_E1_, _2/12v_>>_G1_, _3/12v_>>_C2_
+- Destinations:
+  - Norns engine
+  - CV (Norns USB>>Crow)
+  - MIDI
+  - Just-Friends (Norns USB>>Crow>>i2c>>JF)
 
 ### Arranger
-- Harmonizer sequences the chord patterns (A, B, C, D) and handles the scheduling of automation events.
-- Automation events can introduce parameter changes, transform or generate chord/arp patterns, send CV triggers from Crow, etc...
+- Arranger sequences the chord patterns (A, B, C, D) and handles the scheduling of "events" along the Arranger timeline.
+- Events set or increment parameter values as well as call functions. For instance, you can create a dynamic crescendo/accelerando, schedule a Barry-Manilow key change or two, send triggers out from Crow to CV gear, and even generate and transform chord and arp patterns.
 
+### Generator
+- Sometimes it's nice to shuffle the deck, so to speak, before beginning to compose. Dreamsequence has the ability to algorithmically generate chord progressions and arpeggios, along with some randomization of things like tempo, mode, and key.
+- Generator algorithms can be selected at random or set using the "C-gen" and "A-gen" Global menu options.
 
 # Grid interface
 
@@ -95,7 +113,7 @@ The Arp view is used to create an arpeggio based on the currently-playing chord
 ----------------------------------------------------------------------------------------------------------------------
 ### Events view
 ![ds_events_grid](https://user-images.githubusercontent.com/435570/205140348-9ca26128-de84-44ca-bf74-afa3ca21bec6.svg)
-The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement. For instance, you can create a dynamic crescendo/accelerando, schedule a Barry-Manilow key change or two, and even generate and transform chord/arp patterns.
+The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement.
 
 - Events view is entered by holding down an Arranger segment on row 5 of the Arranger view, then pressing Norns key 3
 - Each key represents on event, which fire from left to right then top to bottom.
