@@ -257,7 +257,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
   - None: Selecting 'none' will mute the arp.
   - Engine: Norns' PolyPerc engine.
   - MIDI: Output on MIDI port 1.
-  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear.
+  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching).
   - ii-JF: Just Friends Eurorack module requires Crow connected to Just Friends via i2c.
 
 - Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently.
@@ -295,7 +295,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
   - MIDI: Output on MIDI port 1.
-  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear.
+  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching).
   - ii-JF: Just Friends Eurorack module requires Crow connected to Just Friends via i2c.
 
 - Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently.
@@ -332,7 +332,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
   - MIDI: Output on MIDI port 1.
-  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. See Crow Patching section below for details.
+  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching).
   - ii-JF: Just Friends Eurorack module requires Crow connected to Just Friends via i2c.
 
 - Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently.
