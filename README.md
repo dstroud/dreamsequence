@@ -222,7 +222,7 @@ At the top right of the screen is the Pattern Dashboard.
 
 ![ds_arranger_mask](https://user-images.githubusercontent.com/435570/205408738-b5681489-2fad-4b31-9003-b8cbf2e360ec.png)
 
-At the top right of the screen is the Arranger Dashboard.
+At the bottom right of the screen is the Arranger Dashboard.
 - Dashboard will be brightly illuminated when Arranger is enabled, and dimmed when disabled.
 - The numbers in the top left indicate the current Arranger segment and step. "1.1" in the example above indicates the first step of segment 1. If the Arrange is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger picks back up on the next segment.
 - To the right, a symbol will indicate if the Arranger is in Loop mode (as in the example above) or One-shot mode (arrow symbol).
