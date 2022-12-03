@@ -196,6 +196,40 @@ The Events view is used to manage the scheduling of parameter changes and functi
   - While holding Chord, Arp, or Chord+Arp Grid view keys (last two keys on the rightmost column): shift the selected pattern left or right.
 
 ## Norns screen
+![ds_global_corrected](https://user-images.githubusercontent.com/435570/205408391-6636eec4-8fce-4683-9575-4e72978d946d.png)
+
+Upon starting Dreamsequence you will be dropped into the Global page. Let's orient you a bit.
+
+![ds_menu_mask](https://user-images.githubusercontent.com/435570/205408637-b9f59a51-072f-4f1d-8ce9-bdb155f5e52f.png)
+
+The left portion of the Norns screen displays one of the following "pages" and associated menu items:
+  - GLOBAL
+  - CHORD
+  - ARP
+  - MIDI HARMONIZER
+  - CV HARMONIZER
+ 
+To navigate between pages, use E2 to scroll to the top of the list of menu items until the page name is highlighted, then use E3 to change the page. To change a menu item, simply scroll down the list using E2 and change its value using E3. < and > symbols will appear when you are at the end of the range of possible values.
+ 
+![ds_pattern_mask](https://user-images.githubusercontent.com/435570/205408704-f8704d71-08dd-456e-835a-e4a4ec2d2c62.png)
+
+At the top right of the screen is the Pattern Dashboard.
+
+- "A1" in the example above means we are on step 1 of pattern A.
+- To the right of this, a symbol will show the current playback state: Playing, Paused, or Stopped.
+- Below, the currently-playing chord will be displayed. Holding down a chord key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key.
+
+
+![ds_arranger_mask](https://user-images.githubusercontent.com/435570/205408738-b5681489-2fad-4b31-9003-b8cbf2e360ec.png)
+
+At the top right of the screen is the Arranger Dashboard.
+- Dashboard will be brightly illuminated when Arranger is enabled, and dimmed when disabled.
+- The numbers in the top left indicate the current Arranger segment and step. "1.1" in the example above indicates the first step of segment 1. If the Arrange is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger picks back up on the next segment.
+- To the right, a symbol will indicate if the Arranger is in Loop mode (as in the example above) or One-shot mode (arrow symbol).
+- In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. In the example above, pattern A will be played twice, then pattern B twice, and pattern C twice. Note that, unlike the Arranger Grid view, this chart shows the individual steps within each segment, at a scale of one pixel per step.
+- At the bottom of the chart is an indication of which steps have events. In the example above, events are highlighted on the first step of segments one, three, and five.
+- At the very bottom of the dash is a readout of the remaining time on the Arranger. Note that this countdown may be adjusted if the Arranger is interrupted by being disabled and re-enabled.
+
 
 ## Menus
 ### Global menu: General settings that affect the entire script.
