@@ -406,7 +406,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping.
 
 
-## Crow Patching
+# Crow Patching
 
 Dreamsequence supports using Crow to receive an incoming CV sequence+trigger to feed the CV Harmonizer as well as to send out a CV sequence+trigger, clock, and optional Event triggers.
 
