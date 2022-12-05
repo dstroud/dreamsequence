@@ -1246,7 +1246,8 @@ function to_engine(source, note)
   end
   
   if engine_play_note == true then
-    local note_hz = musicutil.note_num_to_freq(note + 36)
+    -- PolyPerc crashes if sent >24000 hz!!!
+    note_hz = math.min(musicutil.note_num_to_freq(note + 36), 24000)
     engine.amp(params:get(source..'_pp_amp') / 100)
     engine.cutoff(note_hz * params:get(source..'_pp_tracking') *.01 + params:get(source..'_pp_cutoff'))
     engine.release(duration_sec(_G[source .. '_duration']))
