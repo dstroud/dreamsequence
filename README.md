@@ -10,24 +10,38 @@ Optional: Crow, Just Friends, CV and/or MIDI sequencers/controllers.
 
 # Overview
 
-Dreamsequence takes a walled-garden approach to composition by first limiting the available chords to a given mode and key, then limiting the output of the arpeggiator and harmonizers to only notes in the currently-playing chord. It will make you sound like a genius composer (or at least a vaguely competent one).
+Dreamsequence is a walled-garden sequencer built for speed, improvisation, and experimentation. Rather than aim for an open-ended approach in which any possible chord or note can be sequenced, it operates by first limiting the available chords to a given mode and key, then limiting the output of the arpeggiator and harmonizers to only notes in the currently-playing chord. The upshot to such a constrained approach to composition is that we're able to get pretty weird with features like live pattern manipulation and bringing in generative sequences from CV and MIDI 
+
+While this may sound like a rather limiting way to build a song, the upshot is that you're able
+
+
+It will make you sound like a genius composer (or at least a vaguely competent one).
 
 To understand Dreamsequence, let's take a look at its core components:
 
 ### Grid-based chord sequencer
 - Create up to 4 chord patterns (A, B, C, D) by entering a pattern on Grid (or by using the Generator).
 
-- Available chords are referenced by degrees (I-VII) across two octaves. If you're not well-versed in music theory (_I sure am not_), this is nothing to be intimidated by. It's a handy way to quickly and non-destructively change the mood of a composition by simply switching to a different Mode.- 
+- Sequencer pattern operates using chord degrees (I-VII) across two octaves. You can quickly and non-destructively change the mood of a composition by simply switching to a different Mode which will adjust the chord output accordingly.
 
 - Chords can be output to one of several destinations: 
   - Norns engine
   - MIDI
   - Just-Friends (Norns USB>>Crow>>i2c>>JF)
 
-- Currently-playing chord is sent to the linked arpeggiator and harmonizers where it will define their behavior.
+- The currently playing chord is sent to the linked arpeggiator and harmonizers where it will define their behavior.
 
 ### Grid-based arpeggiator (Arp)
-- Arpeggiate or strum the current chord by entering a pattern on Grid (or by using the Generator).
+- Arpeggiate or strum the current chord by entering a pattern on Grid (or by using the Generator). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj:
+
+  | Column  | Triad Out| 7th Out  |
+  |---------|----------|----------|
+  | 1       | C1       | C1       |
+  | 2       | E1       | E1       |
+  | 3       | G1       | G1       |
+  | 4       | C2       | B1       |
+  | 5       | E2       | C2       |
+  | 6       | G2       | E2       |
 
 - Arp can be output to one of several destinations: 
   - Norns engine
@@ -38,16 +52,16 @@ To understand Dreamsequence, let's take a look at its core components:
 ### MIDI harmonizer
 - Transform an incoming MIDI sequence to play notes from the current chord across a wide range of octaves.
 
-- +/- 1 change in incoming semitone relative to C1 results in a +/- 1 change in note selection from the current chord (across range of octaves). Example assuming the chord sequencer is playing Cmaj:
+- +/- 1 change in incoming semitone relative to C1 results in a +/- 1 change in note selection from the current chord (across range of octaves). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj:
 
-  | Note In | Note Out |
-  |---------|----------|
-  | C1      | C1       |
-  | C#1     | E1       |
-  | D1      | G1       |
-  | D#1     | C2       |
-  | E1      | E2       |
-  | F1      | G2       |
+  | Note In | Triad Out| 7th Out  |
+  |---------|----------|----------|
+  | C1      | C1       | C1       |
+  | C#1     | E1       | E1       |
+  | D1      | G1       | G1       |
+  | D#1     | C2       | B1       |
+  | E1      | E2       | C2       |
+  | F1      | G2       | E2       |
 
 - Harmonizer can be output to one of several destinations: 
   - Norns engine
@@ -60,14 +74,14 @@ To understand Dreamsequence, let's take a look at its core components:
 
 - +/- 1/12v (1 semitone @ 1v/oct) change in incoming voltage results in a +/- 1 change in note selection from the current chord (across range of octaves). Example assuming the chord sequencer is playing Cmaj:
 
-  | Volts In| Note Out |
-  |---------|----------|
-  | 0v      | C1       |
-  | 1/12v   | E1       |
-  | 2/12v   | G1       |
-  | 3/12v   | C2       |
-  | 4/12v   | E2       |
-  | 5/12v   | G2       |
+  | Volts In| Triad Out| 7th Out  |
+  |---------|----------|----------|
+  | 0v      | C1       | C1       |
+  | 1/12v   | E1       | E1       |
+  | 2/12v   | G1       | G1       |
+  | 3/12v   | C2       | B1       |
+  | 4/12v   | E2       | C2       |
+  | 5/12v   | G2       | E2       |
 
 - Harmonizer can be output to one of several destinations: 
   - Norns engine
@@ -180,59 +194,58 @@ The Events view is used to manage the scheduling of parameter changes and functi
 - K3: Reset
   - Arranger disabled: reset arp and chord playhead positions.
   - Arranger enabled: reset arranger, arp, and chord playhead positions.
-  - While holding Chord, Arp, or Chord+Arp Grid view keys (last two keys on the rightmost column): Generate a new chord pattern, arp pattern, or both chord and arp patterns. Algorithms used can be set in Global: C-gen/A-gen (chord and arp, respectively).
   - While holding down an arranger Event Timeline key: enter Event Editor.
   - While in the Events editor screen: save Events and return back to Arranger.
+  - While holding Chord, Arp, or Chord+Arp Grid view keys (last two keys on the rightmost column): Generate a new chord pattern, arp pattern, or both chord and arp patterns. Algorithms used can be set in Global: C-gen/A-gen (chord and arp, respectively).
 
 - E1: Not currently used
 
 - E2: Select menu
   - Scrolls up/down to select menu.
-  - While holding Chord, Arp, or Chord+Arp Grid view keys (last two keys on the rightmost column): rotate the looped portion of the active pattern up or down.
+  - While holding Chord or Arp Grid view keys (last two keys on the rightmost column): rotate the looped portion of the active pattern up or down.
 
 
 - E3: Edit
   - Changes the value of the selected menu item, including changing the 'page' on top level menus.
-  - While holding Chord, Arp, or Chord+Arp Grid view keys (last two keys on the rightmost column): shift the selected pattern left or right.
+  - While holding Chord or Arp Grid view keys (last two keys on the rightmost column): shift the selected pattern left or right.
 
 ## Norns screen
+
+Dreamsequence starts up on the Global menu page. The following documentation explains each section of the screen.
+
 ![ds_global_corrected](https://user-images.githubusercontent.com/435570/205408391-6636eec4-8fce-4683-9575-4e72978d946d.png)
-
-Upon starting Dreamsequence you will be dropped into the Global page. Let's orient you a bit.
-
-![ds_menu_mask](https://user-images.githubusercontent.com/435570/205408637-b9f59a51-072f-4f1d-8ce9-bdb155f5e52f.png)
-
-The left portion of the Norns screen displays one of the following "pages" and associated menu items:
-  - GLOBAL
-  - CHORD
-  - ARP
-  - MIDI HARMONIZER
-  - CV HARMONIZER
+----------------------------------------------------------------------------------------------------------------------
  
-To navigate between pages, use E2 to scroll to the top of the list of menu items until the page name is highlighted, then use E3 to change the page. To change a menu item, simply scroll down the list using E2 and change its value using E3. < and > symbols will appear when you are at the end of the range of possible values.
- 
+### Pattern Dashboard
+
 ![ds_pattern_mask](https://user-images.githubusercontent.com/435570/205408704-f8704d71-08dd-456e-835a-e4a4ec2d2c62.png)
-
-At the top right of the screen is the Pattern Dashboard.
 
 - "A1" in the example above means we are on step 1 of pattern A.
 - To the right of this, a symbol will show the current playback state: Playing, Paused, or Stopped.
 - Below, the currently-playing chord will be displayed. Holding down a chord key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key.
+----------------------------------------------------------------------------------------------------------------------
 
+### Arranger Dashboard
 
 ![ds_arranger_mask](https://user-images.githubusercontent.com/435570/205408738-b5681489-2fad-4b31-9003-b8cbf2e360ec.png)
 
-At the bottom right of the screen is the Arranger Dashboard.
 - Dashboard will be brightly illuminated when Arranger is enabled, and dimmed when disabled.
 - The numbers in the top left indicate the current Arranger segment and step. "1.1" in the example above indicates the first step of segment 1. If the Arrange is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger picks back up on the next segment.
 - To the right, a symbol will indicate if the Arranger is in Loop mode (as in the example above) or One-shot mode (arrow symbol).
 - In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. In the example above, pattern A will be played twice, then pattern B twice, and pattern C twice. Note that, unlike the Arranger Grid view, this chart shows the individual steps within each segment, at a scale of one pixel per step.
 - At the bottom of the chart is an indication of which steps have events. In the example above, events are highlighted on the first step of segments one, three, and five.
 - At the very bottom of the dash is a readout of the remaining time on the Arranger. Note that this countdown may be adjusted if the Arranger is interrupted by being disabled and re-enabled.
+----------------------------------------------------------------------------------------------------------------------
 
+### Menus
+![ds_menu_mask](https://user-images.githubusercontent.com/435570/205408637-b9f59a51-072f-4f1d-8ce9-bdb155f5e52f.png)
 
-## Menus
-### Global menu: General settings that affect the entire script.
+The left portion of the Norns screen displays one of the following "pages" and associated menu items:
+  - GLOBAL <> CHORD <> ARP <> MIDI HARMONIZER <> CV HARMONIZER
+ 
+To navigate between pages, use E2 to scroll to the top of the list of menu items until the page name is highlighted, then use E3 to change the page. To change a menu item, simply scroll down the list using E2 and change its value using E3. < and > symbols will appear when you are at the end of the range of possible values. Descriptions of each page and menu options follow.
+
+#### Global menu: General settings that affect the entire script.
 - Mode: 9 primary modes.
 
 - Key: Global transposition of +/- 12 semitones.
@@ -255,7 +268,7 @@ At the bottom right of the screen is the Arranger Dashboard.
 
 - A-gen: Which algorithm is used for generating _arp_ patterns. The default value of Random picks an algorighm randomly each time.
 
-### Chord menu: Settings for the chord sequencer.
+#### Chord menu: Settings for the chord sequencer.
 - Destination: Where the output of the chord sequence is sent for playback. Some menu items are destination-specific.
   - None: Still sends chords to the arp and harmonizers, they just won't play directly. 
   - Engine: Norns' PolyPerc engine.
@@ -286,7 +299,7 @@ At the bottom right of the screen is the Arranger Dashboard.
 
 - Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping.
 
-### Arp menu: Setting for the built-in arpeggiator
+#### Arp menu: Setting for the built-in arpeggiator
 - Destination: Where the output of the arpeggio is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the arp.
   - Engine: Norns' PolyPerc engine.
@@ -324,7 +337,7 @@ At the bottom right of the screen is the Arranger Dashboard.
 
 - Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping.
 
-### MIDI in menu: Setting for the MIDI harmonizer
+#### MIDI in menu: Setting for the MIDI harmonizer
 - Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
@@ -361,7 +374,7 @@ At the bottom right of the screen is the Arranger Dashboard.
 - Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping.
 
 
-### CV in menu: Setting for the CV harmonizer
+#### CV in menu: Setting for the CV harmonizer
 - Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
@@ -399,9 +412,12 @@ At the bottom right of the screen is the Arranger Dashboard.
 
 
 ## Crow Patching
+
+Dreamsequence supports using Crow to receive an incoming CV sequence+trigger to feed the CV Harmonizer as well as to send out a CV sequence+trigger, clock, and optional Event triggers.
+
 - Crow IN 1: CV in, feeding the CV harmonizer
 - Crow IN 2: Trigger in will sample the CV on Crow IN 1
 - Crow OUT 1: V/oct out
 - Crow OUT 2: Trigger or 10v AR envelope out
-- Crow OUT 3: Clock out
-- Crow OUT 4: A trigger can be sent from this output by scheduling an event
+- Crow OUT 3: Clock out (beat-division or PPQN set in "Global:Crow clock" menu item.
+- Crow OUT 4: A trigger can be sent from this output by scheduling an Event.
