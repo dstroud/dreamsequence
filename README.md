@@ -10,14 +10,9 @@ Optional: Crow, Just Friends, CV and/or MIDI sequencers/controllers.
 
 # Overview
 
-Dreamsequence is a walled-garden sequencer built for speed, improvisation, and experimentation. Rather than aim for an open-ended approach in which any possible chord or note can be sequenced, it operates by first limiting the available chords to a given mode and key, then limiting the output of the arpeggiator and harmonizers to only notes in the currently-playing chord. The upshot to such a constrained approach to composition is that we're able to get pretty weird with features like live pattern manipulation and bringing in generative sequences from CV and MIDI 
+Dreamsequence is a walled-garden sequencer built for speed, improvisation, and experimentation. Rather than aim for an open-ended approach in which any possible chord or note can be sequenced, it operates by first limiting the available chords to a given mode and key, then limiting the output of the arpeggiator and harmonizers to only notes in the currently-playing chord. The upshot to such a constrained approach to composition is that we're able to get weird with features like live pattern manipulation and harmonizers that ingest CV/MIDI sequences and adapt them to fit your song's structure.
 
-While this may sound like a rather limiting way to build a song, the upshot is that you're able
-
-
-It will make you sound like a genius composer (or at least a vaguely competent one).
-
-To understand Dreamsequence, let's take a look at its core components:
+Let's take a look at the core components of Dreamsequence:
 
 ### Grid-based chord sequencer
 - Create up to 4 chord patterns (A, B, C, D) by entering a pattern on Grid (or by using the Generator).
@@ -90,9 +85,9 @@ To understand Dreamsequence, let's take a look at its core components:
   - Just-Friends (Norns USB>>Crow>>i2c>>JF)
 
 ### Arranger
-- Sequence the chord patterns (A, B, C, D) and schedule "events" along the Arranger timeline.
+- Sequence the chord patterns (A, B, C, D) and schedule "Events" along the Arranger timeline.
 
-- Events set or increment parameter values as well as call functions. For example, create a dynamic crescendos/accelerandos, schedule a Barry-Manilow key change or two, send triggers out from Crow to CV gear, and even generate and transform chord and arp patterns.
+- Events set or increment parameter values as well as call functions. For example, you might create a dynamic crescendos/accelerandos, schedule a Barry-Manilow key change or two, redirect sequences to various destinations, send triggers out from Crow to CV gear, and even generate and transform chord and arp patterns.
 
 ### Generator
 - Algorithmically generate chord progressions and arpeggios, along with some randomization of things like tempo, mode, and key.
@@ -106,14 +101,14 @@ To understand Dreamsequence, let's take a look at its core components:
 ![ds_chord_grid](https://user-images.githubusercontent.com/435570/205140357-8cf54869-e00c-4991-aefd-77bc8f69672e.svg)
 The Chord view is used to sequence chord patterns A-D. Since the following views are all affected by what chord is playing, this is typically where you'll begin composing.
 
-- Chords are selected using columns 1-14 which represent chord degrees I-VII across two octaves.
-
 - Sequence plays from top to bottom and sequence length is set using column 15.
+
+- Chords are selected using columns 1-14 which represent chord degrees I-VII across two octaves. Pressing and holding a key will display the corresponding chord on the Norns screen Pattern Dashboard.
 
 - Rows 1-4 of rightmost column represent 4 chord patterns: A, B, C, D.
   - Tapping a pattern will disable the Arranger and cue the pattern to play once the current pattern is completed.
-  - Tapping a pattern twice will immediately jump to the pattern.
-  - Holding one pattern and tapping on another will copy and paste chords from the held segment.
+  - Tapping a pattern twice (or the currently playing pattern once) will immediately jump to the pattern.
+  - Holding one pattern and tapping on another will copy and paste chords from the held pattern.
 
 - The last three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views.
   - Holding the Chord view key enables alternate functions:
@@ -145,15 +140,15 @@ The Arranger view is used to sequence chord patterns and enter the Events editor
 
 - Rows 1-4 correspond to chord patterns A-D and columns 1-16 represent "segments" of the Arranger sequence. The Arranger length automatically resizes to the rightmost set pattern and any gaps in the sequence are filled in lighter colors to indicate that the previous chord pattern will be held.
 
-- Row 5 is the Events Timeline, which indicates if one or more events are present on a segment. Holding down a key on the Events Timeline will enable alternate functions:
+- Row 5 is the Events Timeline, which illuminates a key if a segment contains one or more events. Holding down a key on the Events Timeline will enable alternate functions:
   - E3 shifts the selected segment and subsequent segments to the right or left depending on the direction of rotation.
   - K2 will jump the playhead to the selected segment after the current segment is finished.
   - K3 enters the Events view (see below).
   - Holding one segment and tapping on another will copy and paste events from the held segment.
 
-- Key 1 (bottom left) will enable or disable the Arranger.
+- Grid key 1 (bottom left) will enable or disable the Arranger.
 
-- Key 2 (bottom, second from left) switches between Loop (bright) and One-shot (dim) Arranger modes.
+- Grid key 2 (bottom, second from left) switches between Loop (bright) and One-shot (dim) Arranger modes.
 
 - The last three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views. 
 
@@ -165,16 +160,16 @@ The Events view is used to manage the scheduling of parameter changes and functi
 - Events view is entered by holding down an Arranger segment on row 5 of the Arranger view, then pressing K3.
 
 - Each key represents on event, which fire from left to right then top to bottom.
-  - Columns 1-16 are 'event lanes' although you can mix event types if you embrace chaos in your life (highly recommended).
+  - Columns 1-16 are 'event lanes', although you can mix event types if you embrace chaos in your life (highly recommended).
   - Rows 1-8 represent each step in the segment's chord pattern. Keys will be dimly-illuminated to indicate the length of the pattern. Note that you can create events beyond the range of the chord pattern's length- they just won't fire.
 
-- If an event is present (brightly illuminated), tapping the key will show the event settings.
+- If an event is present (brightly illuminated), tapping the key will show the event settings. If an event is empty, tapping it will show the last-selected event type as a convenience.
 
 - Events are set using E2 and E3, and are saved using K3.
 
 - K2 deletes the selected event or all events if none is selected.
 
-- Holding one event and tapping on another will copy and paste events from the held segment.
+- Holding one event and tapping on another will copy and paste events from the held position.
 
 - K3 is used to return to the Arranger view once finished.
 
@@ -230,7 +225,7 @@ Dreamsequence starts up on the Global menu page. The following documentation exp
 ![ds_arranger_mask](https://user-images.githubusercontent.com/435570/205408738-b5681489-2fad-4b31-9003-b8cbf2e360ec.png)
 
 - Dashboard will be brightly illuminated when Arranger is enabled, and dimmed when disabled.
-- The numbers in the top left indicate the current Arranger segment and step. "1.1" in the example above indicates the first step of segment 1. If the Arrange is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger picks back up on the next segment.
+- The numbers in the top left indicate the current Arranger segment and step. "1.1" in the example above indicates the first step of segment 1. If the Arranger is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger resumes on the next segment.
 - To the right, a symbol will indicate if the Arranger is in Loop mode (as in the example above) or One-shot mode (arrow symbol).
 - In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. In the example above, pattern A will be played twice, then pattern B twice, and pattern C twice. Note that, unlike the Arranger Grid view, this chart shows the individual steps within each segment, at a scale of one pixel per step.
 - At the bottom of the chart is an indication of which steps have events. In the example above, events are highlighted on the first step of segments one, three, and five.
@@ -254,11 +249,11 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Clock: System clock setting. Internal is recommended, but MIDI will work assuming you are syncing to a delay/latency-compensated clock source. Link is not recommended since there is no latency compensation in Norn's system clock. Crow clock source is not supported at this time.
 
-- Out: System MIDI out parameter.
+- Out: System MIDI clock destination parameter.
 
-- Crow clock: Frequency of the clock pulse from Crow out port 3. Options include note-style divisions or Pulses Per Quarter Note (PPQN). Note that higher PPQN settings are likely to result in instability. _At launch, Dreamsequence sets the Norns system clock "crow out" parameter to 'off' since Dreamsequence generates its own clock pulses for Crow that only runs when the script's transport is playing._
+- Crow clock: Frequency of the clock pulse from Crow out port 3. Options include note-style divisions or Pulses Per Quarter Note (PPQN). Note that higher PPQN settings are likely to result in instability. _At launch, Dreamsequence sets the Norns system clock "crow out" parameter to "off" since Dreamsequence generates its own clock pulses for Crow that only runs when the script's transport is playing._
 
-- Dedupe <: This enables and sets the threshold for detecting and de-duplicating repeat notes at each destination. This can be particularly helpful when merging sequences from different sources (say arp and harmonizer). Rather than trying to send the same note twice (resulting in truncated notes or phasing issues), this will let the initial note pass and filter out the second note if it arrives within the defined period of time.
+- Dedupe <: This enables and sets the threshold for detecting and de-duplicating repeat notes at each destination. This can be particularly helpful when merging sequences from different sources (say arp and harmonizer). Rather than trying to send the same note twice (potentially resulting in truncated notes or phase cancellation issues), this will let the initial note pass and filter out the second note if it arrives within the specified period of time.
 
 - Chord preload: This setting enables the sequencer to fetch upcoming chord changes slightly early for processing the harmonizer inputs. This compensates for situations where the incoming note may arrive slightly before the chord change it's intended to harmonize with. This does not change when the Chord and Arp sequences fire, it's only for background processing.
 
