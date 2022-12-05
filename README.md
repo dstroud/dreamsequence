@@ -383,7 +383,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Duration (_Engine, Crow, MIDI_): note duration relative to 1 measure.
 
-- Auto-rest: When true, this function will suppress the same note when it is repeated within one chord step, resulting in a rest.
+- Auto-rest: When true, this option will suppress the same note when it is repeated consecutively within one chord step, resulting in a rest.
 
 - Amp: (_Engine_): Norns engine amplitude.
 
