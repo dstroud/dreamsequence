@@ -240,7 +240,8 @@ The left portion of the Norns screen displays one of the following "pages" and a
  
 To navigate between pages, use E2 to scroll to the top of the list of menu items until the page name is highlighted, then use E3 to change the page. To change a menu item, simply scroll down the list using E2 and change its value using E3. < and > symbols will appear when you are at the end of the range of possible values. Descriptions of each page and menu options follow.
 
-#### Global menu: General settings that affect the entire script.
+#### Global menu
+
 - Mode: 9 primary modes.
 
 - Key: Global transposition of +/- 12 semitones.
@@ -263,7 +264,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - A-gen: Which algorithm is used for generating _arp_ patterns. The default value of Random picks an algorighm randomly each time.
 
-#### Chord menu: Settings for the chord sequencer.
+#### Chord menu
 - Destination: Where the output of the chord sequence is sent for playback. Some menu items are destination-specific.
   - None: Still sends chords to the arp and harmonizers, they just won't play directly. 
   - Engine: Norns' PolyPerc engine.
@@ -294,7 +295,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping.
 
-#### Arp menu: Setting for the built-in arpeggiator
+#### Arp menu
 - Destination: Where the output of the arpeggio is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the arp.
   - Engine: Norns' PolyPerc engine.
@@ -332,7 +333,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping.
 
-#### MIDI in menu: Setting for the MIDI harmonizer
+#### MIDI Harmonizer menu
 - Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
@@ -369,7 +370,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - Amp (_Just Friends_): amplitude of Just Friends' voice. Note that the amp range is very wide an can result in distortion or clipping.
 
 
-#### CV in menu: Setting for the CV harmonizer
+#### CV Harmonizer menu
 - Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
