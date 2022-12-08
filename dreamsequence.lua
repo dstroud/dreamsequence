@@ -232,6 +232,7 @@ function init()
   arranger_queue = false
   pattern_copy_performed = false
   arranger_seq_retrig = false
+  spp_beats = 0
   -- Raw arranger_seq which can contain 0 patterns
   arranger_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
   -- Version of arranger_seq which generates chord patterns for held segments
@@ -668,6 +669,7 @@ function sequence_clock()
       transport_midi_update()
       if params:get('clock_midi_out') ~= 1 then
         if clock_start_method == 'start' then
+          spp_beats = 0
           transport_midi:start()
         else
           transport_midi:continue()
@@ -677,11 +679,19 @@ function sequence_clock()
       start = false
     end
     
+    -- Update SPP. To-do: simplify so this just updates at the start of each bar?
+    if clock_step % 12 == 0 then
+      spp_beats = spp_beats + 1
+      -- spp_lsb = spp_beats % 128
+      -- spp_bar_lsb = (math.floor((spp_lsb - 1) / 4) + 1) * 4
+      -- spp_msb = math.floor(spp_beats / 128)
+    end
     
     -- ADVANCE CLOCK_STEP
     -- Wrap not strictly needed and could actually be used to count arranger position? 
     -- 192 tics per measure * 8 (max a step can be, 0-indexed. 
     clock_step = util.wrap(clock_step + 1,0, 1535)
+    
     
     
     -- STOP beat-quantized
@@ -691,15 +701,31 @@ function sequence_clock()
       -- Default quantization is global_clock_div * 4 to stop at end of measure
       -- To-do: add param for quantizing transport stop in different time signatures
       if params:string('clock_source') == 'internal' then
-        if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the beat.
+        
+        -- -- WIP attempt to stop MIDI clock early
+        -- if params:string('clock_midi_out') ~= 'off' and ((clock_step) % (global_clock_div * 4) == 0) then
+        --   transport_midi_update()
+        --     transport_midi:stop()
+        --     -- transport_midi:song_position(16,0)
+        -- end
+        
+        if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the bar
           
-          -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
-          clock_step = util.wrap(clock_step - 1, 0, 1535)  
-            
+          -- Send MIDI clock stop/SPP
           transport_midi_update() 
           if params:string('clock_midi_out') ~= 'off' then
             transport_midi:stop()
+            
+            -- Optimize this by only calculating on first beat of new bar
+            spp_lsb = spp_beats % 128
+            spp_bar_lsb = (math.floor((spp_lsb - 1) / 4) + 1) * 4
+            spp_msb = math.floor(spp_beats / 128)
+            transport_midi:song_position(spp_bar_lsb,spp_msb)
+            print(spp_beats .. ' ' .. spp_lsb .. ' ' .. spp_msb)
           end
+          
+          -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
+          clock_step = util.wrap(clock_step - 1, 0, 1535)  
           
           print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           print('Canceling clock_id ' .. (sequence_clock_id or 0))
