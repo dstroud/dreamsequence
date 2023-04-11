@@ -655,6 +655,7 @@ end
 
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
+  pause_tics = 2 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable.
   
   -- -- Optional count-in for when syncing to external MIDI/Link
   -- if params:string('clock_source') ~= 'internal' and params:get('count_in') > 0 then
@@ -662,6 +663,10 @@ function sequence_clock()
   -- end
 
   while transport_active do
+    
+    -- Moving syncing to beginning 2023-04-11
+    clock.sync(1/global_clock_div)
+    
     if start == true and stop ~= true then
   
       -- Send out MIDI start/continue messages
@@ -691,10 +696,12 @@ function sequence_clock()
       -- Default quantization is global_clock_div * 4 to stop at end of measure
       -- To-do: add param for quantizing transport stop in different time signatures
       if params:string('clock_source') == 'internal' then
-        if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the beat.
+        if (clock_step + pause_tics) % (global_clock_div * 4) == 0 then  --stops at the end of the beat. pause_tics added 2023-04-11
           
+          print('stopping')
           -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
-          clock_step = util.wrap(clock_step - 1, 0, 1535)  
+          clock_step = util.wrap(clock_step - 1, 0, 1535) -- if pause_tics is increased too much I think we might need to roll this back more
+          
             
           transport_midi_update() 
           if params:string('clock_midi_out') ~= 'off' then
@@ -771,8 +778,8 @@ function sequence_clock()
       grid_dirty = false
     end
 
-    -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync
-    clock.sync(1/global_clock_div)
+    -- -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync
+    -- clock.sync(1/global_clock_div)
       
   end
 end
