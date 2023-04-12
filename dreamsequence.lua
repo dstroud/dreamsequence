@@ -655,7 +655,7 @@ end
 
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
-  pause_tics = 2 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable.
+  pause_tics = 0 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable. This also fucks up arranger one-shot (plays extra beat at end of arrangement)
   
   -- -- Optional count-in for when syncing to external MIDI/Link
   -- if params:string('clock_source') ~= 'internal' and params:get('count_in') > 0 then
@@ -698,17 +698,19 @@ function sequence_clock()
       if params:string('clock_source') == 'internal' then
         if (clock_step + pause_tics) % (global_clock_div * 4) == 0 then  --stops at the end of the beat. pause_tics added 2023-04-11
           
-          print('stopping')
+          print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
           clock_step = util.wrap(clock_step - 1, 0, 1535) -- if pause_tics is increased too much I think we might need to roll this back more
-          
+        
+          print('clock_step reset to ' .. clock_step)
+
             
           transport_midi_update() 
           if params:string('clock_midi_out') ~= 'off' then
             transport_midi:stop()
           end
           
-          print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+          -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           print('Canceling clock_id ' .. (sequence_clock_id or 0))
           
           clock.cancel(sequence_clock_id)-- or 0)
@@ -881,7 +883,11 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   chord_seq_position = 0
   readout_chord_seq_position = 0
   arranger_seq_position = 0
-  pattern = arranger_seq[1]
+  
+  -- 2023-11-04 updating this to retain existing pattern if the arranger_seq is 0 post-reset (can happen if you wipe arranger then switch to one-shot arranger)
+  -- pattern = arranger_seq[1]
+  if arranger_seq[1] > 0 then pattern = arranger_seq[1] end
+
   if params:string('arranger_enabled') == 'True' then arranger_enabled = true end
   reset_clock()
   get_next_chord()
@@ -2164,7 +2170,7 @@ function enc(n,d)
   -- elseif grid_view_name == 'Arranger' and arranger_key_count > 0 then
   elseif grid_view_name == 'Arranger' and arranger_loop_key_count > 0 then
     -- Arranger segment detail options are on-screen
-    if arranger_loop_key_count > 0 then
+    if arranger_loop_key_count > 0 then -- redundant?
       d_cuml = d_cuml + d
       arranger_seq_length = util.clamp(arranger_seq_length_og + d_cuml, 1, max_arranger_seq_length)
 
@@ -2188,17 +2194,29 @@ function enc(n,d)
           end
           
         end
-        
+      -- Shifting pattern to the left and overwriting existing patterns
       elseif d < 0 then
         local d = -1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
         for i = 1, max_arranger_seq_length do
+          
+          -- if arranger column is >= the newly-shifted pattern, shift over arranger_seq and automator_events.
+          -- if the shift exceeds what is in automator_events_og, it will deepcopy over nothing which kinda breaks stuff
           if i >= event_edit_pattern_og + d_cuml then
             arranger_seq[i] = arranger_seq_og[i - d_cuml]
             automator_events[i] = deepcopy(automator_events_og[i - d_cuml])
           end
+          
+          -- 2023-04-11 adding something to pad out blank automator_events after deep copy since redraw+others break if missing
+          if automator_events[i] == nil then
+            automator_events[i] = {}
+              for step = 1,8 do -- needs to be expanded eventually for more than 8 steps
+                automator_events[i][step] = {}
+              end
+          end
+        
         end
       end
-    generate_arranger_seq_padded()  
+    generate_arranger_seq_padded()
     grid_redraw()
     end
    
@@ -2658,7 +2676,12 @@ function redraw()
               screen.level(((automator_events[i].populated or 0) > 0 and (automator_events[i][s].populated or 0) > 0) and 15 or 1)
             end  
           else
+            -- this produces an error if arranger is wiped clean using left-shift
             screen.level(((automator_events[i].populated or 0) > 0 and (automator_events[i][s].populated or 0) > 0) and 4 or 1)
+            
+            -- screen.level(10)
+            -- screen.level(((automator_events[i].populated or 0) > 0 and (automator_events[i][s].populated or 0) > 0) and 4 or 1)
+
           end
 
           screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
