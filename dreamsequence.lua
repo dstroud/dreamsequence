@@ -655,7 +655,7 @@ end
 
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
-  pause_tics = 0 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable. This also fucks up arranger one-shot (plays extra beat at end of arrangement)
+  pause_tics = 0 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter and general MIDI crappiness (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable. This also fucks up arranger one-shot (plays extra beat at end of arrangement). Need to think about this some more. Essentially we need a way to anticipate stopping (lookahead on advancing chord?) and send a MIDI stop message a little early. Off the top of my head: quantized stop from keypress and arranger ending.
   
   -- -- Optional count-in for when syncing to external MIDI/Link
   -- if params:string('clock_source') ~= 'internal' and params:get('count_in') > 0 then
@@ -664,11 +664,10 @@ function sequence_clock()
 
   while transport_active do
     
-    -- Moving syncing to beginning 2023-04-11
+    -- Moving syncing to beginning of while-do loop 2023-04-11. In testing, it seems that you can get better latency when syncing to an external MIDI source when syncing at the end of the loop but this is probably Bad for some reason.
     clock.sync(1/global_clock_div)
     
     if start == true and stop ~= true then
-  
       -- Send out MIDI start/continue messages
       transport_midi_update()
       if params:get('clock_midi_out') ~= 1 then
@@ -780,7 +779,7 @@ function sequence_clock()
       grid_dirty = false
     end
 
-    -- -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync
+    -- -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync. I've moved this to the beginning of the while/do loop but might want to test this more. If enabled, start = true needs to be moved to the end of function clock.transport.start()
     -- clock.sync(1/global_clock_div)
       
   end
@@ -838,6 +837,8 @@ end
     
     
 function clock.transport.start()
+  print('Transport starting')
+  start = true
   transport_active = true
   
   -- Clock for note duration, note-off events
@@ -853,7 +854,8 @@ function clock.transport.start()
   
   -- Tells sequence_clock to send a MIDI start/continue message AFTER initial clock sync
   -- Might want to have this only run if clock_source = internal
-  start = true
+  -- moving this to beginning 2023-04-12
+  -- start = true
 end
 
 
@@ -1941,7 +1943,7 @@ function key(n,z)
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action = action
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action_var = action_var
             
-            print('Action = ' .. action .. '(' .. action_var .. ')')
+            print('Action = ' .. action or '' .. '(' .. action_var or ''  .. ')')
           end
           
     
