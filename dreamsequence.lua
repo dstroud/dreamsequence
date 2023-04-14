@@ -77,7 +77,7 @@ function init()
   params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1) 
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
-  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
+  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
     params:set_action("chord_dest",function() update_menus() end)
   params:add_number('chord_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -303,6 +303,7 @@ function init()
   engine_note_history = {}
   crow_note_history = {}
   jf_note_history = {}
+  disting_note_history = {}
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   -- get_next_chord() -- Placeholder for when table loading from file is implemented
@@ -812,6 +813,18 @@ function timing_clock()
       end
     end
     
+    for i = #disting_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
+      disting_note_history[i][1] = disting_note_history[i][1] - 1
+      if disting_note_history[i][1] == 0 then
+        -- print('note_off')
+        -- out_midi:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- note, vel, ch.
+        crow.ii.disting.note_off(disting_note_history[i][2])
+        table.remove(disting_note_history, i)
+      end
+    end
+
+
+    
     for i = #engine_note_history, 1, -1 do
       engine_note_history[i][1] = engine_note_history[i][1] - 1
       if engine_note_history[i][1] == 0 then
@@ -1086,6 +1099,12 @@ function play_chord(destination, channel)
       local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_jf('chord',note, params:get('chord_jf_amp')/10)
     end
+  elseif destination == 'Disting' then
+    for i = 1, params:get('chord_type') do
+      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      -- to_disting(note, params:get('chord_disting_velocity'), params:get('chord_disting_ch'), chord_duration)
+      to_disting(note, 6, chord_duration) -- hardcoding velocity for now. TODO: fix
+    end    
   end
 end
 
@@ -1389,6 +1408,46 @@ function to_jf(source, note, amp)
   if jf_note_history_insert == true then
     -- Subbing dedupe_threshold_int for duration for engine out. Only used to make sure record is kept long enough to do a dedupe check
   table.insert(jf_note_history, {dedupe_threshold_int, note, note_on_time})    
+  end
+end
+
+
+function to_disting(note, velocity, duration)
+  local disting_note = note + 36
+  local note_on_time = util.time()
+  disting_play_note = true
+  disting_note_history_insert = true
+  
+  -- Check for duplicate notes and process according to dedupe_threshold setting
+  for i = 1, #disting_note_history do
+    if disting_note_history[i][2] == disting_note then
+
+      -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below.
+      
+      disting_note_history[i][1] = math.max(duration, disting_note_history[i][1])
+      disting_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
+
+      if params:get('dedupe_threshold') > 1 and (note_on_time - disting_note_history[i][3]) < dedupe_threshold_s then
+        -- print(('Deduped ' .. note_on_time - midi_note_history[i][4]) .. ' | ' .. dedupe_threshold_s)
+        disting_play_note = false -- Prevent duplicate note from playing
+      end
+    
+      -- Always update any existing note_on_time, even if a note wasn't played. 
+      -- Otherwise the note duration may be extended but the gap between note_on_time and current time grows indefinitely and no dedupe occurs.
+      -- Alternative is to not extend the duration when dedupe_threshold > 0 and a duplicate is found
+      disting_note_history[i][3] = note_on_time
+    end
+  end
+  
+  -- Play note and insert new note-on record if appropriate
+  if disting_play_note == true then
+    -- out_midi:note_on((midi_note), velocity, channel)
+    -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
+      crow.ii.disting.note_pitch( disting_note, (disting_note-48)/12)
+      crow.ii.disting.note_velocity( disting_note, 10)    
+  end
+  if disting_note_history_insert == true then
+    table.insert(disting_note_history, {duration, disting_note,  note_on_time})
   end
 end
 
