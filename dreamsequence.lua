@@ -21,8 +21,7 @@ include("dreamsequence/lib/includes")
 -- To-do, add options for selecting MIDI in/out ports
 in_midi = midi.connect(1)
 out_midi = midi.connect(1)
--- transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1)) -- bork
-transport_midi = midi.connect(1)
+-- transport messages will be sent to whatever is configured in the global midi parameters
 
 function init()
   init_generator()
@@ -41,7 +40,7 @@ function init()
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)     
-  params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end)
+  params:add_number('crow_pullup','Crow Pullup',0, 1, 1,function(param) return t_f_string(param:get()) end)
     params:set_action("crow_pullup",function() crow_pullup() end)
   -- Not used currently but might re-implement at some point  
   -- params:add_number('count_in', 'Count-in', 0, 8, 0)
@@ -195,9 +194,10 @@ function init()
   clock_start_method = 'start'
 
   -- Send out MIDI stop on launch
-  transport_midi_update() 
-  if params:get('clock_midi_out_1') ~= 1 then transport_midi:stop() end
-      
+  -- transport_midi_update()
+  -- if params:get('clock_midi_out_1') ~= 1 then transport_midi:stop() end --fix
+  transport_multi_stop()  
+
   arranger_enabled = false      
   chord_seq_retrig = true
   crow.input[1].stream = sample_crow
@@ -426,13 +426,47 @@ function div_to_index(string)
 end
 
 
--- Sends midi transport messages on the same 'midi out' port used for system clock
--- If Off in system clock params, it will default to port 1
+-- This previously was used to define a single destination for sending out MIDI clock (and transport). Now we're using this to look up the system clock destinations and logging those so we send transport messages to all destinations.
 function transport_midi_update()
   -- transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1)) -- disabling due to multiple midi clock outs in Norns update
-  transport_midi = midi.connect(1) -- fix: hardcoded
+  -- transport_midi = midi.connect(1) -- fix: hardcoded
+
+-- Find out which ports Norns is sending MIDI clock on so we know where to send transport messages
+  midi_transport_ports = {}
+  for i = 1,16 do
+    local index 
+    if params:get('clock_midi_out_' .. i) == 1 then
+        midi_transport_ports[i] = i
+    end
+  end
 end
 
+-- check which ports the global midi clock is being sent to and sends a start message there
+function transport_multi_start()
+  transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
+  for i in pairs(midi_transport_ports) do  
+    transport_midi = midi.connect(midi_transport_ports[i])
+    transport_midi:start()
+  end  
+end
+
+-- check which ports the global midi clock is being sent to and sends a stop message there
+function transport_multi_stop()
+  transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
+  for i in pairs(midi_transport_ports) do  
+    transport_midi = midi.connect(midi_transport_ports[i])
+    transport_midi:stop()
+  end  
+end
+
+-- check which ports the global midi clock is being sent to and sends a continue message there
+function transport_multi_continue()
+  transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
+  for i in pairs(midi_transport_ports) do  
+    transport_midi = midi.connect(midi_transport_ports[i])
+    transport_midi:continue()
+  end  
+end
 
 function crow_pullup()
   crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
@@ -686,14 +720,16 @@ function sequence_clock()
     
     if start == true and stop ~= true then
       -- Send out MIDI start/continue messages
-      transport_midi_update()
-      if params:get('clock_midi_out_1') ~= 1 then
+      -- transport_midi_update()
+      -- if params:get('clock_midi_out_1') ~= 1 then
         if clock_start_method == 'start' then
-          transport_midi:start()
+          -- transport_midi:start()
+          transport_multi_start()  
         else
-          transport_midi:continue()
+          -- transport_midi:continue()
+          transport_multi_continue()
         end
-      end
+      -- end
       clock_start_method = 'continue'
       start = false
     end
@@ -721,10 +757,12 @@ function sequence_clock()
           print('clock_step reset to ' .. clock_step)
 
             
-          transport_midi_update() 
-          if params:string('clock_midi_out_1') ~= 'off' then
-            transport_midi:stop()
-          end
+          -- transport_midi_update() 
+          -- if params:string('clock_midi_out_1') ~= 'off' then
+            -- transport_midi:stop()
+          -- end
+          transport_multi_stop()
+          
           
           -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           print('Canceling clock_id ' .. (sequence_clock_id or 0))
@@ -736,9 +774,10 @@ function sequence_clock()
         
       else -- External clock_source. No quantization. Just resets pattern/arrangement
 
-        -- IDK why someone would be syncing to an external source and also be sending a clock out from Norns but whatever  
-        transport_midi_update() 
-        if params:string('clock_midi_out') ~= 'off' then transport_midi:stop() end
+        -- IDK why someone would be syncing to an external source and also be sending a clock out from Norns but whatever. We can work with it.
+        -- transport_midi_update() 
+        -- if params:string('clock_midi_out') ~= 'off' then transport_midi:stop() end
+        transport_multi_stop()  
         
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
         print('Canceling clock_id ' .. (sequence_clock_id or 0))
@@ -938,14 +977,15 @@ end
 function reset_external_clock()
   -- If we're sending MIDI clock out, send a stop msg
   -- Tell the transport to Start on the next sync of sequence_clock
-  if params:get('clock_midi_out_1') ~= 1 then
+  -- if params:get('clock_midi_out_1') ~= 1 then
     if transport_active then
-      transport_midi:stop()
+      -- transport_midi:stop()
+      transport_multi_stop()  
     end
     -- Tell sequence_clock to send a MIDI start/continue message after initial clock sync
     clock_start_method = 'start'
     start = true
-  end    
+  -- end    
 end
 
 function advance_chord_seq()
@@ -1938,7 +1978,8 @@ function key(n,z)
           -- Tell the transport to Start on the next sync of sequence_clock
           if params:string('clock_midi_out_1') ~= 'off' then
             if transport_active then
-              transport_midi:stop()
+              -- transport_midi:stop()
+              transport_multi_stop()
             end
             
           -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
