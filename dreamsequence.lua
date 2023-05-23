@@ -21,7 +21,8 @@ include("dreamsequence/lib/includes")
 -- To-do, add options for selecting MIDI in/out ports
 in_midi = midi.connect(1)
 out_midi = midi.connect(1)
-transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1))
+-- transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1)) -- bork
+transport_midi = midi.connect(1)
 
 function init()
   init_generator()
@@ -95,6 +96,7 @@ function init()
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('chord_disting_velocity','Velocity',0, 100, 50)
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_duration_index',function() set_duration('chord') end)
   params:add_number('chord_octave','Octave',-2, 4, 0)
@@ -106,7 +108,7 @@ function init()
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("arp_dest",function() update_menus() end)
   params:add_number('arp_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -116,6 +118,7 @@ function init()
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('arp_disting_velocity','Velocity',0, 100, 50)
   params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("arp_tr_env",function() update_menus() end)
   params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
@@ -128,7 +131,7 @@ function init()
   
   --MIDI PARAMS
   params:add_separator ('MIDI')
-  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
   params:add_number('midi_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -138,6 +141,7 @@ function init()
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
   params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('midi_disting_velocity','Velocity',0, 100, 50)
   params:add_number('do_midi_velocity_passthru', 'Pass velocity', 0, 1, 0, function(param) return t_f_string(param:get()) end)
     params:set_action("do_midi_velocity_passthru",function() update_menus() end)
   params:add_option("midi_tr_env", "Output", {'Trigger','AR env.'},1)
@@ -154,7 +158,7 @@ function init()
   -- Crow clock uses hybrid notation/PPQN
   params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
     params:set_action('crow_clock_index',function() set_crow_clock() end)
-  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("crow_dest",function() update_menus() end)
   params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_number('do_crow_auto_rest', 'Auto-rest', 0, 1, 0, function(param) return t_f_string(param:get()) end)
@@ -165,6 +169,7 @@ function init()
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('crow_disting_velocity','Velocity',0, 100, 50)
   params:add_option("crow_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("crow_tr_env",function() update_menus() end)
   params:add_number('crow_ar_skew','AR env. skew',0, 100, 0)
@@ -345,6 +350,8 @@ function update_menus()
     menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_jf_amp'}
+  elseif params:string('chord_dest') == 'Disting' then
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- ARP MENU
@@ -362,6 +369,8 @@ function update_menus()
     end
   elseif params:string('arp_dest') == 'ii-JF' then
     menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
+  elseif params:string('arp_dest') == 'Disting' then
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_disting_velocity'}    
   end
   
   -- MIDI HARMONIZER MENU
@@ -383,6 +392,8 @@ function update_menus()
     end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+ elseif params:string('midi_dest') == 'Disting' then
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}    
   end
   
   -- CV HARMONIZER MENU
@@ -400,6 +411,8 @@ function update_menus()
     end
   elseif params:string('crow_dest') == 'ii-JF' then
     menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
+  elseif params:string('crow_dest') == 'Disting' then
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_disting_velocity'}    
   end  
 end
 
@@ -416,7 +429,8 @@ end
 -- Sends midi transport messages on the same 'midi out' port used for system clock
 -- If Off in system clock params, it will default to port 1
 function transport_midi_update()
-  transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1))
+  -- transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1)) -- disabling due to multiple midi clock outs in Norns update
+  transport_midi = midi.connect(1) -- fix: hardcoded
 end
 
 
@@ -1104,8 +1118,7 @@ function play_chord(destination, channel)
   elseif destination == 'Disting' then
     for i = 1, params:get('chord_type') do
       local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      -- to_disting(note, params:get('chord_disting_velocity'), params:get('chord_disting_ch'), chord_duration)
-      to_disting(note, 6, chord_duration) -- hardcoding velocity for now. TODO: fix
+      to_disting(note, params:get('chord_disting_velocity'), chord_duration)
     end    
   end
 end
@@ -1204,8 +1217,10 @@ function advance_arp_seq()
       to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), arp_duration)
     elseif destination == 'Crow' then
       to_crow('arp',note)
-    elseif destination =='ii-JF' then
+    elseif destination == 'ii-JF' then
       to_jf('arp',note, params:get('arp_jf_amp')/10)
+    elseif destination == 'Disting' then
+      to_disting(note, params:get('arp_disting_velocity'), arp_duration)
     end
   end
   
@@ -1238,6 +1253,8 @@ function sample_crow(volts)
       to_crow('crow', note)
     elseif destination =='ii-JF' then
       to_jf('crow',note, params:get('crow_jf_amp')/10)
+    elseif destination == 'Disting' then
+      to_disting(note, params:get('crow_disting_velocity'), crow_duration)      
     end
   end
   
@@ -1261,6 +1278,8 @@ in_midi.event = function(data)
       to_crow('midi', note)
     elseif destination =='ii-JF' then
       to_jf('midi', note, params:get('midi_jf_amp')/10)
+    elseif destination == 'Disting' then
+      to_disting(note, params:get('midi_disting_velocity'), midi_duration)      
     end
   end
 end
@@ -1446,7 +1465,7 @@ function to_disting(note, velocity, duration)
     -- out_midi:note_on((midi_note), velocity, channel)
     -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
       crow.ii.disting.note_pitch( disting_note, (disting_note-48)/12)
-      crow.ii.disting.note_velocity( disting_note, 10)    
+      crow.ii.disting.note_velocity( disting_note, velocity/10)    
   end
   if disting_note_history_insert == true then
     table.insert(disting_note_history, {duration, disting_note,  note_on_time})
