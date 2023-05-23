@@ -21,7 +21,7 @@ include("dreamsequence/lib/includes")
 -- To-do, add options for selecting MIDI in/out ports
 in_midi = midi.connect(1)
 out_midi = midi.connect(1)
-transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
+transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1))
 
 function init()
   init_generator()
@@ -191,7 +191,7 @@ function init()
 
   -- Send out MIDI stop on launch
   transport_midi_update() 
-  if params:get('clock_midi_out') ~= 1 then transport_midi:stop() end
+  if params:get('clock_midi_out_1') ~= 1 then transport_midi:stop() end
       
   arranger_enabled = false      
   chord_seq_retrig = true
@@ -331,8 +331,10 @@ function update_menus()
     automator_events_menus =  {'event_category', 'event_name'}
   end
 
-  -- GLOBAL MENU
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
+  -- GLOBAL MENU 
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
+      --'clock_midi_out', -- temporarily removing 'clock_midi_out' option
+      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
@@ -414,7 +416,7 @@ end
 -- Sends midi transport messages on the same 'midi out' port used for system clock
 -- If Off in system clock params, it will default to port 1
 function transport_midi_update()
-  transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
+  transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1))
 end
 
 
@@ -671,7 +673,7 @@ function sequence_clock()
     if start == true and stop ~= true then
       -- Send out MIDI start/continue messages
       transport_midi_update()
-      if params:get('clock_midi_out') ~= 1 then
+      if params:get('clock_midi_out_1') ~= 1 then
         if clock_start_method == 'start' then
           transport_midi:start()
         else
@@ -706,7 +708,7 @@ function sequence_clock()
 
             
           transport_midi_update() 
-          if params:string('clock_midi_out') ~= 'off' then
+          if params:string('clock_midi_out_1') ~= 'off' then
             transport_midi:stop()
           end
           
@@ -922,7 +924,7 @@ end
 function reset_external_clock()
   -- If we're sending MIDI clock out, send a stop msg
   -- Tell the transport to Start on the next sync of sequence_clock
-  if params:get('clock_midi_out') ~= 1 then
+  if params:get('clock_midi_out_1') ~= 1 then
     if transport_active then
       transport_midi:stop()
     end
@@ -1915,7 +1917,7 @@ function key(n,z)
           generator()
           -- If we're sending MIDI clock out, send a stop msg
           -- Tell the transport to Start on the next sync of sequence_clock
-          if params:string('clock_midi_out') ~= 'off' then
+          if params:string('clock_midi_out_1') ~= 'off' then
             if transport_active then
               transport_midi:stop()
             end
