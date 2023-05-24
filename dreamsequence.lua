@@ -100,6 +100,8 @@ function init()
     params:set_action('chord_duration_index',function() set_duration('chord') end)
   params:add_number('chord_octave','Octave',-2, 4, 0)
   params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
+  
 
 
   --ARP PARAMS
@@ -343,15 +345,15 @@ function update_menus()
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_dest') == 'Disting' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- ARP MENU
@@ -426,17 +428,19 @@ function div_to_index(string)
 end
 
 
--- This previously was used to define a single destination for sending out MIDI clock (and transport). Now we're using this to look up the system clock destinations and logging those so we send transport messages to all destinations.
+-- This previously was used to define a single destination for sending out MIDI clock (and transport). Now we're using this to look up the system clock destinations and logging those so we send transport messages to all destinations. Fix: this gets called a lot just to be safe, but is probably only needed when the clock params are touched (callback?) or when starting transport.
 function transport_midi_update()
   -- transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1)) -- disabling due to multiple midi clock outs in Norns update
   -- transport_midi = midi.connect(1) -- fix: hardcoded
 
 -- Find out which ports Norns is sending MIDI clock on so we know where to send transport messages
   midi_transport_ports = {}
+  midi_transport_ports_index = 1
   for i = 1,16 do
-    local index 
     if params:get('clock_midi_out_' .. i) == 1 then
-        midi_transport_ports[i] = i
+      -- print('clock to port ' .. i)
+      midi_transport_ports[midi_transport_ports_index] = i
+      midi_transport_ports_index = midi_transport_ports_index + 1
     end
   end
 end
@@ -444,7 +448,8 @@ end
 -- check which ports the global midi clock is being sent to and sends a start message there
 function transport_multi_start()
   transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
-  for i in pairs(midi_transport_ports) do  
+  -- for i in pairs(midi_transport_ports) do  
+  for i = 1,#midi_transport_ports do
     transport_midi = midi.connect(midi_transport_ports[i])
     transport_midi:start()
   end  
@@ -1123,8 +1128,19 @@ function update_chord()
   current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
   current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
   chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  invert_chord()
 end
 
+-- Makes a copy of the base chord table for inversions
+function invert_chord()
+  chord_inverted = deepcopy(chord)
+  if params:get('chord_inversion') ~= 0 then
+    for i = 1,params:get('chord_inversion') do
+      local index = util.wrap(i, 1, params:get('chord_type'))
+      chord_inverted[index] = chord_inverted[index] + 12
+    end  
+  end
+end  
 
 -- Simpler chord update that just picks up the current mode (for param actions)
 function update_chord_action()
@@ -1137,27 +1153,27 @@ function play_chord(destination, channel)
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_engine('chord', note)
     end
   elseif destination == 'MIDI' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), chord_duration)
     end
   elseif destination == 'Crow' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_crow('chord',note)
     end
   elseif destination =='ii-JF' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_jf('chord',note, params:get('chord_jf_amp')/10)
     end
   elseif destination == 'Disting' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_disting(note, params:get('chord_disting_velocity'), chord_duration)
     end    
   end
@@ -1974,9 +1990,12 @@ function key(n,z)
         
           -- When Chord+Arp Grid View keys are held down, K3 runs Generator and resets pattern+arp
           generator()
-          -- If we're sending MIDI clock out, send a stop msg
+          
+          -- If we're sending MIDI clock out, send a stop msg. This has changed with the multi clock Norns update. Needs testing.
           -- Tell the transport to Start on the next sync of sequence_clock
-          if params:string('clock_midi_out_1') ~= 'off' then
+          -- if params:string('clock_midi_out_1') ~= 'off' then
+          if #midi_transport_ports >0 then
+            
             if transport_active then
               -- transport_midi:stop()
               transport_multi_stop()
