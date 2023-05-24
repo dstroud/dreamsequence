@@ -101,6 +101,7 @@ function init()
   params:add_number('chord_octave','Octave',-2, 4, 0)
   params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
+  params:add_number('chord_spread', 'Spread', 0, 6, 0)
   
 
 
@@ -345,15 +346,15 @@ function update_menus()
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_dest') == 'Disting' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- ARP MENU
@@ -1129,18 +1130,42 @@ function update_chord()
   current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
   chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
   invert_chord()
+  spread_chord()  
 end
 
--- Makes a copy of the base chord table for inversions
+-- Makes a copy of the base chord table with inversion applied
 function invert_chord()
-  chord_inverted = deepcopy(chord)
+  chord_inverted = {}
+  for i = 1,params:get('chord_type') do
+    chord_inverted[i] = chord[i]
+  end  
+  -- chord_inverted = deepcopy(chord)
+  -- table.remove(chord_inverted[4])
   if params:get('chord_inversion') ~= 0 then
     for i = 1,params:get('chord_inversion') do
-      local index = util.wrap(i, 1, params:get('chord_type'))
+      local index = util.wrap(i, 1, #chord_inverted) --params:get('chord_type'))
       chord_inverted[index] = chord_inverted[index] + 12
-    end  
+    end
+    -- Now re-sort them so we can apply additional transformations later
+    table.sort(chord_inverted)
   end
 end  
+
+-- Applies note spread to chord (in octaves)
+function spread_chord()
+  -- chord_inverted = deepcopy(chord)
+  if params:get('chord_spread') ~= 0 then
+    -- for i = 1,params:get('chord_inversion') do
+    --   local index = util.wrap(i, 1, params:get('chord_type'))
+    --   chord_inverted[index] = chord_inverted[index] + 12
+    -- end
+    -- -- Now re-sort them so we can apply additional transformations later
+    -- table.sort(chord_inverted)
+    for i = 1,#chord_inverted do --params:get('chord_type') do
+      chord_inverted[i] = chord_inverted[i] + round((params:get('chord_spread') / (params:get('chord_type') - 1) * (i - 1))) * 12
+    end
+  end
+end
 
 -- Simpler chord update that just picks up the current mode (for param actions)
 function update_chord_action()
