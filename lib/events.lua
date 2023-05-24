@@ -16,6 +16,7 @@ events_lookup = {
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_dest', 	name= 'Destination', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'set', 	formatter= 'chord_type', 			},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_octave', 	name= 'Octave', 	value_type= 'inc, set', 				},
+  {	category= 'Chord', 	event_type= 'param', 	id= 'chord_inversion', 	name= 'Inversion', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_div_index', 	name= 'Pattern step length', 	value_type= 'set', 	formatter= 'divisions_string', 	action= 'set_div', 	action_var= 'chord', 	},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_duration_index', 	name= 'Duration', 	value_type= 'inc, set', 	formatter= 'divisions_string', 	action= 'set_duration', 	action_var= 'chord', 	},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_pp_amp', 	name= 'Engine amp', 	value_type= 'inc, set', 	formatter= 'percent', 			},

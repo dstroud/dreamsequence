@@ -1490,7 +1490,7 @@ end
 
 
 function to_disting(note, velocity, duration)
-  local disting_note = note + 36
+  local disting_note = note + 24
   local note_on_time = util.time()
   disting_play_note = true
   disting_note_history_insert = true
