@@ -21,7 +21,7 @@ include("dreamsequence/lib/includes")
 -- To-do, add options for selecting MIDI in/out ports
 in_midi = midi.connect(1)
 out_midi = midi.connect(1)
-transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
+-- transport messages will be sent to whatever is configured in the global midi parameters
 
 function init()
   init_generator()
@@ -40,7 +40,7 @@ function init()
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
     params:set_action('chord_preload', function(x) chord_preload(x) end)     
-  params:add_number('crow_pullup','Crow Pullup',0, 1, 0,function(param) return t_f_string(param:get()) end)
+  params:add_number('crow_pullup','Crow Pullup',0, 1, 1,function(param) return t_f_string(param:get()) end)
     params:set_action("crow_pullup",function() crow_pullup() end)
   -- Not used currently but might re-implement at some point  
   -- params:add_number('count_in', 'Count-in', 0, 8, 0)
@@ -77,7 +77,7 @@ function init()
   params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1) 
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
-  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF'},2)
+  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
     params:set_action("chord_dest",function() update_menus() end)
   params:add_number('chord_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -95,10 +95,13 @@ function init()
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('chord_disting_velocity','Velocity',0, 100, 50)
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_duration_index',function() set_duration('chord') end)
   params:add_number('chord_octave','Octave',-2, 4, 0)
   params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
+  
 
 
   --ARP PARAMS
@@ -106,7 +109,7 @@ function init()
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("arp_dest",function() update_menus() end)
   params:add_number('arp_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -116,6 +119,7 @@ function init()
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('arp_disting_velocity','Velocity',0, 100, 50)
   params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("arp_tr_env",function() update_menus() end)
   params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
@@ -128,7 +132,7 @@ function init()
   
   --MIDI PARAMS
   params:add_separator ('MIDI')
-  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
   params:add_number('midi_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -138,6 +142,7 @@ function init()
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
   params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('midi_disting_velocity','Velocity',0, 100, 50)
   params:add_number('do_midi_velocity_passthru', 'Pass velocity', 0, 1, 0, function(param) return t_f_string(param:get()) end)
     params:set_action("do_midi_velocity_passthru",function() update_menus() end)
   params:add_option("midi_tr_env", "Output", {'Trigger','AR env.'},1)
@@ -154,7 +159,7 @@ function init()
   -- Crow clock uses hybrid notation/PPQN
   params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
     params:set_action('crow_clock_index',function() set_crow_clock() end)
-  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF'},2)
+  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("crow_dest",function() update_menus() end)
   params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_number('do_crow_auto_rest', 'Auto-rest', 0, 1, 0, function(param) return t_f_string(param:get()) end)
@@ -165,6 +170,7 @@ function init()
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  params:add_number('crow_disting_velocity','Velocity',0, 100, 50)
   params:add_option("crow_tr_env", "Output", {'Trigger','AR env.'},1)
     params:set_action("crow_tr_env",function() update_menus() end)
   params:add_number('crow_ar_skew','AR env. skew',0, 100, 0)
@@ -190,9 +196,10 @@ function init()
   clock_start_method = 'start'
 
   -- Send out MIDI stop on launch
-  transport_midi_update() 
-  if params:get('clock_midi_out') ~= 1 then transport_midi:stop() end
-      
+  -- transport_midi_update()
+  -- if params:get('clock_midi_out_1') ~= 1 then transport_midi:stop() end --fix
+  transport_multi_stop()  
+
   arranger_enabled = false      
   chord_seq_retrig = true
   crow.input[1].stream = sample_crow
@@ -303,6 +310,7 @@ function init()
   engine_note_history = {}
   crow_note_history = {}
   jf_note_history = {}
+  disting_note_history = {}
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   -- get_next_chord() -- Placeholder for when table loading from file is implemented
@@ -330,18 +338,22 @@ function update_menus()
     automator_events_menus =  {'event_category', 'event_name'}
   end
 
-  -- GLOBAL MENU
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'clock_midi_out', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
+  -- GLOBAL MENU 
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
+      --'clock_midi_out', -- temporarily removing 'clock_midi_out' option
+      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
+  elseif params:string('chord_dest') == 'Disting' then
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- ARP MENU
@@ -359,6 +371,8 @@ function update_menus()
     end
   elseif params:string('arp_dest') == 'ii-JF' then
     menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
+  elseif params:string('arp_dest') == 'Disting' then
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_disting_velocity'}    
   end
   
   -- MIDI HARMONIZER MENU
@@ -380,6 +394,8 @@ function update_menus()
     end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+ elseif params:string('midi_dest') == 'Disting' then
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}    
   end
   
   -- CV HARMONIZER MENU
@@ -397,6 +413,8 @@ function update_menus()
     end
   elseif params:string('crow_dest') == 'ii-JF' then
     menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
+  elseif params:string('crow_dest') == 'Disting' then
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_disting_velocity'}    
   end  
 end
 
@@ -410,12 +428,50 @@ function div_to_index(string)
 end
 
 
--- Sends midi transport messages on the same 'midi out' port used for system clock
--- If Off in system clock params, it will default to port 1
+-- This previously was used to define a single destination for sending out MIDI clock (and transport). Now we're using this to look up the system clock destinations and logging those so we send transport messages to all destinations. Fix: this gets called a lot just to be safe, but is probably only needed when the clock params are touched (callback?) or when starting transport.
 function transport_midi_update()
-  transport_midi = midi.connect(math.max(params:get('clock_midi_out') - 1, 1))
+  -- transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1)) -- disabling due to multiple midi clock outs in Norns update
+  -- transport_midi = midi.connect(1) -- fix: hardcoded
+
+-- Find out which ports Norns is sending MIDI clock on so we know where to send transport messages
+  midi_transport_ports = {}
+  midi_transport_ports_index = 1
+  for i = 1,16 do
+    if params:get('clock_midi_out_' .. i) == 1 then
+      -- print('clock to port ' .. i)
+      midi_transport_ports[midi_transport_ports_index] = i
+      midi_transport_ports_index = midi_transport_ports_index + 1
+    end
+  end
 end
 
+-- check which ports the global midi clock is being sent to and sends a start message there
+function transport_multi_start()
+  transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
+  -- for i in pairs(midi_transport_ports) do  
+  for i = 1,#midi_transport_ports do
+    transport_midi = midi.connect(midi_transport_ports[i])
+    transport_midi:start()
+  end  
+end
+
+-- check which ports the global midi clock is being sent to and sends a stop message there
+function transport_multi_stop()
+  transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
+  for i in pairs(midi_transport_ports) do  
+    transport_midi = midi.connect(midi_transport_ports[i])
+    transport_midi:stop()
+  end  
+end
+
+-- check which ports the global midi clock is being sent to and sends a continue message there
+function transport_multi_continue()
+  transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
+  for i in pairs(midi_transport_ports) do  
+    transport_midi = midi.connect(midi_transport_ports[i])
+    transport_midi:continue()
+  end  
+end
 
 function crow_pullup()
   crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
@@ -655,7 +711,7 @@ end
 
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
-  pause_tics = 0 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable. This also fucks up arranger one-shot (plays extra beat at end of arrangement)
+  pause_tics = 0 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter and general MIDI crappiness (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable. This also fucks up arranger one-shot (plays extra beat at end of arrangement). Need to think about this some more. Essentially we need a way to anticipate stopping (lookahead on advancing chord?) and send a MIDI stop message a little early. Off the top of my head: quantized stop from keypress and arranger ending.
   
   -- -- Optional count-in for when syncing to external MIDI/Link
   -- if params:string('clock_source') ~= 'internal' and params:get('count_in') > 0 then
@@ -664,20 +720,21 @@ function sequence_clock()
 
   while transport_active do
     
-    -- Moving syncing to beginning 2023-04-11
+    -- Moving syncing to beginning of while-do loop 2023-04-11. In testing, it seems that you can get better latency when syncing to an external MIDI source when syncing at the end of the loop but this is probably Bad for some reason.
     clock.sync(1/global_clock_div)
     
     if start == true and stop ~= true then
-  
       -- Send out MIDI start/continue messages
-      transport_midi_update()
-      if params:get('clock_midi_out') ~= 1 then
+      -- transport_midi_update()
+      -- if params:get('clock_midi_out_1') ~= 1 then
         if clock_start_method == 'start' then
-          transport_midi:start()
+          -- transport_midi:start()
+          transport_multi_start()  
         else
-          transport_midi:continue()
+          -- transport_midi:continue()
+          transport_multi_continue()
         end
-      end
+      -- end
       clock_start_method = 'continue'
       start = false
     end
@@ -705,10 +762,12 @@ function sequence_clock()
           print('clock_step reset to ' .. clock_step)
 
             
-          transport_midi_update() 
-          if params:string('clock_midi_out') ~= 'off' then
-            transport_midi:stop()
-          end
+          -- transport_midi_update() 
+          -- if params:string('clock_midi_out_1') ~= 'off' then
+            -- transport_midi:stop()
+          -- end
+          transport_multi_stop()
+          
           
           -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           print('Canceling clock_id ' .. (sequence_clock_id or 0))
@@ -720,9 +779,10 @@ function sequence_clock()
         
       else -- External clock_source. No quantization. Just resets pattern/arrangement
 
-        -- IDK why someone would be syncing to an external source and also be sending a clock out from Norns but whatever  
-        transport_midi_update() 
-        if params:string('clock_midi_out') ~= 'off' then transport_midi:stop() end
+        -- IDK why someone would be syncing to an external source and also be sending a clock out from Norns but whatever. We can work with it.
+        -- transport_midi_update() 
+        -- if params:string('clock_midi_out') ~= 'off' then transport_midi:stop() end
+        transport_multi_stop()  
         
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
         print('Canceling clock_id ' .. (sequence_clock_id or 0))
@@ -780,7 +840,7 @@ function sequence_clock()
       grid_dirty = false
     end
 
-    -- -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync
+    -- -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync. I've moved this to the beginning of the while/do loop but might want to test this more. If enabled, start = true needs to be moved to the end of function clock.transport.start()
     -- clock.sync(1/global_clock_div)
       
   end
@@ -813,6 +873,18 @@ function timing_clock()
       end
     end
     
+    for i = #disting_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
+      disting_note_history[i][1] = disting_note_history[i][1] - 1
+      if disting_note_history[i][1] == 0 then
+        -- print('note_off')
+        -- out_midi:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- note, vel, ch.
+        crow.ii.disting.note_off(disting_note_history[i][2])
+        table.remove(disting_note_history, i)
+      end
+    end
+
+
+    
     for i = #engine_note_history, 1, -1 do
       engine_note_history[i][1] = engine_note_history[i][1] - 1
       if engine_note_history[i][1] == 0 then
@@ -838,6 +910,8 @@ end
     
     
 function clock.transport.start()
+  print('Transport starting')
+  start = true
   transport_active = true
   
   -- Clock for note duration, note-off events
@@ -853,7 +927,8 @@ function clock.transport.start()
   
   -- Tells sequence_clock to send a MIDI start/continue message AFTER initial clock sync
   -- Might want to have this only run if clock_source = internal
-  start = true
+  -- moving this to beginning 2023-04-12
+  -- start = true
 end
 
 
@@ -907,14 +982,15 @@ end
 function reset_external_clock()
   -- If we're sending MIDI clock out, send a stop msg
   -- Tell the transport to Start on the next sync of sequence_clock
-  if params:get('clock_midi_out') ~= 1 then
+  -- if params:get('clock_midi_out_1') ~= 1 then
     if transport_active then
-      transport_midi:stop()
+      -- transport_midi:stop()
+      transport_multi_stop()  
     end
     -- Tell sequence_clock to send a MIDI start/continue message after initial clock sync
     clock_start_method = 'start'
     start = true
-  end    
+  -- end    
 end
 
 function advance_chord_seq()
@@ -1052,8 +1128,19 @@ function update_chord()
   current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
   current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
   chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  invert_chord()
 end
 
+-- Makes a copy of the base chord table for inversions
+function invert_chord()
+  chord_inverted = deepcopy(chord)
+  if params:get('chord_inversion') ~= 0 then
+    for i = 1,params:get('chord_inversion') do
+      local index = util.wrap(i, 1, params:get('chord_type'))
+      chord_inverted[index] = chord_inverted[index] + 12
+    end  
+  end
+end  
 
 -- Simpler chord update that just picks up the current mode (for param actions)
 function update_chord_action()
@@ -1066,24 +1153,29 @@ function play_chord(destination, channel)
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_engine('chord', note)
     end
   elseif destination == 'MIDI' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), chord_duration)
     end
   elseif destination == 'Crow' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_crow('chord',note)
     end
   elseif destination =='ii-JF' then
     for i = 1, params:get('chord_type') do
-      local note = chord[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_jf('chord',note, params:get('chord_jf_amp')/10)
     end
+  elseif destination == 'Disting' then
+    for i = 1, params:get('chord_type') do
+      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      to_disting(note, params:get('chord_disting_velocity'), chord_duration)
+    end    
   end
 end
 
@@ -1181,8 +1273,10 @@ function advance_arp_seq()
       to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), arp_duration)
     elseif destination == 'Crow' then
       to_crow('arp',note)
-    elseif destination =='ii-JF' then
+    elseif destination == 'ii-JF' then
       to_jf('arp',note, params:get('arp_jf_amp')/10)
+    elseif destination == 'Disting' then
+      to_disting(note, params:get('arp_disting_velocity'), arp_duration)
     end
   end
   
@@ -1215,6 +1309,8 @@ function sample_crow(volts)
       to_crow('crow', note)
     elseif destination =='ii-JF' then
       to_jf('crow',note, params:get('crow_jf_amp')/10)
+    elseif destination == 'Disting' then
+      to_disting(note, params:get('crow_disting_velocity'), crow_duration)      
     end
   end
   
@@ -1238,6 +1334,8 @@ in_midi.event = function(data)
       to_crow('midi', note)
     elseif destination =='ii-JF' then
       to_jf('midi', note, params:get('midi_jf_amp')/10)
+    elseif destination == 'Disting' then
+      to_disting(note, params:get('midi_disting_velocity'), midi_duration)      
     end
   end
 end
@@ -1387,6 +1485,46 @@ function to_jf(source, note, amp)
   if jf_note_history_insert == true then
     -- Subbing dedupe_threshold_int for duration for engine out. Only used to make sure record is kept long enough to do a dedupe check
   table.insert(jf_note_history, {dedupe_threshold_int, note, note_on_time})    
+  end
+end
+
+
+function to_disting(note, velocity, duration)
+  local disting_note = note + 36
+  local note_on_time = util.time()
+  disting_play_note = true
+  disting_note_history_insert = true
+  
+  -- Check for duplicate notes and process according to dedupe_threshold setting
+  for i = 1, #disting_note_history do
+    if disting_note_history[i][2] == disting_note then
+
+      -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below.
+      
+      disting_note_history[i][1] = math.max(duration, disting_note_history[i][1])
+      disting_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
+
+      if params:get('dedupe_threshold') > 1 and (note_on_time - disting_note_history[i][3]) < dedupe_threshold_s then
+        -- print(('Deduped ' .. note_on_time - midi_note_history[i][4]) .. ' | ' .. dedupe_threshold_s)
+        disting_play_note = false -- Prevent duplicate note from playing
+      end
+    
+      -- Always update any existing note_on_time, even if a note wasn't played. 
+      -- Otherwise the note duration may be extended but the gap between note_on_time and current time grows indefinitely and no dedupe occurs.
+      -- Alternative is to not extend the duration when dedupe_threshold > 0 and a duplicate is found
+      disting_note_history[i][3] = note_on_time
+    end
+  end
+  
+  -- Play note and insert new note-on record if appropriate
+  if disting_play_note == true then
+    -- out_midi:note_on((midi_note), velocity, channel)
+    -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
+      crow.ii.disting.note_pitch( disting_note, (disting_note-48)/12)
+      crow.ii.disting.note_velocity( disting_note, velocity/10)    
+  end
+  if disting_note_history_insert == true then
+    table.insert(disting_note_history, {duration, disting_note,  note_on_time})
   end
 end
 
@@ -1852,11 +1990,15 @@ function key(n,z)
         
           -- When Chord+Arp Grid View keys are held down, K3 runs Generator and resets pattern+arp
           generator()
-          -- If we're sending MIDI clock out, send a stop msg
+          
+          -- If we're sending MIDI clock out, send a stop msg. This has changed with the multi clock Norns update. Needs testing.
           -- Tell the transport to Start on the next sync of sequence_clock
-          if params:string('clock_midi_out') ~= 'off' then
+          -- if params:string('clock_midi_out_1') ~= 'off' then
+          if #midi_transport_ports >0 then
+            
             if transport_active then
-              transport_midi:stop()
+              -- transport_midi:stop()
+              transport_multi_stop()
             end
             
           -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
@@ -1941,7 +2083,7 @@ function key(n,z)
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action = action
             automator_events[event_edit_pattern][event_edit_step][event_edit_lane].action_var = action_var
             
-            print('Action = ' .. action .. '(' .. action_var .. ')')
+            print('Action = ' .. action or '' .. '(' .. action_var or ''  .. ')')
           end
           
     
