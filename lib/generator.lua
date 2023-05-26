@@ -7,13 +7,13 @@ end
 
 function generator()
   
-  params:set('chord_octave', math.random(0,1))
+  params:set('chord_octave', math.random(-1,0))
   params:set('arp_octave', math.random(-1,1))
     
     
   --SEQUENCE RANDOMIZATION
   
-  params:set('transpose', math.random(-12,12))
+  params:set('transpose', math.random(-6,6))
   
   -- 7ths are still kida risky and might be better left to the arp section
   params:set('chord_type', percent_chance(20) and 4 or 3)
@@ -22,7 +22,7 @@ function generator()
     params:set('clock_tempo', math.random(50,140))
   end
   
-  params:set('mode', math.random(1,9))
+  params:set('mode', math.random(1,9)) -- Currently this is called each time c-gen runs, but might change this
 
   
   --ENGINE BASED RANDOMIZATIONS
@@ -84,13 +84,13 @@ end
 -- Hacky stripped-down version of full chord+arp generator to be used for Events and Chord grid view gen
 function chord_generator_lite()
   
-  params:set('chord_octave', math.random(0,1))
+  params:set('chord_octave', math.random(-1,0))
   -- params:set('arp_octave', math.random(-1,1))
     
     
   --SEQUENCE RANDOMIZATION
   
-  params:set('transpose', math.random(-12,12))
+  params:set('transpose', math.random(-6,6))
   
   -- 7ths are still kida risky and might be better left to the arp section
   params:set('chord_type', percent_chance(20) and 4 or 3)
@@ -145,6 +145,45 @@ redraw()
 end
 
 
+--utility functions
+    -----------------------------------------------------------------
+--builds a lookup table of chord types: aug/dim etc...
+function build_mode_chord_types()
+    mode_chord_types = {}
+    safe_chord_degrees = {}    
+    for i = 1,7 do
+      local chord_type = get_chord_name(2, params:get('mode'), musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][i])
+      mode_chord_types[i] = chord_type
+      if chord_type == 'maj' or chord_type == 'min' then table.insert(safe_chord_degrees, i) end
+    end
+    print('--------')
+    print('mode ' .. params:get('mode') .. ' chord types')    
+    tab.print(mode_chord_types)
+    print('--------')
+    -- print('safe chords')    
+    -- tab.print(safe_chord_degrees)
+    -----------------------------------------------------------------
+end
+
+-- Chance of playing higher chord degrees an octave lower
+-- Anything over this is going to get transposed down an octave
+function octave_split_down()
+  local split = math.random(9,14)
+  for i = 1,4 do
+    local x = progression[i] + 7
+    progression[i] = x < split and x or x - 7
+  end  
+end
+
+-- -- Chance of playing lower chord degrees an octave higher
+-- -- Anything under this split is going to get transposed up an octave
+-- local split = math.random(1,7)
+-- for i = 1,4 do
+--   local x = progression[i]
+--   progression[i] = x < split and x or x - 7
+-- end  
+-----------------------------------------------------------------
+    
 
 function chord_generator(mode)
   
@@ -164,11 +203,85 @@ function chord_generator(mode)
 
   -- ARP ALGOS LISTED BELOW ARE INSERTED INTO chord_algos
   
+  local chord_algo_name = '4-passing'
+  -- Rules:
+  -- 4 chords
+  -- Don't start with a dim or aug chord
+  -- Aug and dim chords are used as 'passing chords', resulting in the following chord being +/- one degree, respectively
+  table.insert(chord_algos['name'], chord_algo_name)
+  table.insert(chord_algos['func'], function()      
+    
+    pattern_length[pattern] = 4
+    build_mode_chord_types()
+    progression_valid = false
+    local progression = {}
+    
+    while progression_valid == false do
+      for i = 1,4 do
+        if i == 1 then
+          -- Pick a 'safe' chord (not dim or aug) for the first chord in the pattern
+          table.insert(progression, safe_chord_degrees[math.random(1,#safe_chord_degrees)])
+        else
+          local prev_chord_type = mode_chord_types[util.wrap(progression[i-1],1,7)] -- wrapped since we can get values <1
+          if prev_chord_type == 'dim' then
+            table.insert(progression, progression[i-1] - 1)
+          elseif prev_chord_type == 'aug' then  
+            table.insert(progression, progression[i-1] + 1)
+          else
+            table.insert(progression, math.random(1,7))
+          end  
+        end
+        
+      -- If the last chord is dim or aug, wrap around and set the first chord +/- 1
+      -- This works for everything except Melodic Minor which can result in chord 4 being a vii dim and thus chord 1 being a vi dim
+        if i == 4 then
+          if mode_chord_types[progression[4]] == 'dim' then
+            progression[1] = progression[4] - 1
+          elseif mode_chord_types[progression[4]] == 'aug' then
+            progression[1] = progression[4] + 1
+          end
+          -- one final check to see if the 1st chord is a dim which should be rare and will just result in a reroll
+          local prev_chord_type = mode_chord_types[util.wrap(progression[1],1,7)] -- wrapped since we can get values <1
+          if prev_chord_type == 'dim' or prev_chord_type == 'aug' then
+            progression = {}
+            progression_valid = false
+            print('reroll')
+          else
+            progression_valid = true
+          end
+        end
+      end
+    end
+    
+    -- since this is one of the rare algos that can result in an x value <1, transpose up an octave with a chance of knocking some chords down an octave
+    local split = math.random(8,14)
+    for i = 1,4 do
+      local x = progression[i] + 7
+      progression[i] = x < split and x or x - 7
+    end  
+
+    -- pattern will be shifted up an octave since x < 1 is valid
+    for i = 1, pattern_length[pattern] do
+      local x = progression[i]
+      chord_seq[pattern][i].x = x --raw key x coordinate
+      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][i].o = math.floor((x) / 8) --octave
+    end  
+    
+    -- transpose_pattern(7)    
+    
+    -- rotate_pattern('Chord', math.random(0, 3))
+    -- transpose_pattern(math.random() >= .5 and 7 or 0)    
+
+  -- todo: split octaves
+  end)
+  
+  
   local chord_algo_name = 'I-V-vi-IV'
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()  
     
-    local modes = {1,2,3,8}  -- Verified as modes not containing DIM
+    local modes = {1,2,3,8}  -- Verified as modes not containing diminished chords
     params:set('mode', modes[math.random(1,4)])
     local progression = {1,5,6,4}
     pattern_length[pattern] = 4
@@ -181,10 +294,9 @@ function chord_generator(mode)
     end  
     rotate_pattern('Chord', math.random(0, 3))
     transpose_pattern(math.random() >= .5 and 7 or 0)
-   
-   end) 
+  end) 
 
-
+  
   local chord_algo_name = 'I-vi based'
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()      
@@ -354,7 +466,24 @@ function chord_generator(mode)
     sketchy_chords = false  -- reset this
 
     -- FLAGS sketchy_chords IF THERE IS A DIMINISHED CHORD BECAUSE THERE IS A HIGH PROBABILITY OF IT SOUNDING NASTY
-    -- This needs to be refactored with better chord name/degree/type lookup functions
+    -- This needs to be refactored with better chord name/degree/type lookup functions, and made to run only on certain algos prob
+    -- for i = 1, pattern_length[pattern] do
+    --   if chord_seq[pattern][i].c > 0 then
+    --     local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_seq[pattern][i].c]
+    --     if get_chord_name(2, params:get('mode'), chord_degree) == 'dim' 
+    --     or get_chord_name(2, params:get('mode'), chord_degree) == 'aug' then
+    --       sketchy_chords = true
+    --     end
+    --   end
+    -- end
+    -- do_filter_sketchy_chords = false  -- determines if we screen for aug/dim chords
+    if do_filter_sketchy_chords == true then filter_sketchy_chords() end
+  end
+end -- of chord_generator
+
+--FLAGS sketchy_chords IF THERE IS A DIMINISHED CHORD BECAUSE THERE IS A HIGH PROBABILITY OF IT SOUNDING NASTY
+--This needs to be refactored with better chord name/degree/type lookup functions
+function filter_sketchy_chords()
     for i = 1, pattern_length[pattern] do
       if chord_seq[pattern][i].c > 0 then
         local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_seq[pattern][i].c]
@@ -364,9 +493,7 @@ function chord_generator(mode)
         end
       end
     end
-  end
-end -- of chord_generator
-
+end
 
 -- ARP GENERATOR
 function arp_generator(mode)
@@ -526,7 +653,7 @@ function arp_generator(mode)
   table.insert(arp_algos['func'], function()  
     
     params:set('arp_mode', 2)
-    params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
+    params:set('arp_pp_amp',35) --Turn down amp since a lot of notes can clip
     params:set('arp_duration_index',15)
     arp_pattern_length[arp_pattern] = math.random(3,4) * 2
 
@@ -545,7 +672,7 @@ function arp_generator(mode)
   table.insert(arp_algos['func'], function()  
 
     params:set('arp_mode', 2)
-    params:set('arp_pp_amp',70) --Turn down amp since a lot of notes can clip
+    params:set('arp_pp_amp',35) --Turn down amp since a lot of notes can clip
     params:set('arp_duration_index',15)
     arp_pattern_length[arp_pattern] = math.random(3,4) * 2
 

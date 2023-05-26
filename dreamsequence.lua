@@ -74,7 +74,7 @@ function init()
   
   --CHORD PARAMS
   params:add_separator ('Chord')
-  params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1) 
+  params:add_option('chord_generator', 'C-gen', chord_algos['name'], 2) -- fix: revert to 1 
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
   params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
@@ -325,7 +325,7 @@ function init()
 end
 
 
--- UPDATE_MENUS. To-do: Probably can be optimized by only calculating the current view+page
+-- UPDATE_MENUS. To-do: Probably can be optimized by only calculating the current view+page?
 function update_menus()
 
   -- EVENTS MENU
@@ -346,15 +346,15 @@ function update_menus()
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_dest') == 'Disting' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_inversion', 'chord_spread', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- ARP MENU
