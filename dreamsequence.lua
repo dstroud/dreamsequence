@@ -74,7 +74,7 @@ function init()
   
   --CHORD PARAMS
   params:add_separator ('Chord')
-  params:add_option('chord_generator', 'C-gen', chord_algos['name'], 2) -- fix: revert to 1 
+  params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
   params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)

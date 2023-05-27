@@ -146,7 +146,7 @@ end
 
 
 --utility functions
-    -----------------------------------------------------------------
+-----------------------------------------------------------------
 --builds a lookup table of chord types: aug/dim etc...
 function build_mode_chord_types()
     mode_chord_types = {}
@@ -162,26 +162,28 @@ function build_mode_chord_types()
     print('--------')
     -- print('safe chords')    
     -- tab.print(safe_chord_degrees)
-    -----------------------------------------------------------------
+-----------------------------------------------------------------
 end
 
--- Chance of playing higher chord degrees an octave lower
--- Anything over this is going to get transposed down an octave
-function octave_split_down()
-  local split = math.random(9,14)
-  for i = 1,4 do
-    local x = progression[i] + 7
-    progression[i] = x < split and x or x - 7
-  end  
-end
+-- -- Chance of playing higher chord degrees an octave lower
+-- -- Anything over this is going to get transposed down an octave
+-- function octave_split_down()
+--   local split = math.random(9,14)
+--   for i = 1,4 do
+--     local x = progression[i] + 7
+--     progression[i] = x < split and x or x - 7
+--   end  
+-- end
 
--- -- Chance of playing lower chord degrees an octave higher
--- -- Anything under this split is going to get transposed up an octave
--- local split = math.random(1,7)
--- for i = 1,4 do
---   local x = progression[i]
---   progression[i] = x < split and x or x - 7
--- end  
+-- Chance of playing lower chord degrees an octave higher, also transposes anything <0
+-- Anything under this split is going to get transposed up an octave
+function octave_split_up()
+  local split = math.random(1,8)
+  for i = 1,#progression do
+    local x = progression[i]
+    progression[i] = x < split and x +7 or x
+  end
+end
 -----------------------------------------------------------------
     
 
@@ -204,17 +206,17 @@ function chord_generator(mode)
   -- ARP ALGOS LISTED BELOW ARE INSERTED INTO chord_algos
   
   local chord_algo_name = '4-passing'
-  -- Rules:
+  -- Description:
   -- 4 chords
   -- Don't start with a dim or aug chord
-  -- Aug and dim chords are used as 'passing chords', resulting in the following chord being +/- one degree, respectively
+  -- Aug and dim chords are used as 'passing chords' so a dim chord will be followed by a chord one degree down, and an aug will be followed by a chord one degree up.
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()      
     
     pattern_length[pattern] = 4
     build_mode_chord_types()
     progression_valid = false
-    local progression = {}
+    progression = {}
     
     while progression_valid == false do
       for i = 1,4 do
@@ -253,92 +255,94 @@ function chord_generator(mode)
       end
     end
     
-    -- since this is one of the rare algos that can result in an x value <1, transpose up an octave with a chance of knocking some chords down an octave
-    local split = math.random(8,14)
-    for i = 1,4 do
-      local x = progression[i] + 7
-      progression[i] = x < split and x or x - 7
-    end  
+    octave_split_up()
 
-    -- pattern will be shifted up an octave since x < 1 is valid
     for i = 1, pattern_length[pattern] do
       local x = progression[i]
       chord_seq[pattern][i].x = x --raw key x coordinate
       chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
       chord_seq[pattern][i].o = math.floor((x) / 8) --octave
     end  
-    
-    -- transpose_pattern(7)    
-    
-    -- rotate_pattern('Chord', math.random(0, 3))
-    -- transpose_pattern(math.random() >= .5 and 7 or 0)    
-
-  -- todo: split octaves
   end)
   
   
-  local chord_algo_name = 'I-V-vi-IV'
-  table.insert(chord_algos['name'], chord_algo_name)
-  table.insert(chord_algos['func'], function()  
+  -- local chord_algo_name = 'I-V-vi-IV'
+  -- -- This is fine but kinda boring
+  -- table.insert(chord_algos['name'], chord_algo_name)
+  -- table.insert(chord_algos['func'], function()  
     
-    local modes = {1,2,3,8}  -- Verified as modes not containing diminished chords
-    params:set('mode', modes[math.random(1,4)])
-    local progression = {1,5,6,4}
-    pattern_length[pattern] = 4
+  --   local modes = {1,2,3,8}  -- Modes not containing diminished chords
+  --   params:set('mode', modes[math.random(1,4)])
+  --   progression = {1,5,6,4}
+  --   octave_split_up()
+  --   pattern_length[pattern] = 4
     
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern('Chord', math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)
-  end) 
-
-  
-  local chord_algo_name = 'I-vi based'
-  table.insert(chord_algos['name'], chord_algo_name)
-  table.insert(chord_algos['func'], function()      
-    
-    -- exclusions: 2, 3, 4, 6, 7, 8, 9
-    -- OK at least once: 1, 5, 9
-    
-    -- local modes = {1,5,6,7,9} --Preferred but kinda optional. Check this again.
-    -- params:set('mode', 1) -- modes[math.random(1,4)])
-    local progression = {1,2,3,4,5,6}
-    local progression = shuffle(progression)
-    pattern_length[pattern] = 4
-    -- 
-    for i = 1, pattern_length[pattern] do
-      local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
-    end  
-    rotate_pattern('Chord', math.random(0, 3))
-    transpose_pattern(math.random() >= .5 and 7 or 0)    
-
-  end) 
+  --   for i = 1, pattern_length[pattern] do
+  --     local x = progression[i]
+  --     chord_seq[pattern][i].x = x --raw key x coordinate
+  --     chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --     chord_seq[pattern][i].o = math.floor(x / 8) --octave
+  --   end  
+  --   rotate_pattern('Chord', math.random(0, 3))
+  --   -- transpose_pattern(math.random() >= .5 and 7 or 0)
+  -- end)
 
 
   local chord_algo_name = 'I-vi stagger'
+  -- Preserves relationship between chords 1 and 2 and applies this to chords 3 and 4
+  -- Runs until there are no aug/dims which is pretty inefficient. Should refactor when I am feeling more smart
+  -- Still seeing the occasional aug/dim slip through but I have no idea how
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()      
 
-    -- All modes are pretty okay here but setting to triads only
-    -- params:set('mode', math.random(1, 9))
-    params:set('chord_type', 3)
+    build_mode_chord_types()
+    local octave = math.random() >= .5 and 0 or 7
+    local first = math.random(1,#safe_chord_degrees)
     
-    local first = math.random(1,6)
-    local second = util.wrap(first + math.random(1,5), 1, 6)
-    local offset = first - second
-    local third = offset > 0 and math.random(1 + offset, 6) or math.random(1, 6 + offset)
-    local fourth = third - offset
-    local progression = {first, second, third, fourth}
+    while (third or first) == first do
+      third = math.random(1,#safe_chord_degrees)
+    end
+    
+    local first = first + octave
+    local third = third + octave
+    
+    local min_chord = math.min(first, third)
+    local max_chord = math.max(first, third)
+    
+    reroll = true
+    while reroll == true do
+      --local 
+      max_jump = 10 -- Smaller number = smaller jumps to chord 2 and 4 but fewer pattern possibilities
+      
+      -- offset = math.random((1 - min_chord), (max_jump - max_chord))
+      offset = math.random(math.max((1 - min_chord), -max_jump), math.min((14 - max_chord), max_jump))
+      
+      if (math.abs(offset) == 7) or (offset == 0) then 
+        reroll = true 
+      else
+        reroll = false
+      end
+    end
+    
+    local second = first + offset
+    local fourth = third + offset
+    
+    progression = {first, second, third, fourth}
 
+    -- Reroll if dims/augs show up. This can result in a lot of rerolls eeeeee
+    reroll = false
+    for i = 1,#progression do
+      local this_type = mode_chord_types[util.wrap(progression[i], 1, 7)]
+      if (this_type == 'aug') or (this_type == 'dim') then
+        print('reroll')
+        reroll = true
+      end
+    end
+    if reroll == true then
+      load(chord_algos['func'][chord_algo])
+    end
+      
     pattern_length[pattern] = 4
-    
     for i = 1, pattern_length[pattern] do
       local x = progression[i]
       chord_seq[pattern][i].x = x --raw key x coordinate
@@ -346,12 +350,9 @@ function chord_generator(mode)
       chord_seq[pattern][i].o = math.floor(x / 8) --octave
     end  
     
-    -- Reroll if it's repeating.
-    if second == third or first == third then
-      load(chord_algos['func'][chord_algo])
-    end
-    
   end) 
+  
+  
   
   -- local chord_algo_name = 'Weird'
   -- table.insert(chord_algos['name'], chord_algo_name)
@@ -390,20 +391,54 @@ function chord_generator(mode)
   -- end)
 
 
-  local chord_algo_name = 'I-vi 2-chord'
+  -- local chord_algo_name = 'I-vi 2-chord'
+  -- table.insert(chord_algos['name'], chord_algo_name)
+  -- table.insert(chord_algos['func'], function()  
+    
+  --   params:set('chord_div_index', div_to_index('1/4'))
+  --   pattern_length[pattern] = 8
+  --   -- local modes = {1} -- to-do: see what other modes work well
+  --   -- params:set('mode', modes[math.random(1,#modes)])
+  --   progression = {1,2,3,4,5,6}
+  --   progression = shuffle(progression)
+    
+  --   -- Transposes a value up an octave if the split is too wide.
+  --   progression[2] = progression[2] + ((progression[1] - progression[2] > 3) and 7 or 0)
+  --   progression[1] = progression[1] + ((progression[2] - progression[1] > 3) and 7 or 0)
+    
+  --   local x = progression[1]
+  --   chord_seq[pattern][1].x = x --raw key x coordinate
+  --   chord_seq[pattern][1].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --   chord_seq[pattern][1].o = math.floor(x / 8) --octave
+  --   local x = progression[2]
+  --   chord_seq[pattern][5].x = x --raw key x coordinate
+  --   chord_seq[pattern][5].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+  --   chord_seq[pattern][6].o = math.floor(x / 8) --octave
+
+  -- end)
+
+
+  local chord_algo_name = '2-chord+'
+  -- 2 chords with adjusted step length for possibility of embellishment chords
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()  
     
     params:set('chord_div_index', div_to_index('1/4'))
     pattern_length[pattern] = 8
-    -- local modes = {1} -- to-do: see what other modes work well
-    -- params:set('mode', modes[math.random(1,#modes)])
-    local progression = {1,2,3,4,5,6}
-    local progression = shuffle(progression)
+    
+    build_mode_chord_types()
+    -- mode_chord_types = {}
+    -- safe_chord_degrees = {}  
+
+
+    progression = {1,2,3,4,5,6,7}
+    progression = shuffle(safe_chord_degrees)
     
     -- Transposes a value up an octave if the split is too wide.
     progression[2] = progression[2] + ((progression[1] - progression[2] > 3) and 7 or 0)
     progression[1] = progression[1] + ((progression[2] - progression[1] > 3) and 7 or 0)
+  
+    
     
     local x = progression[1]
     chord_seq[pattern][1].x = x --raw key x coordinate
@@ -412,9 +447,38 @@ function chord_generator(mode)
     local x = progression[2]
     chord_seq[pattern][5].x = x --raw key x coordinate
     chord_seq[pattern][5].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-    chord_seq[pattern][6].o = math.floor(x / 8) --octave
+    chord_seq[pattern][5].o = math.floor(x / 8) --octave
+    
+    -- Chance of adding a transition chord at end of loop
+    if math.random() >.7 then
+      local position = 8
+      local x = (math.max(progression[1], progression[3]) -  math.min(progression[1], progression[3])) < (math.max(progression[1], progression[3] + 7) -  math.min(progression[1], progression[3] + 7)) and 0 or 7
+      local x = x + progression[3] 
+      chord_seq[pattern][position].x = x --raw key x coordinate
+      chord_seq[pattern][position].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][position].o = math.floor(x / 8) --octave
+    end
+    
+    -- Use diminished passing chord if possible
+    if (progression[1] < 14) and mode_chord_types[util.wrap(progression[1], 1, 7) + 1] == 'dim' then --math.random() >.5 then
+      local position = 8
+      local x = progression[1] + 1
+      chord_seq[pattern][position].x = x --raw key x coordinate
+      chord_seq[pattern][position].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][position].o = math.floor(x / 8) --octave
+    end      
 
- end)   
+    -- Use augmented passing chord if possible
+    if (progression[1] >1) and mode_chord_types[util.wrap(progression[1], 1, 7) - 1] == 'aug' then
+      local position = 8
+      local x = progression[1] - 1
+      chord_seq[pattern][position].x = x --raw key x coordinate
+      chord_seq[pattern][position].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
+      chord_seq[pattern][position].o = math.floor(x / 8) --octave
+    end  
+    
+  end)
+  
 
 
   -- local chord_algo_name = 'Circle'
@@ -425,8 +489,8 @@ function chord_generator(mode)
   --   -- keeps ii–V–I turnaround at the end with random pattern length
   --   local modes = {1}
   --   params:set('mode', modes[math.random(1,#modes)])
-  --   local progression = {1,5,6,4}
-  --   local progression = {8,4,7,3,6,2,5,1}
+  --   progression = {1,5,6,4}
+  --   progression = {8,4,7,3,6,2,5,1}
   --   local swappable_index_iii = {1,2,6,7,8} --Spots we might swap in a iii (avoiding repeat iii chords)
   --   local swappable_index_v = {1,2,3,4,5}   --Spots we might swap in a V (avoiding repeat V chords)
   --   -- Chance of adding a iii and V
