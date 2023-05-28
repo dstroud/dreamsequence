@@ -121,9 +121,9 @@ function init()
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('arp_disting_velocity','Velocity',0, 100, 50)
-  params:add_option("arp_tr_env", "Output", {'Trigger','AR env.'},1)
+  params:add_option("arp_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("arp_tr_env",function() update_menus() end)
-  params:add_number('arp_ar_skew','AR env. skew',0, 100, 0)
+  params:add_number('arp_ar_skew','AD env. skew',0, 100, 0)
   params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_duration_index',function() set_duration('arp') end)
   params:add_number('arp_octave','Octave',-2, 4, 0)
@@ -146,9 +146,9 @@ function init()
   params:add_number('midi_disting_velocity','Velocity',0, 100, 50)
   params:add_number('do_midi_velocity_passthru', 'Pass velocity', 0, 1, 0, function(param) return t_f_string(param:get()) end)
     params:set_action("do_midi_velocity_passthru",function() update_menus() end)
-  params:add_option("midi_tr_env", "Output", {'Trigger','AR env.'},1)
+  params:add_option("midi_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("midi_tr_env",function() update_menus() end)
-  params:add_number('midi_ar_skew','AR env. skew',0, 100, 0)
+  params:add_number('midi_ar_skew','AD env. skew',0, 100, 0)
   params:add_number('midi_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
     params:set_action('midi_duration_index',function() set_duration('midi') end)
   params:add_number('midi_octave','Octave',-2, 4, 0)
@@ -172,9 +172,9 @@ function init()
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('crow_disting_velocity','Velocity',0, 100, 50)
-  params:add_option("crow_tr_env", "Output", {'Trigger','AR env.'},1)
+  params:add_option("crow_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("crow_tr_env",function() update_menus() end)
-  params:add_number('crow_ar_skew','AR env. skew',0, 100, 0)
+  params:add_number('crow_ar_skew','AD env. skew',0, 100, 0)
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
     params:set_action('crow_duration_index',function() set_duration('crow') end)
   params:add_number('crow_octave','Octave',-2, 4, 0)
@@ -364,7 +364,7 @@ function update_menus()
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
       menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
-    else -- AR envelope
+    else -- AD envelope
       menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
@@ -387,7 +387,7 @@ function update_menus()
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
       menus[4] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env', }
-    else -- AR envelope
+    else -- AD envelope
       menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', }
     end
   elseif params:string('midi_dest') == 'ii-JF' then
@@ -406,7 +406,7 @@ function update_menus()
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
       menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
-    else -- AR envelope
+    else -- AD envelope
       menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ar_skew', }
     end
   elseif params:string('crow_dest') == 'ii-JF' then
@@ -1441,7 +1441,7 @@ function to_crow(source, note)
   -- To-do: revisit after Crow 4.x bugs are worked out
   if crow_play_note == true then
     crow.output[1].volts = (note) / 12
-    crow.output[2].volts = 0  -- Needed or skew 100 AR gets weird
+    crow.output[2].volts = 0  -- Needed or skew 100 AD gets weird
     if params:get(source..'_tr_env') == 1 then  -- Trigger
       crow.output[2].action = 'pulse(.001,10,1)' -- (time,level,polarity)
     else -- envelope
