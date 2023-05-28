@@ -196,9 +196,7 @@ function init()
   
   clock_start_method = 'start'
 
-  -- Send out MIDI stop on launch
-  -- transport_midi_update()
-  -- if params:get('clock_midi_out_1') ~= 1 then transport_midi:stop() end --fix
+  -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
 
   arranger_enabled = false      
@@ -316,16 +314,15 @@ function init()
   reset_clock() -- will turn over to step 0 on first loop
   -- get_next_chord() -- Placeholder for when table loading from file is implemented
   next_chord = chord
-  -- grid_dirty = true
   params:bang()
-  -- Action needs to occur post-bang
+  -- Some actions need to occur post-bang
   params:set_action('mode', function() update_chord_action() end)
   grid_redraw()
   redraw()
 end
 
 
--- UPDATE_MENUS. To-do: Probably can be optimized by only calculating the current view+page?
+-- UPDATE_MENUS. To-do: Probably can be optimized by only calculating the current view+page
 function update_menus()
 
   -- EVENTS MENU
@@ -341,7 +338,7 @@ function update_menus()
 
   -- GLOBAL MENU 
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
-      --'clock_midi_out', -- temporarily removing 'clock_midi_out' option
+      --'clock_midi_out', --'clock_midi_out' option removed for Norns update with multi-clock. TBD if we should replicate all ports here (this could get cluttered)
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
   
   -- CHORD MENU
@@ -431,10 +428,7 @@ end
 
 -- This previously was used to define a single destination for sending out MIDI clock (and transport). Now we're using this to look up the system clock destinations and logging those so we send transport messages to all destinations. Fix: this gets called a lot just to be safe, but is probably only needed when the clock params are touched (callback?) or when starting transport.
 function transport_midi_update()
-  -- transport_midi = midi.connect(math.max(params:get('clock_midi_out_1') - 1, 1)) -- disabling due to multiple midi clock outs in Norns update
-  -- transport_midi = midi.connect(1) -- fix: hardcoded
-
--- Find out which ports Norns is sending MIDI clock on so we know where to send transport messages
+  -- Find out which ports Norns is sending MIDI clock on so we know where to send transport messages
   midi_transport_ports = {}
   midi_transport_ports_index = 1
   for i = 1,16 do
@@ -446,6 +440,7 @@ function transport_midi_update()
   end
 end
 
+
 -- check which ports the global midi clock is being sent to and sends a start message there
 function transport_multi_start()
   transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
@@ -456,6 +451,7 @@ function transport_multi_start()
   end  
 end
 
+
 -- check which ports the global midi clock is being sent to and sends a stop message there
 function transport_multi_stop()
   transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
@@ -464,6 +460,7 @@ function transport_multi_stop()
     transport_midi:stop()
   end  
 end
+
 
 -- check which ports the global midi clock is being sent to and sends a continue message there
 function transport_multi_continue()
@@ -474,83 +471,102 @@ function transport_multi_continue()
   end  
 end
 
+
 function crow_pullup()
   crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
   print('crow pullup: ' .. t_f_string(params:get('crow_pullup')))
 end
 
+
 function first_to_upper(str)
   return (str:gsub("^%l", string.upper))
 end
 
+
 function crow_clock_string(index) 
   return(clock_names[index][2])
 end
+
 
 function set_crow_clock(source)
   crow_div = clock_names[params:get('crow_clock_index')][1]
   -- crow_slew = clock.get_beat_sec() / global_clock_div --- divisior should be PPQN
 end
 
+
 function divisions_string(index) 
   if index == 0 then return('Off') else return(division_names[index][2]) end
 end
+
 
 --Creates a variable for each source's div.
 function set_div(source)
   _G[source .. '_div'] = division_names[params:get(source .. '_div_index')][1]
 end
 
+
 --Creates a variable for each source's duration
 function set_duration(source)
   _G[source .. '_duration'] = division_names[params:get(source .. '_duration_index')][1]
 end
 
+
 function duration_sec(dur_mod)
   return(dur_mod/global_clock_div * clock.get_beat_sec())
 end
+
 
 function param_id_to_name(id)
   return(params.params[params.lookup[id]].name)
 end
 
+
 function mode_index_to_name(index)
   return(musicutil.SCALES[index].name)
 end
+  
   
 function round(num, numDecimalPlaces)
   local mult = 10^(numDecimalPlaces or 0)
   return math.floor(num * mult + 0.5) / mult
 end
 
+
 function t_f_string(x)
   return(x == 1 and 'True' or 'False')
 end
+
 
 function transpose_string(x)
   local keys = {'C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C'}
   return(keys[x + 13] .. (x == 0 and '' or ' ') ..  (x >= 1 and '+' or '') .. (x ~= 0 and x or '') )
 end
 
+
 function t_f_bool(x)
   return(x == 1 and true or false)
 end
+
 
 function div_10(x)
   return(x / 10)
 end
 
+
 function mult_100_percent(x)
   return(math.floor(x * 100) .. '%')
 end
+
 
 function percent(x)
   return(math.floor(x) .. '%')
 end
 
+
 function chord_type(x)
   return(x == 3 and 'Triad' or '7th')
 end
+
 
 -- Establishes the threshold in seconds for considering duplicate notes as well as providing an integer for placeholder duration
 function dedupe_threshold()
@@ -559,13 +575,16 @@ function dedupe_threshold()
   dedupe_threshold_s = (index == 0) and 1 or duration_sec(dedupe_threshold_int) * .95
 end  
 
+
 function chord_preload(index)
   chord_preload_tics = (index == 0) and 0 or division_names[index][1]
 end  
 
+
 function percent_chance (percent)
   return percent >= math.random(1, 100) 
 end
+
 
 function clear_chord_pattern()
   for i = 1, 8 do
@@ -575,6 +594,7 @@ function clear_chord_pattern()
   end
 end
 
+
 function shuffle(tbl)
   for i = #tbl, 2, -1 do
     local j = math.random(i)
@@ -583,11 +603,13 @@ function shuffle(tbl)
   return tbl
 end
 
+
 -- Callback function when system tempo changes
 function clock.tempo_change_handler()  
   dedupe_threshold()
-  -- To-do: thing about other tempo-based things that are not generated dynamically
+  -- To-do: think about other tempo-based things that are not generated dynamically
 end  
+
 
 -- Pads out arranger where it has 0 segments
 -- Called when selecting/deselecting Arranger segments, changing Arranger lenth via key or enc (insert/delete), switching patterns manually
@@ -626,6 +648,7 @@ end
 
 
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
+-- Could probably gain some efficiency by just writing all this to a table
 -- @treturn chord_type
 function get_chord_name(root_num, scale_type, roman_chord_type)
 
@@ -712,8 +735,7 @@ end
 
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
-  pause_tics = 0 -- Determines how many tics before the end of the measure we pause. This is an attempt to keep any synced devices (DAW, etc...) from jumping to the next bar by mistake due to clock jitter and general MIDI crappiness (I think). Value of 2 seems to work okay. 1 occasionally slips to the next bar. If this isn't working well enough, we probably need to reduce the global_clock_div to 24 which seems to be more stable. This also fucks up arranger one-shot (plays extra beat at end of arrangement). Need to think about this some more. Essentially we need a way to anticipate stopping (lookahead on advancing chord?) and send a MIDI stop message a little early. Off the top of my head: quantized stop from keypress and arranger ending.
-  
+
   -- -- Optional count-in for when syncing to external MIDI/Link
   -- if params:string('clock_source') ~= 'internal' and params:get('count_in') > 0 then
   --   clock.sync(params:get('count_in'))
@@ -749,66 +771,45 @@ function sequence_clock()
     
     -- STOP beat-quantized
     if stop == true then
-      
       -- When internally clocked, stop is quantized to occur at the end of the beat
       -- Default quantization is global_clock_div * 4 to stop at end of measure
       -- To-do: add param for quantizing transport stop in different time signatures
       if params:string('clock_source') == 'internal' then
-        if (clock_step + pause_tics) % (global_clock_div * 4) == 0 then  --stops at the end of the beat. pause_tics added 2023-04-11
-          
+        if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the beat
           print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
-          clock_step = util.wrap(clock_step - 1, 0, 1535) -- if pause_tics is increased too much I think we might need to roll this back more
-        
+          clock_step = util.wrap(clock_step - 1, 0, 1535)
           print('clock_step reset to ' .. clock_step)
-
-            
-          -- transport_midi_update() 
-          -- if params:string('clock_midi_out_1') ~= 'off' then
-            -- transport_midi:stop()
-          -- end
           transport_multi_stop()
-          
-          
-          -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           print('Canceling clock_id ' .. (sequence_clock_id or 0))
-          
           clock.cancel(sequence_clock_id)-- or 0)
           transport_active = false
           stop = false
         end
         
       else -- External clock_source. No quantization. Just resets pattern/arrangement
-
-        -- IDK why someone would be syncing to an external source and also be sending a clock out from Norns but whatever. We can work with it.
-        -- transport_midi_update() 
-        -- if params:string('clock_midi_out') ~= 'off' then transport_midi:stop() end
         transport_multi_stop()  
-        
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
         print('Canceling clock_id ' .. (sequence_clock_id or 0))
-        
         clock.cancel(sequence_clock_id)-- or 0)
+        
         if arranger_enabled then
           reset_arrangement()
         else
           reset_pattern()
         end
-      
+        
         transport_active = false
         stop = false
       end
-      
     end
-  
   
     -- Checking transport state again in case transport was just set to 'false' by Stop
     if transport_active then
- 
       if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
         get_next_chord()
       end
-      
+    
       if clock_step % chord_div == 0 then
         advance_chord_seq()
         grid_dirty = true
@@ -821,10 +822,6 @@ function sequence_clock()
           grid_dirty = true      
         end
       end
-      
-      -- if clock_step % params:get('crow_clock') == 0 then
-      -- crow.output[3]() --pulse defined in init
-      -- end
       
       if clock_step % crow_div == 0 then
       -- crow.output[3]() --pulse defined in init
@@ -841,9 +838,6 @@ function sequence_clock()
       grid_dirty = false
     end
 
-    -- -- Syncing at the end works better for external sync but I can't get reproducable results on internal sync. I've moved this to the beginning of the while/do loop but might want to test this more. If enabled, start = true needs to be moved to the end of function clock.transport.start()
-    -- clock.sync(1/global_clock_div)
-      
   end
 end
 
@@ -883,8 +877,6 @@ function timing_clock()
         table.remove(disting_note_history, i)
       end
     end
-
-
     
     for i = #engine_note_history, 1, -1 do
       engine_note_history[i][1] = engine_note_history[i][1] - 1
@@ -905,6 +897,7 @@ function timing_clock()
       if jf_note_history[i][1] == 0 then
         table.remove(jf_note_history, i)
       end
+      
     end
   end
 end
@@ -925,11 +918,6 @@ function clock.transport.start()
   --Clock used to refresh screen once a second for the arranger countdown timer
   clock.cancel(seconds_clock_id or 0) 
   seconds_clock_id = clock.run(seconds_clock)
-  
-  -- Tells sequence_clock to send a MIDI start/continue message AFTER initial clock sync
-  -- Might want to have this only run if clock_source = internal
-  -- moving this to beginning 2023-04-12
-  -- start = true
 end
 
 
@@ -950,6 +938,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   redraw()
 end
 
+
 -- Does not set start = true since this can be called by clock.transport.stop() when pausing
 function reset_arrangement() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
   arranger_queue = nil
@@ -960,8 +949,6 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   readout_chord_seq_position = 0
   arranger_seq_position = 0
   
-  -- 2023-11-04 updating this to retain existing pattern if the arranger_seq is 0 post-reset (can happen if you wipe arranger then switch to one-shot arranger)
-  -- pattern = arranger_seq[1]
   if arranger_seq[1] > 0 then pattern = arranger_seq[1] end
 
   if params:string('arranger_enabled') == 'True' then arranger_enabled = true end
@@ -979,20 +966,19 @@ function reset_clock()
   generate_arranger_seq_padded()
 end
 
+
 -- Used when resetting view K3 or when jumping to chord pattern immediately via g.key press
 function reset_external_clock()
   -- If we're sending MIDI clock out, send a stop msg
   -- Tell the transport to Start on the next sync of sequence_clock
-  -- if params:get('clock_midi_out_1') ~= 1 then
-    if transport_active then
-      -- transport_midi:stop()
-      transport_multi_stop()  
-    end
-    -- Tell sequence_clock to send a MIDI start/continue message after initial clock sync
-    clock_start_method = 'start'
-    start = true
-  -- end    
+  if transport_active then
+    transport_multi_stop()  
+  end
+  -- Tell sequence_clock to send a MIDI start/continue message after initial clock sync
+  clock_start_method = 'start'
+  start = true
 end
+
 
 function advance_chord_seq()
   chord_seq_retrig = true -- indicates when we're on a new chord seq step for crow auto-rest logic.
@@ -1014,13 +1000,12 @@ function advance_chord_seq()
         arrangement_reset = true
         reset_arrangement()
         clock.transport.stop()
-        
       else
         arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)
         pattern = arranger_seq_padded[arranger_seq_position]
         arranger_queue = nil
-        
       end
+      
       -- Indicates arranger has moved to new pattern.
       arranger_seq_retrig = true
     end
@@ -1050,6 +1035,7 @@ function advance_chord_seq()
 
     -- Play the chord
     if chord_seq[pattern][chord_seq_position].c > 0 then play_chord(params:string('chord_dest'), params:get('chord_midi_ch')) end
+    
     if chord_key_count == 0 then
       chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)
       generate_chord_names()
@@ -1090,6 +1076,7 @@ function automator()
           local action = automator_events[arranger_seq_position][chord_seq_position][i].action or nil
           local action_var = automator_events[arranger_seq_position][chord_seq_position][i].action_var or nil
           
+          -- debuggin'
           -- print('event_type: ' .. event_type)
           -- print('event_name: ' .. event_name)
           -- print('value: ' .. value)
@@ -1105,6 +1092,7 @@ function automator()
           if action ~= nil then
             _G[action](action_var)
           end
+          
         end
         
       end
@@ -1116,7 +1104,7 @@ end
 function generate_chord_names()
   if chord_no > 0 then
     chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
-    --To-do: more thoughful selection of sharps or flats depending on the key.
+    --To-do: More thoughtful display of either sharps or flats depending on specific chord and key. I need someone that is not a musical hack (me) to explain how this works.
     chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
     chord_name_modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- transpose root?
   end
@@ -1129,6 +1117,7 @@ function update_chord()
   current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
   current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
   chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  -- chord transformations
   invert_chord()
   spread_chord()  
 end
@@ -1139,33 +1128,28 @@ function invert_chord()
   for i = 1,params:get('chord_type') do
     chord_inverted[i] = chord[i]
   end  
-  -- chord_inverted = deepcopy(chord)
-  -- table.remove(chord_inverted[4])
+
   if params:get('chord_inversion') ~= 0 then
     for i = 1,params:get('chord_inversion') do
       local index = util.wrap(i, 1, #chord_inverted) --params:get('chord_type'))
       chord_inverted[index] = chord_inverted[index] + 12
     end
-    -- Now re-sort them so we can apply additional transformations later
+    -- Re-sort them so we can apply additional transformations later
     table.sort(chord_inverted)
   end
 end  
+
 
 -- Applies note spread to chord (in octaves)
 function spread_chord()
   -- chord_inverted = deepcopy(chord)
   if params:get('chord_spread') ~= 0 then
-    -- for i = 1,params:get('chord_inversion') do
-    --   local index = util.wrap(i, 1, params:get('chord_type'))
-    --   chord_inverted[index] = chord_inverted[index] + 12
-    -- end
-    -- -- Now re-sort them so we can apply additional transformations later
-    -- table.sort(chord_inverted)
-    for i = 1,#chord_inverted do --params:get('chord_type') do
+    for i = 1,#chord_inverted do
       chord_inverted[i] = chord_inverted[i] + round((params:get('chord_spread') / (params:get('chord_type') - 1) * (i - 1))) * 12
     end
   end
 end
+
 
 -- Simpler chord update that just picks up the current mode (for param actions)
 function update_chord_action()
@@ -1264,7 +1248,7 @@ function get_next_chord()
 end
 
     
--- Used by source == midi and crow to quantize with upcoming chord.
+-- Used for CV/MIDI harmonizers to quantize per upcoming chord.
 function pre_quantize_note(note_num, source)
   local chord_length = params:get(source..'_chord_type') -- Move upstream?
   local source_octave = params:get(source..'_octave') -- Move upstream?
@@ -1272,6 +1256,7 @@ function pre_quantize_note(note_num, source)
   local quantized_octave = math.floor((note_num - 1) / chord_length)
   return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
 end
+
 
 function quantize_note(note_num, source)
   local chord_length = params:get(source..'_chord_type') -- Move upstream?
@@ -1311,6 +1296,7 @@ function advance_arp_seq()
   end   
 end
 
+
 function crow_trigger() --Trigger in used to sample voltage from Crow IN 1
     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
@@ -1348,7 +1334,6 @@ in_midi.event = function(data)
   local d = midi.to_msg(data)
   -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
   if d.type == "note_on" then
-    -- local note = quantize_note(d.note - 35, 'midi')
     local note = params:get('chord_preload') == 0 and quantize_note(d.note - 35, 'midi') or pre_quantize_note(d.note - 35, 'midi')
     local destination = params:string('midi_dest')
     if destination == 'Engine' then
@@ -1453,6 +1438,7 @@ function to_crow(source, note)
   end
 
   --Play the note
+  -- To-do: revisit after Crow 4.x bugs are worked out
   if crow_play_note == true then
     crow.output[1].volts = (note) / 12
     crow.output[2].volts = 0  -- Needed or skew 100 AR gets weird
@@ -1474,7 +1460,8 @@ function to_crow(source, note)
 end
 
 
---WIP for estimating JF's envelope time using regression. Doesn't update on call though because of an issue with crow.ii.jf.event?
+--WIP for estimating JF's envelope time using regression analysis. Doesn't update on call though because of an issue with crow.ii.jf.event?
+-- To-do: revisit after Crow 4.x bugs are worked out
 -- crow.ii.jf.event = function( e, value )
 --   if e.name == 'time' then
 --     jf_time_v = value
@@ -1543,7 +1530,6 @@ function to_disting(note, velocity, duration)
   
   -- Play note and insert new note-on record if appropriate
   if disting_play_note == true then
-    -- out_midi:note_on((midi_note), velocity, channel)
     -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
       crow.ii.disting.note_pitch( disting_note, (disting_note-48)/12)
       crow.ii.disting.note_velocity( disting_note, velocity/10)    
@@ -1561,7 +1547,6 @@ function grid_redraw()
   if screen_view_name == 'Events' then
     
   -- Draw grid with 16 event lanes (columns) for each step in the selected pattern 
-    -- local event_pattern_length = pattern_length[arranger_seq_padded[event_edit_pattern]] or 0
     for x = 1, 16 do -- event lanes
       for y = 1,8 do -- pattern steps
         g:led(x, y, (automator_events[event_edit_pattern][y][x] ~= nil and 7 or (y > (pattern_length[arranger_seq_padded[event_edit_pattern]] or 0) and 0 or 2)))
@@ -1718,7 +1703,6 @@ function g.key(x,y,z)
       elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
           screen_view_name = 'Chord+arp'
       end
-      
       
     --ARRANGER KEY DOWN-------------------------------------------------------
     elseif grid_view_name == 'Arranger' then
@@ -2018,11 +2002,9 @@ function key(n,z)
           
           -- If we're sending MIDI clock out, send a stop msg. This has changed with the multi clock Norns update. Needs testing.
           -- Tell the transport to Start on the next sync of sequence_clock
-          -- if params:string('clock_midi_out_1') ~= 'off' then
           if #midi_transport_ports >0 then
             
             if transport_active then
-              -- transport_midi:stop()
               transport_multi_stop()
             end
             
@@ -2059,7 +2041,6 @@ function key(n,z)
         ---------------------------------------
         -- K3 TO SAVE EVENT
         ---------------------------------------
-        -- Intermittent occurred here (one time, really) where event appeared to save but was not overwritten. Printing a bunch of stuff for when it happens again.
         print('event_edit_active ' .. (event_edit_active and 'true' or 'false'))
         if event_edit_active then
           
@@ -2178,7 +2159,7 @@ function rotate_pattern(view, direction)
 end
 
 
--- EVENT-SPECIFIC FUNCTIONS -----
+-- EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
 
 -- Variation on the standard generators that will just run the algos and reset arp (but not pattern or arranger)
 -- function generator_and_reset()
@@ -2187,25 +2168,30 @@ function event_gen()
   arp_seq_position = 0
 end    
 
+
 function event_chord_gen()
   chord_generator_lite()
   arp_seq_position = 0
 end   
+
 
 function event_arp_gen()
   arp_generator('run')
   arp_seq_position = 0
 end    
 
+
 function shuffle_arp()
   local shuffled_arp_seq = shuffle(arp_seq[arp_pattern])
   arp_seq[arp_pattern] = shuffled_arp_seq
 end
+      
           
 -- Passes along 'Arp' var so we can have a specific event for just arp
 function rotate_arp(direction)
   rotate_pattern('Arp', direction)
 end
+
 
 -- Event Crow trigger out
 function crow_event_trigger()
@@ -2219,10 +2205,12 @@ function transpose_chord_pattern(direction)
   transpose_pattern('Chord', direction)
 end
 
+
 -- for event triggers
 function transpose_arp_pattern(direction)
   transpose_pattern('Arp', direction)
 end
+
 
 -- "Transposes" pattern if you can call it that
 function transpose_pattern(view, direction)
@@ -2253,7 +2241,8 @@ function set_event_category_min_max()
     event_category_max_index = event_categories[i] == params:string('event_category') and i or event_category_max_index
   end 
 end
-       
+-- END OF EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
+
           
 function enc(n,d)
   -- if keys[1] == 1 then -- fn key (KEY1) held down mode
@@ -2261,7 +2250,7 @@ function enc(n,d)
   -- Reserved for scrolling/extending Arranger, Chord, Arp sequences
   if n == 1 then
   
-  -- N == ENC 2 ------------------------------------------------
+  -- n == ENC 2 ------------------------------------------------
   elseif n == 2 then
     if view_key_count > 0 then
       if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
@@ -2323,7 +2312,6 @@ function enc(n,d)
       -- Clamp the current event_value in case it's out-of-bounds
       params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
     
-    
     elseif selected_automator_events_menu == 'event_value' then
       set_event_range()
       params:set('event_value',util.clamp(util.clamp(params:get('event_value'), event_range[1], event_range[2]) + d, event_range[1], event_range[2]))
@@ -2333,8 +2321,7 @@ function enc(n,d)
       params:delta(selected_automator_events_menu, d)
     end
   
-  -- moving from arranger keys 1-4 to the arranger loop strip on row 5
-  -- elseif grid_view_name == 'Arranger' and arranger_key_count > 0 then
+  -- moving from arranger keys 1-4 to the arranger loop strip on row 5. This still trips me up but avoids weirdness around handling dual-use keypress (enable/disable vs. entering event editor)
   elseif grid_view_name == 'Arranger' and arranger_loop_key_count > 0 then
     -- Arranger segment detail options are on-screen
     if arranger_loop_key_count > 0 then -- redundant?
@@ -2351,7 +2338,7 @@ function enc(n,d)
             
           elseif i >= event_edit_pattern_og and i < event_edit_pattern_og + d_cuml then
             arranger_seq[i] = 0
-            for s = 1,8 do -- To-do: hardcoded number steps will eventually be extended
+            for s = 1,8 do -- To-do: hardcoded number of steps will eventually be extended
               automator_events[i][s] = {} 
             end
             
@@ -2403,6 +2390,7 @@ end
 
 
 function init_event_value()
+  -- debuggin'
   -- print('init_event_value() called')
   -- print('event_name = ' .. event_name)
   -- print('event_type = ' ..events_lookup[params:get('event_name')].event_type)
@@ -2466,7 +2454,8 @@ end
 --   return string.format("%02d",m) ..":".. string.format("%02d",s)
 -- end
 
--- Alternative for more digits up to 9 hours -- LOL
+
+-- Alternative for more digits up to 9 hours LETSGOOOOOOO
 function s_to_min_sec(seconds)
   local seconds = tonumber(seconds)
     -- hours = (string.format("%02.f", math.floor(seconds/3600));
@@ -2538,7 +2527,9 @@ function redraw()
     elseif grid_view_name == 'Arranger' then
       screen.level(15)
       screen.move(2,8)
-      screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+      -- Placeholder
+      -- screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
+      screen.text(string.upper(grid_view_name) .. ' GRID')
       -- screen.move(2,28)
       -- screen.text('ENC 2: Rotate seq ↑↓')
       -- screen.move(2,38)
@@ -2548,6 +2539,8 @@ function redraw()
       screen.line(128,54)
       screen.stroke()
       screen.level(3)      
+      
+      -- The following key options were moved to arranger grid buttons
       -- screen.move(1,62)
       -- if params:get('arranger_enabled') == 0 then
       --   screen.text('(K2) ENABLE')
@@ -2594,7 +2587,6 @@ function redraw()
       screen.text_right('(K3) GEN. ARP')  
       end
       
-    
   -- Events editor intro
   elseif arranger_loop_key_count > 0 then
     screen.level(15)
@@ -2613,44 +2605,6 @@ function redraw()
     screen.move(82,62)
     screen.text('(K3) EVENTS')  
   
-  -- -- KEY 1 Fn screen  
-  -- elseif keys[1] == 1 then
-  -- if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
-  --     screen.level(15)
-  --     screen.move(2,8)
-  --     screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
-  --     screen.move(2,28)
-  --     screen.text('ENC 2: Rotate seq ↑↓')
-  --     screen.move(2,38)
-  --     screen.text('ENC 3: Transpose seq ←→')
-  --     screen.level(4)
-  --     screen.move(1,54)
-  --     screen.line(128,54)
-  --     screen.stroke()
-  --     screen.level(3)      
-  --     screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
-  --     screen.text('(K3) GENERATOR')    
-
-  --   -- Alternate grid functions for Arranger TBD
-  --   elseif grid_view_name == 'Arranger' then
-  --     screen.level(15)
-  --     screen.move(2,8)
-  --     screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
-  --     -- screen.move(2,28)
-  --     -- screen.text('ENC 2: ')
-  --     -- screen.move(2,38)
-  --     -- screen.text('ENC 3: Transpose seq ←→')
-  --     -- screen.text('ENC 3: Playhead ←→')   
-  --     screen.level(4)
-  --     screen.move(1,54)
-  --     screen.line(128,54)
-  --     screen.stroke()
-  --     screen.level(3)      
-  --     screen.move(67,62)  -- 128 - screen.text_extents('(K3) DONE')
-  --     screen.text('(K3) GENERATOR')         
-  --   end
- 
-    
   -- Standard priority (not momentary) menus---------------------------------  
   else
     ---------------------------
@@ -2689,7 +2643,6 @@ function redraw()
         screen.text('SEGMENT ' .. event_edit_pattern .. '.' .. event_edit_step)
         screen.move(126,8)
         screen.text_right('EVENT ' .. event_edit_lane .. '/16') 
-
   
         -- Scrolling events menu
         local menu_offset = scroll_offset(automator_events_index,#automator_events_menus, 5, 10)
@@ -2777,7 +2730,6 @@ function redraw()
       end
       screen.fill()
     
-    
       --------------------------------------------    
       -- Pattern position readout
       --------------------------------------------      
@@ -2792,7 +2744,6 @@ function redraw()
         screen.move(dash_x + 17,y_offset + 16)
         screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name. To-do: param to switch between this and chord_degree ?
       end
-      
       
       --------------------------------------------
       -- Arranger dash
@@ -2843,19 +2794,13 @@ function redraw()
               screen.level(((automator_events[i].populated or 0) > 0 and (automator_events[i][s].populated or 0) > 0) and 15 or 1)
             end  
           else
-            -- this produces an error if arranger is wiped clean using left-shift
             screen.level(((automator_events[i].populated or 0) > 0 and (automator_events[i][s].populated or 0) > 0) and 4 or 1)
-            
-            -- screen.level(10)
-            -- screen.level(((automator_events[i].populated or 0) > 0 and (automator_events[i][s].populated or 0) > 0) and 4 or 1)
-
           end
 
           screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
           screen.fill()
           events_rect_x = events_rect_x + 1
         end
-        
         
         -- Dim interrupted segment if Arranger is re-syncing
         if params:get('arranger_enabled') == 1 then
@@ -2874,7 +2819,6 @@ function redraw()
       
       screen.rect(dash_x+1, arranger_dash_y+2,33,38)
       screen.stroke()
-      
       
       -- Header
       screen.level(params:get('arranger_enabled') == 1 and 10 or 2)
@@ -2946,7 +2890,6 @@ function redraw()
         end
         line = line + 1
       end
-      
       
       --Sticky header
       screen.level(menu_index == 0 and 15 or 4)
