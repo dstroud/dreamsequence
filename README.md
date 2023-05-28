@@ -1,19 +1,21 @@
 # Dreamsequence
 
-Chord-based sequencer, arpeggiator, and harmonizer for Grid.
+Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid.
 
 Required: Monome Norns (**v2.7.6 or later**) and Grid.
 
-Optional: **Crow** can be used to process incoming CV+triggers as well as to send sequences to CV gear or certain i2c gear (currently Just Friends and Disting EX). **MIDI** can be used to process incoming notes (from a sequencer or MIDI controller) as well as to send MIDI sequences to synths, samplers, DAWs, etc..
+Optional:
+- Crow can be used to process incoming CV+triggers as well as to send sequences to CV gear or certain i2c gear (currently Just Friends and Disting EX).
+- MIDI can be used to process incoming notes (from a sequencer or MIDI controller) as well as to send MIDI sequences to synths, samplers, DAWs, etc..
 
 
 # Overview
 
-As a self-taught musical tinkerer, I've often felt as if there is a barrier between me and my composition tools. My limited knowledge of theory and my amateur keyboard chops make for a rather laborious songwriting process. By the time I have composed something acceptable, I've iterated on and listened to it so much that it has long since worn its welcome.
+As a self-taught musical tinkerer, I've often struggled with getting an idea out of my head and into a sequencer/DAW/instrument. My limited knowledge of theory and my amateur keyboard chops make for a rather laborious songwriting process. By the time I have composed something okay-sounding, I've iterated on and listened to it so much that it has long since worn its welcome.
 
-Wouldn't it be nice if there was a tool that offloaded some of the music-theory burden so we can focus on enjoying the process of composing? Dreamsequence aims to be just such a tool; it's a musical playground that employs some reasonable constraints to keep us from making too much of a mess of things. More importantly, it's a lot of fun to use and will make you feel like a musical genius.
+Wouldn't it be nice if there was a tool that offloaded some of the music-theory burden so we can focus on enjoying the process of composing? Dreamsequence aims to be just such a tool; it's a musical sketchpad that allows for rapid prototyping, improvisation, experimentation, and performance- without the risk of going too far off the rails.
 
-The core concept is one that I began exploring with my Teletype scripts Minim and Subsequence. Similar to those tools, *Dreamsequence works by first limiting the available chords to a given mode and key, then limiting the arpeggiator and harmonizer outputs to only notes in the active chord. In other works, you are free to poke wildly at Grid and there is a pretty good chance that the result will be musically coherent.*
+The core concept is one that I began exploring with my Teletype scripts [Minim](https://github.com/dstroud/minim) and [Subsequence](https://github.com/dstroud/subsequence). Similar to those tools, *Dreamsequence works by first limiting the available chords to a given mode and key, then limiting the arpeggiator and harmonizer outputs to only notes in the active chord. In other words, you are free to poke wildly at Grid and there is a pretty good chance that the result will be musically coherent.*
 
 Let's take a look at the core components of Dreamsequence:
 
@@ -23,26 +25,22 @@ Let's take a look at the core components of Dreamsequence:
 - Chord patterns are referenced by chord degrees (I-VII) across two octaves. You can quickly and non-destructively change the mood of a composition by simply switching to a different mode or key which will adjust the chord output accordingly.
 
 - Chords can be sent to one of several destinations: 
-  - Norns engine
+  - Norns sound engine
   - MIDI
   - Just Friends or Disting EX via Crow's i2c bus
 
-- The active chord is always sent to the arpeggiator and harmonizers where it will be used to restrict their output to match the chord.
+- The active chord is always sent to the arpeggiator and harmonizers where it will be used to restrict their output to match the chord, even if direct chord playback is disabled.
 
 ### Grid-based arpeggiator (Arp)
-- Arpeggiate or strum the active chord by entering a pattern on Grid (or by using the procedural arp Generator). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj:
-
-  | Column  | Triad Out| 7th Out  |
-  |---------|----------|----------|
-  | 1       | C1       | C1       |
-  | 2       | E1       | E1       |
-  | 3       | G1       | G1       |
-  | 4       | C2       | B1       |
-  | 5       | E2       | C2       |
-  | 6       | G2       | E2       |
+- Arpeggiate or strum the active chord by entering a pattern on Grid (or by using the procedural arp Generator). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
+  
+  | Column    | 1  | 2  | 3  | 4  | 5  | 6  | 7  | 8  | 9  | 10 | 11 | 12 | 13 | 14 |
+  |:---------:|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+  | Triad Out | C1 | E1 | G1 | C2 | E2 | G2 | C3 | E3 | G3 | C4 | E4 | G4 | C5 | E5 |
+  | 7th Out   | C1 | E1 | G1 | B1 | C2 | E2 | G2 | B2 | C3 | E3 | G3 | B3 | C4 | E4 |
 
 - Arp can be sent to one of several destinations: 
-  - Norns engine
+  - Norns sound engine
   - MIDI
   - CV via Crow outputs 1 (CV) and 2 (trigger or envelope)
   - Just Friends or Disting EX via Crow's i2c bus
@@ -50,7 +48,7 @@ Let's take a look at the core components of Dreamsequence:
 ### MIDI harmonizer
 - Transform an incoming MIDI sequence to play notes from the active chord across a wide range of octaves.
 
-- +/- 1 change in incoming semitone relative to C1 results in a +/- 1 change in note selection from the active chord (across range of octaves). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj:
+- +/- 1 change in incoming semitone relative to C1 results in a +/- 1 change in note selection from the active chord (across range of octaves). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
 
   | Note In | Triad Out| 7th Out  |
   |---------|----------|----------|
@@ -60,9 +58,19 @@ Let's take a look at the core components of Dreamsequence:
   | D#/E♭1  | C2       | B1       |
   | E1      | E2       | C2       |
   | F1      | G2       | E2       |
+  
+  | Note In   | C1 | C# | D1 | D# | E1 | F1 | F# | G1 | G# | A1 | A# | B1 |
+  |:---------:|----|----|----|----|----|----|----|----|----|----|----|----|
+  | Triad Out | C1 | E1 | G1 | C2 | E2 | G2 | C3 | E3 | G3 | C4 | E4 | G4 |
+  | 7th Out   | C1 | E1 | G1 | B1 | C2 | E2 | G2 | B2 | C3 | E3 | G3 | B3 |
+  
+- Typical use-cases might include:
+  - Turning a synced step sequencer into a secondary arpeggio, melody, bassline, etc...
+  - Improvising with a MIDI keyboard in a live performance (no dud notes!).
+  - Using a looping MIDI clip from a synced DAW to generate more complex chord voicings and timings (e.g., swing).
 
 - MIDI Harmonizer can be sent to one of several destinations: 
-  - Norns engine
+  - Norns sound engine
   - MIDI
   - CV via Crow outputs 1 (CV) and 2 (trigger or envelope)
   - Just Friends or Disting EX via Crow's i2c bus
@@ -70,7 +78,7 @@ Let's take a look at the core components of Dreamsequence:
 ### CV harmonizer (requires Crow)
 - Transform incoming control voltage (CV) to play notes from the active chord across a wide range of octaves.
 
-- +/- 1/12v (1 semitone @ 1v/oct) change in incoming voltage results in a +/- 1 change in note selection from the active chord (across range of octaves). Example assuming the chord sequencer is playing Cmaj:
+- +/- 1/12v (1 semitone @ 1v/oct) change in incoming voltage results in a +/- 1 change in note selection from the active chord (across range of octaves). Example assuming the chord sequencer is playing Cmaj/7:
 
   | Volts In| Triad Out| 7th Out  |
   |---------|----------|----------|
@@ -81,8 +89,18 @@ Let's take a look at the core components of Dreamsequence:
   | 4/12v   | E2       | C2       |
   | 5/12v   | G2       | E2       |
 
+  | Volts In  | 1/12v | 2/12v | 3/12v | 4/12v | 5/12v | 6/12v | 7/12v | 8/12v | 9/12v | 10/12v | 11/12v | 1v     |
+  |:---------:|-------|-------|-------|-------|-------|-------|-------|-------|-------|--------|--------|--------|
+  | Triad Out | C1    | E1    | G1    | C2    | E2    | G2    | C3    | E3    | G3    | C4     | E4     | G4     |
+  | 7th Out   | C1    | E1    | G1    | B1    | C2    | E2    | G2    | B2    | C3    | E3     | G3     | B3     |
+  
+- Typical use-cases might include:
+  - Using a synced Eurorack sequencer with modulations to create an evolving sequence.
+  - Turning LFOs, function generators, S&H modules, etc... into chord-quantized sequencers.
+  - Using trigger/clock/voltage sources to create complex (or totally desynced) sequence timing.
+
 - CV Harmonizer can be sent to one of several destinations: 
-  - Norns engine
+  - Norns sound engine
   - MIDI
   - CV via Crow outputs 1 (CV) and 2 (trigger or envelope)
   - Just Friends or Disting EX via Crow's i2c bus
@@ -334,7 +352,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Channel (_MIDI_): MIDI channel.
 
-- Velocity (_MIDI, Disting_: Note velocity.
+- Velocity (_MIDI, Disting_): Note velocity.
 
 - Output (_Crow_): Select between trigger or Attack Decay (AD) envelope to be sent from Crow out 2.
 
@@ -420,4 +438,4 @@ Dreamsequence supports using Crow to receive incoming CV for the CV Harmonizer a
 - Crow OUT 1: V/oct out
 - Crow OUT 2: Trigger or 10v Attack Decay envelope out
 - Crow OUT 3: Clock out (beat-division or PPQN set in "Global:Crow clock" menu item.
-- Crow OUT 4: A trigger can be sent from this output by scheduling an Arranger Event.
+- Crow OUT 4: A trigger can be sent from this output by scheduling an [Arranger Event](https://github.com/dstroud/dreamsequence/edit/main/README.md#events-view).
