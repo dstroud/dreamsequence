@@ -34,10 +34,14 @@ Let's take a look at the core components of Dreamsequence:
 ### Grid-based arpeggiator (Arp)
 - Arpeggiate or strum the active chord by entering a pattern on Grid (or by using the procedural arp Generator). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
   
-  | Column    | 1  | 2  | 3  | 4  | 5  | 6  | 7  | 8  | 9  | 10 | 11 | 12 | 13 | 14 |
-  |:---------:|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-  | Triad Out | C1 | E1 | G1 | C2 | E2 | G2 | C3 | E3 | G3 | C4 | E4 | G4 | C5 | E5 |
-  | 7th Out   | C1 | E1 | G1 | B1 | C2 | E2 | G2 | B2 | C3 | E3 | G3 | B3 | C4 | E4 |
+  | Column  | Triad Out| 7th Out  |
+  |---------|----------|----------|
+  | 1       | C1       | C1       |
+  | 2       | E1       | E1       |
+  | 3       | G1       | G1       |
+  | 4       | C2       | B1       |
+  | 5       | E2       | C2       |
+  | 6       | G2       | E2       |
 
 - Arp can be sent to one of several destinations: 
   - Norns sound engine
@@ -58,11 +62,6 @@ Let's take a look at the core components of Dreamsequence:
   | D#/E♭1  | C2       | B1       |
   | E1      | E2       | C2       |
   | F1      | G2       | E2       |
-  
-  | Note In   | C1 | C# | D1 | D# | E1 | F1 | F# | G1 | G# | A1 | A# | B1 |
-  |:---------:|----|----|----|----|----|----|----|----|----|----|----|----|
-  | Triad Out | C1 | E1 | G1 | C2 | E2 | G2 | C3 | E3 | G3 | C4 | E4 | G4 |
-  | 7th Out   | C1 | E1 | G1 | B1 | C2 | E2 | G2 | B2 | C3 | E3 | G3 | B3 |
   
 - Typical use-cases might include:
   - Turning a synced step sequencer into a secondary arpeggio, melody, bassline, etc...
@@ -88,11 +87,6 @@ Let's take a look at the core components of Dreamsequence:
   | 3/12v   | C2       | B1       |
   | 4/12v   | E2       | C2       |
   | 5/12v   | G2       | E2       |
-
-  | Volts In  | 1/12v | 2/12v | 3/12v | 4/12v | 5/12v | 6/12v | 7/12v | 8/12v | 9/12v | 10/12v | 11/12v | 1v     |
-  |:---------:|-------|-------|-------|-------|-------|-------|-------|-------|-------|--------|--------|--------|
-  | Triad Out | C1    | E1    | G1    | C2    | E2    | G2    | C3    | E3    | G3    | C4     | E4     | G4     |
-  | 7th Out   | C1    | E1    | G1    | B1    | C2    | E2    | G2    | B2    | C3    | E3     | G3     | B3     |
   
 - Typical use-cases might include:
   - Using a synced Eurorack sequencer with modulations to create an evolving sequence.
