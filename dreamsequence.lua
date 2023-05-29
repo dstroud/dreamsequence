@@ -1,4 +1,4 @@
--- Dreamsequence v0.1
+-- Dreamsequence v1.0.0
 -- Dan Stroud @modularbeat
 --
 -- KEY 2: Play/pause
