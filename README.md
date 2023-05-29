@@ -6,18 +6,24 @@ Required: Monome Norns (**v2.7.6 or later**) and Grid.
 
 Optional:
 - Crow can be used to process incoming CV+triggers as well as to send sequences to CV gear or certain i2c gear (currently Just Friends and Disting EX).
-- MIDI can be used to process incoming notes (from a sequencer or MIDI controller) as well as to send MIDI sequences to synths, samplers, DAWs, etc..
+- MIDI can be used to process incoming notes (from a sequencer or MIDI controller) as well as to send sequences to synths, samplers, DAWs, etc..
 
 
 # Overview
 
-As a self-taught musical tinkerer, I've often struggled with getting an idea out of my head and into a sequencer/DAW/instrument. My limited knowledge of theory and my amateur keyboard chops make for a rather laborious songwriting process. By the time I have composed something okay-sounding, I've iterated on and listened to it so much that it has long since worn its welcome.
+Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It streamlines the process of composing by limiting your palette of chords and notes to _only what you need at the moment_. This approach does come with some tradeoffs (you won’t be making modal jazz with it) but it’s by no means a paint-by-numbers experience. You’ll find that there are ample opportunities to get weird:
 
-Wouldn't it be nice if there was a tool that offloaded some of the music-theory burden so we can focus on enjoying the process of composing? Dreamsequence aims to be just such a tool; it's a musical sketchpad that allows for rapid prototyping, improvisation, experimentation, and performance- without the risk of going too far off the rails.
+- Use the event scheduler to change dozens of parameters during song playback. Modulate to a different key or mode, transform your existing sequence, or algorithmically generate a new chord progression and arpeggio on the fly.
+  
+- Sync your eurorack gear via Crow then feed random CV and triggers into Dreamsequence to generate harmony from chaos.
+  
+- Use MIDI clips from a synced DAW to generate more complex chord voicings and rhythms. 
+  
+- Combine multiple sequences, sending them to one destination. Think chords with a bit of embellishment or a shifting polyrhythmic mono sequence.
+	
+- Run a MIDI keyboard into the harmonizer for a delightfully bizarre experience wherein nothing is as it should be but everything feels just right
 
-The core concept is one that I began exploring with my Teletype scripts [Minim](https://github.com/dstroud/minim) and [Subsequence](https://github.com/dstroud/subsequence). Similar to those tools, *Dreamsequence works by first limiting the available chords to a given mode and key, then limiting the arpeggiator and harmonizer outputs to only notes in the active chord. In other words, you are free to poke wildly at Grid and there is a pretty good chance that the result will be musically coherent.*
-
-Let's take a look at the core components of Dreamsequence:
+If you'd like to learn more about exactly _how_ Dreamsequence works, the following sections should sort you out. If you're more of a the skim-the-manual type, I'd suggest jumping right to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) part of this read-me handy for reference.
 
 ### Grid-based chord sequencer
 - Create up to 4 chord patterns (A, B, C, D) by entering a pattern on Grid (or by using the procedural chord progression Generator).
@@ -34,14 +40,14 @@ Let's take a look at the core components of Dreamsequence:
 ### Grid-based arpeggiator (Arp)
 - Arpeggiate or strum the active chord by entering a pattern on Grid (or by using the procedural arp Generator). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
   
-  | Column  | Triad Out| 7th Out  |
-  |---------|----------|----------|
-  | 1       | C1       | C1       |
-  | 2       | E1       | E1       |
-  | 3       | G1       | G1       |
-  | 4       | C2       | B1       |
-  | 5       | E2       | C2       |
-  | 6       | G2       | E2       |
+  | Grid col. | Triad Out| 7th Out  |
+  |-----------|----------|----------|
+  | 1         | C1       | C1       |
+  | 2         | E1       | E1       |
+  | 3         | G1       | G1       |
+  | 4         | C2       | B1       |
+  | 5         | E2       | C2       |
+  | 6         | G2       | E2       |
 
 - Arp can be sent to one of several destinations: 
   - Norns sound engine
@@ -250,7 +256,7 @@ The following documentation explains each section of the screen.
 - The numbers in the top left indicate the current Arranger segment and step. "2.1" in the example above means the Arranger is on step 1 of the 2nd Arranger segment. If the Arranger is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger resumes on the next segment.
 - To the right, a symbol will indicate if the Arranger is in Loop mode (as in the example above) or One-shot mode (arrow symbol).
 - In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. In the example above, pattern A will be played once, then pattern B twice, then pattern C twice. The length of each segment is at a scale of one pixel per step.
-- At the bottom of the chart is a timeline that highlights any steps that have an event. In the example above, events occur on the firt step of the upcoming segment, followed by a segment with an event on every step.
+- At the bottom of the chart is a timeline that highlights any steps that have an event. In the example above, events occur on the first step of the upcoming segment, followed by a segment with an event on every step.
 - At the very bottom of the dash is a readout of the remaining time on the Arranger. Note that this countdown will be adjusted if the Arranger is interrupted by being disabled and re-enabled.
 ----------------------------------------------------------------------------------------------------------------------
 
