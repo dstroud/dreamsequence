@@ -2339,7 +2339,8 @@ function enc(n,d)
           elseif i >= event_edit_pattern_og and i < event_edit_pattern_og + d_cuml then
             arranger_seq[i] = 0
             for s = 1,8 do -- To-do: hardcoded number of steps will eventually be extended
-              automator_events[i][s] = {} 
+              automator_events[i][s] = {}
+              automator_events[i].populated = nil 
             end
             
           elseif i < event_edit_pattern_og then
