@@ -1,8 +1,8 @@
 # Dreamsequence
 
-Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid.
+Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid
 
-Required: Monome Norns (**v2.7.6 or later**) and Grid.
+Required: Monome Norns (**v2.7.6 or later**) and Grid
 
 Optional:
 - Crow (**[v3.0.1](https://github.com/monome/crow/releases/tag/v3.0.1)** due to issues with v4.0.2) can be used to process incoming CV+triggers as well as to send sequences to CV gear or certain i2c gear (currently Just Friends and Disting EX).
