@@ -225,14 +225,17 @@ The Events view is used to manage the scheduling of parameter changes and functi
 
 ## Norns screen
 
-Dreamsequence boots to the Global menu page. The following documentation explains each section of the screen.
+Dreamsequence boots to the Global menu page.
 
-![ds_global_corrected](https://user-images.githubusercontent.com/435570/205408391-6636eec4-8fce-4683-9575-4e72978d946d.png)
+![dreamsequence](doc/global_screen.png)
+
+The following documentation explains each section of the screen.
+
 ----------------------------------------------------------------------------------------------------------------------
  
 ### Pattern Dashboard
 
-![ds_pattern_mask](https://user-images.githubusercontent.com/435570/205408704-f8704d71-08dd-456e-835a-e4a4ec2d2c62.png)
+![dreamsequence](doc/pattern_dash.png)
 
 - "A1" in the example above means we are on step 1 of pattern A.
 - To the right of this, a symbol will indicate the current playback state: Playing, Paused, or Stopped.
@@ -241,7 +244,7 @@ Dreamsequence boots to the Global menu page. The following documentation explain
 
 ### Arranger Dashboard
 
-![ds_arranger_mask](https://user-images.githubusercontent.com/435570/205408738-b5681489-2fad-4b31-9003-b8cbf2e360ec.png)
+![dreamsequence](doc/arranger_dash.png)
 
 - Dashboard will be brightly illuminated when Arranger is enabled, and dimmed when disabled.
 - The numbers in the top left indicate the current Arranger segment and step. If the Arranger is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger resumes on the next segment.
@@ -252,7 +255,7 @@ Dreamsequence boots to the Global menu page. The following documentation explain
 ----------------------------------------------------------------------------------------------------------------------
 
 ### Menus
-![ds_menu_mask](https://user-images.githubusercontent.com/435570/205408637-b9f59a51-072f-4f1d-8ce9-bdb155f5e52f.png)
+![dreamsequence](doc/global_menu.png)
 
 The left portion of the Norns screen displays one of the following "pages" and associated menu items:
   - GLOBAL <> CHORD <> ARP <> MIDI HARMONIZER <> CV HARMONIZER
@@ -260,6 +263,7 @@ The left portion of the Norns screen displays one of the following "pages" and a
 To navigate between pages, use E2 to scroll to the top of the list of menu items until the page name is highlighted, then use E3 to change the page. To change a menu item, simply scroll down the list using E2 and change its value using E3. < and > symbols will appear when you are at the end of the range of possible values. Descriptions of each page and menu options follow.
 
 #### Global menu
+![dreamsequence](doc/global_menu.png)
 
 - Mode: 9 modes: Major, Natural Minor, Harmonic Minor, Melodic Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian.
 
@@ -282,6 +286,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - A-gen: Which algorithm is used for generating _arp_ patterns. The default value picks an algorithm randomly.
 
 #### Chord menu
+![dreamsequence](doc/chord_menu.png)
+
 - Destination: Where the output of the chord sequence is sent for playback. Some menu items are destination-specific.
   - None: Still sends chords to the arp and harmonizers, they just won't play directly. 
   - Engine: Norns' PolyPerc engine.
@@ -316,6 +322,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - Velocity (_MIDI, Disting_: Note velocity.
 
 #### Arp menu
+![dreamsequence](doc/arp_menu.png)
+
 - Destination: Where the output of the arpeggio is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the arp.
   - Engine: Norns' PolyPerc engine.
@@ -353,6 +361,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - AD env. skew: Amount the AD envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only.
 
 #### MIDI Harmonizer menu
+![dreamsequence](doc/midi_menu.png)
+
 - Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
@@ -388,6 +398,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - AD env. skew: Amount the AD envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only.
 
 #### CV Harmonizer menu
+![dreamsequence](doc/cv_menu.png)
+
 - Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
   - None: Selecting 'none' will mute the harmonizer.
   - Engine: Norns' PolyPerc engine.
