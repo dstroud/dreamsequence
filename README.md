@@ -113,7 +113,7 @@ Let's take a look at the core components of Dreamsequence:
 # Grid interface
 
 ### Chord view
-![ds_chord_grid](https://user-images.githubusercontent.com/435570/205140357-8cf54869-e00c-4991-aefd-77bc8f69672e.svg)
+![dreamsequence](doc/grid_chord.svg)
 The Chord view is used to sequence chord patterns A-D. Since the arp and harmonizers operate on the active chord, this is typically where you'll begin composing.
 
 - Sequence plays from top to bottom and sequence length is set using column 15.
@@ -134,7 +134,7 @@ The Chord view is used to sequence chord patterns A-D. Since the arp and harmoni
 
 ----------------------------------------------------------------------------------------------------------------------
 ### Arp view
-![ds_arp_grid](https://user-images.githubusercontent.com/435570/205157464-555400fc-a94d-43d7-86d6-1d877d23561d.svg)
+![dreamsequence](doc/grid_arp.svg)
 The Arp view is used to create an arpeggio or one-shot (strummed) pattern based on the currently-playing chord.
 
 - Notes from the active chord are sequenced using columns 1-14. Ex: if playing a Cmaj chord, columns 1-3 would result in the notes C, E, G. Columns 4-6 would result in the same notes one octave higher. Chord Type in the Arp menu can result in 4 notes/columns per octave.
@@ -150,7 +150,7 @@ The Arp view is used to create an arpeggio or one-shot (strummed) pattern based 
 
 ----------------------------------------------------------------------------------------------------------------------
 ### Arranger view
-![ds_arranger_grid](https://user-images.githubusercontent.com/435570/205140359-95a72fb4-a905-4a6c-a025-3b6bdc7d85aa.svg)
+![dreamsequence](doc/grid_arranger.svg)
 The Arranger view is used to sequence chord patterns and enter the Events editor.
 
 - Rows 1-4 correspond to chord patterns A-D and columns 1-16 represent "segments" of the Arranger sequence. The Arranger length automatically resizes to the rightmost set pattern and any gaps in the sequence are filled in lighter colors to indicate that the previous chord pattern will be sustained.
@@ -169,7 +169,7 @@ The Arranger view is used to sequence chord patterns and enter the Events editor
 
 ----------------------------------------------------------------------------------------------------------------------
 ### Events view
-![ds_events_grid](https://user-images.githubusercontent.com/435570/205140348-9ca26128-de84-44ca-bf74-afa3ca21bec6.svg)
+![dreamsequence](doc/grid_events.svg)
 The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement.
 
 - Events view is entered by holding down an Arranger segment on row 5 of the Arranger view, then pressing K3.
@@ -237,9 +237,9 @@ The following documentation explains each section of the screen.
 
 ![dreamsequence](doc/pattern_dash.png)
 
-- "A1" in the example above means we are on step 1 of pattern A.
+- "A.1" in the example above means the active chord is from step 1 of pattern A.
 - To the right of this, a symbol will indicate the current playback state: Playing, Paused, or Stopped.
-- Below, the currently-playing chord will be displayed. Holding down a chord key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key.
+- Below, the active chord will be displayed. Holding down a chord sequence key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key.
 ----------------------------------------------------------------------------------------------------------------------
 
 ### Arranger Dashboard
@@ -247,10 +247,10 @@ The following documentation explains each section of the screen.
 ![dreamsequence](doc/arranger_dash.png)
 
 - Dashboard will be brightly illuminated when Arranger is enabled, and dimmed when disabled.
-- The numbers in the top left indicate the current Arranger segment and step. If the Arranger is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger resumes on the next segment.
+- The numbers in the top left indicate the current Arranger segment and step. "2.1" in the example above means the Arranger is on step 1 of the 2nd Arranger segment. If the Arranger is interrupted by being disabled and re-enabled, this readout will change to something like "T-4" where the number is a countdown, in steps, until the current pattern is completed and the Arranger resumes on the next segment.
 - To the right, a symbol will indicate if the Arranger is in Loop mode (as in the example above) or One-shot mode (arrow symbol).
-- In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. In the example above, pattern A will be played twice, then pattern B twice, then pattern C twice. Note that, unlike the Arranger Grid view, this chart shows the individual steps within each segment, at a scale of one pixel per step.
-- At the bottom of the chart is an indication of which steps have events. In the example above, events are highlighted on the first step of segments one, three, and five.
+- In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. In the example above, pattern A will be played once, then pattern B twice, then pattern C twice. The length of each segment is at a scale of one pixel per step.
+- At the bottom of the chart is a timeline that highlights any steps that have an event. In the example above, events occur on the firt step of the upcoming segment, followed by a segment with an event on every step.
 - At the very bottom of the dash is a readout of the remaining time on the Arranger. Note that this countdown will be adjusted if the Arranger is interrupted by being disabled and re-enabled.
 ----------------------------------------------------------------------------------------------------------------------
 
