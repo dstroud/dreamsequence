@@ -1,4 +1,4 @@
--- Dreamsequence v1.0.0
+-- Dreamsequence v1.0.1
 -- Dan Stroud @modularbeat
 --
 -- KEY 2: Play/pause
@@ -997,11 +997,13 @@ function advance_chord_seq()
       
       -- Check if it's the last pattern in the arrangement.
       if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
+
         arrangement_reset = true
         reset_arrangement()
         clock.transport.stop()
       else
-        arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)
+        -- changed from wrap to a check if incremented arranger_seq_position exceeds seq_length
+        arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or (arranger_seq_position + 1 > arranger_seq_length) and 1 or arranger_seq_position + 1
         pattern = arranger_seq_padded[arranger_seq_position]
         arranger_queue = nil
       end
@@ -1009,7 +1011,6 @@ function advance_chord_seq()
       -- Indicates arranger has moved to new pattern.
       arranger_seq_retrig = true
     end
-    
     -- Flag if arranger is on the last pattern of a 1-shot sequence
     arranger_ending()
   end
