@@ -1,4 +1,4 @@
--- Dreamsequence v1.0.1
+-- Dreamsequence v1.0.2
 -- Dan Stroud @modularbeat
 --
 -- KEY 2: Play/pause
@@ -56,7 +56,7 @@ function init()
 
 
   -- EVENT PARAMS
-  params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI in', 'CV in'}, 1)
+  params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI harmonizer', 'CV harmonizer'}, 1)
     params:set_action('event_category',function() update_menus() end)
     params:hide(params.lookup['event_category'])
   event_display_names = {} -- to-do: make local after debug
