@@ -1,4 +1,4 @@
--- Dreamsequence v1.0.1
+-- Dreamsequence v1.0.2
 -- Dan Stroud @modularbeat
 --
 -- KEY 2: Play/pause
@@ -56,7 +56,7 @@ function init()
 
 
   -- EVENT PARAMS
-  params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI in', 'CV in'}, 1)
+  params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI harmonizer', 'CV harmonizer'}, 1)
     params:set_action('event_category',function() update_menus() end)
     params:hide(params.lookup['event_category'])
   event_display_names = {} -- to-do: make local after debug
@@ -2774,20 +2774,24 @@ function redraw()
           steps_elapsed = (i == arranger_seq_position and math.max(readout_chord_seq_position - 1,0) or 0) or 0          
         end
         
+        -- This is used as a replacement for arranger_seq_padded[i] in several places to handle situations where the chord pattern is changed unexpectedly:
+        -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
+        -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_enabled to false and should suspend the arranger mini chart until Arranger pickup occurs.
+        -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
+        local pattern_stable = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i]
+        
         -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative (possibly obsolete now?)
-        steps_remaining_in_pattern = math.max(pattern_length[arranger_seq_padded[i]] - steps_elapsed, 0)  --rect_w
+        steps_remaining_in_pattern = math.max(pattern_length[pattern_stable] - steps_elapsed, 0)  --rect_w
         steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
         seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
       
-        -- Lock in the currently-playing pattern even if it's changed on Grid, update everything else
-        local pattern_y = arranger_seq_position == i and pattern or arranger_seq_padded[i]
-        local rect_y = arranger_dash_y + (pattern_y * 2) + pattern_y
+        local rect_y = arranger_dash_y + (pattern_stable * 2) + pattern_stable
 
         -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
         local rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
 
         -- Automator event indicator. To-do: This is simpler than the above and can probably be used to draw the primary chart too.
-        for s = i == arranger_seq_position and readout_chord_seq_position or 1, pattern_length[arranger_seq_padded[i]] do
+        for s = i == arranger_seq_position and readout_chord_seq_position or 1, pattern_length[pattern_stable] do
           if params:get('arranger_enabled') == 1 then
             -- Dim the interrupted segment upon resume
             if arranger_enabled == false and i == arranger_seq_position then
