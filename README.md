@@ -8,6 +8,11 @@ Optional:
 - Crow (**[v3.0.1](https://github.com/monome/crow/releases/tag/v3.0.1)** due to issues with v4.0.2) can be used to process incoming CV+triggers as well as to send sequences to CV gear or certain i2c gear (currently Just Friends and Disting EX).
 - MIDI can be used to process incoming notes (from a sequencer or MIDI controller) as well as to send sequences to synths, samplers, DAWs, etc..
 
+[![Watch the video](https://img.youtube.com/vi/Z6plHOHKwdg/0.jpg)](https://youtu.be/Z6plHOHKwdg)
+
+[Dreamsequence demo and basics on YouTube](https://youtu.be/Z6plHOHKwdg)
+
+
 
 # Overview
 
