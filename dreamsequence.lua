@@ -1,4 +1,4 @@
--- Dreamsequence v1.0.3
+-- Dreamsequence v1.0.4
 -- Dan Stroud @modularbeat
 --
 -- KEY 2: Play/pause
@@ -18,10 +18,6 @@
 g = grid.connect()
 include("dreamsequence/lib/includes")
 
--- To-do, add options for selecting MIDI in/out ports
-in_midi = midi.connect(1)
-out_midi = midi.connect(1)
--- transport messages will be sent to whatever is configured in the global midi parameters
 
 function init()
   init_generator()
@@ -36,6 +32,21 @@ function init()
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end)
     -- moving action to post-bang
     -- params:set_action('mode', function() update_chord_action() end)
+    
+  params:add_number('midi_in_port', 'Midi in',1,#midi.vports,1)
+    params:set_action('midi_in_port', function(value)
+      in_midi.event = nil
+      in_midi = midi.connect(params:get('midi_in_port'))
+      in_midi.event = midi_event      
+    end)
+    -- set in_midi port once before params:bang()
+  in_midi = midi.connect(params:get('midi_in_port'))
+  in_midi.event = midi_event
+  
+  params:add_number('midi_out_port', 'Midi out',1,#midi.vports,1)
+    params:set_action('midi_out_port', function() out_midi = midi.connect(params:get('midi_out_port')) end)
+  -- (transport messages will be sent to whatever is configured in the global midi parameters)
+    
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
@@ -337,7 +348,7 @@ function update_menus()
   end
 
   -- GLOBAL MENU 
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'midi_in_port', 'midi_out_port', 'clock_source',
       --'clock_midi_out', --'clock_midi_out' option removed for Norns update with multi-clock. TBD if we should replicate all ports here (this could get cluttered)
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
   
@@ -1331,9 +1342,8 @@ function sample_crow(volts)
 end
 
 
-in_midi.event = function(data)
+midi_event = function(data)
   local d = midi.to_msg(data)
-  -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
   if d.type == "note_on" then
     local note = params:get('chord_preload') == 0 and quantize_note(d.note - 35, 'midi') or pre_quantize_note(d.note - 35, 'midi')
     local destination = params:string('midi_dest')
@@ -1350,8 +1360,8 @@ in_midi.event = function(data)
     end
   end
 end
-
-
+  
+  
 function to_engine(source, note)
   local note_on_time = util.time()
   engine_play_note = true
