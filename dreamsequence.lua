@@ -26,6 +26,12 @@ function init()
   params:set('clock_crow_out', 1)
   
   
+  -- midi stuff
+  midi_device = {} -- container for connected midi devices
+  midi_device_names = {} -- container for their names
+  refresh_midi_devices()
+  
+
   --GLOBAL PARAMS
   params:add_separator ('Global')
   params:add_number("transpose","Key",-12, 12, 0, function(param) return transpose_string(param:get()) end)
@@ -42,10 +48,8 @@ function init()
     -- set in_midi port once before params:bang()
   in_midi = midi.connect(params:get('midi_in_port'))
   in_midi.event = midi_event
-  
-  params:add_number('midi_out_port', 'MIDI out',1,#midi.vports,1)
-    params:set_action('midi_out_port', function() out_midi = midi.connect(params:get('midi_out_port')) end)
   -- (transport messages will be sent to whatever is configured in the global midi parameters)
+    
     
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
@@ -104,6 +108,8 @@ function init()
   params:add_control("chord_pp_gain","Gain",pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50, function(param) return percent(param:get()) end)
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
+  params:add_number('chord_midi_out_port', 'MIDI out',1,#midi.vports,1)
+    -- params:set_action('chord_midi_out_port', function(value) chord_midi_out = midi_device[value] end)    
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
   params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   params:add_number('chord_disting_velocity','Velocity',0, 100, 50)
@@ -128,6 +134,7 @@ function init()
   params:add_number('arp_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
   params:add_control("arp_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
+  params:add_number('arp_midi_out_port', 'MIDI out',1,#midi.vports,1)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -151,6 +158,7 @@ function init()
   params:add_number('midi_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
   params:add_control("midi_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
+  params:add_number('midi_midi_out_port', 'MIDI out',1,#midi.vports,1)
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
   params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -179,6 +187,7 @@ function init()
   params:add_number('crow_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
   params:add_control("crow_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("crow_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
+  params:add_number('crow_midi_out_port', 'MIDI out',1,#midi.vports,1)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -348,7 +357,7 @@ function update_menus()
   end
 
   -- GLOBAL MENU 
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'midi_in_port', 'midi_out_port', 'clock_source',
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
       --'clock_midi_out', --'clock_midi_out' option removed for Norns update with multi-clock. TBD if we should replicate all ports here (this could get cluttered)
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
   
@@ -358,7 +367,7 @@ function update_menus()
   elseif params:string('chord_dest') == 'Engine' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity'}
   elseif params:string('chord_dest') == 'ii-JF' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_dest') == 'Disting' then
@@ -371,7 +380,7 @@ function update_menus()
   elseif params:string('arp_dest') == 'Engine' then
     menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_ch', 'arp_midi_velocity'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
       menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
@@ -391,20 +400,20 @@ function update_menus()
     menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru'}
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index','midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru'}
     else
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[4] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env', }
+      menus[4] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env'}
     else -- AD envelope
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew', }
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew'}
     end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
  elseif params:string('midi_dest') == 'Disting' then
-    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}    
+    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
   end
   
   -- CV HARMONIZER MENU
@@ -413,7 +422,7 @@ function update_menus()
   elseif params:string('crow_dest') == 'Engine' then
     menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_ch', 'crow_midi_velocity'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
       menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
@@ -425,6 +434,17 @@ function update_menus()
   elseif params:string('crow_dest') == 'Disting' then
     menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_disting_velocity'}    
   end  
+end
+
+
+function refresh_midi_devices()
+  for i = 1,#midi.vports do -- query all ports
+    midi_device[i] = midi.connect(i) -- connect each device
+    table.insert( -- register its name:
+      midi_device_names, -- table to insert to
+      "port "..i..": "..util.trim_string_to_width(midi_device[i].name,80) -- value to insert
+    )
+  end
 end
 
 
@@ -816,7 +836,7 @@ function sequence_clock()
     -- Checking transport state again in case transport was just set to 'false' by Stop
     if transport_active then
       -- if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
-      if (dclock_step + chord_preload_tics) % chord_div == 0 then
+      if (clock_step + chord_preload_tics) % chord_div == 0 then
         get_next_chord()
       end
     
@@ -873,7 +893,7 @@ function timing_clock()
       midi_note_history[i][1] = midi_note_history[i][1] - 1
       if midi_note_history[i][1] == 0 then
         -- print('note_off')
-        out_midi:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- note, vel, ch.
+        midi_device[midi_note_history[i][5]]:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- port, note, vel, ch.
         table.remove(midi_note_history, i)
       end
     end
@@ -1179,7 +1199,7 @@ function play_chord(destination, channel)
   elseif destination == 'MIDI' then
     for i = 1, params:get('chord_type') do
       local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), chord_duration)
+      to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), chord_duration, params:get('chord_midi_out_port'))
     end
   elseif destination == 'Crow' then
     for i = 1, params:get('chord_type') do
@@ -1291,7 +1311,7 @@ function advance_arp_seq()
     if destination == 'Engine' then
       to_engine('arp', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), arp_duration)
+      to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), arp_duration, params:get('arp_midi_out_port'))
     elseif destination == 'Crow' then
       to_crow('arp',note)
     elseif destination == 'ii-JF' then
@@ -1326,7 +1346,7 @@ function sample_crow(volts)
     if destination == 'Engine' then
       to_engine('crow', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('crow_midi_velocity'), params:get('crow_midi_ch'), crow_duration)
+      to_midi(note, params:get('crow_midi_velocity'), params:get('crow_midi_ch'), crow_duration, params:get('crow_midi_out_port'))
     elseif destination == 'Crow' then
       to_crow('crow', note)
     elseif destination =='ii-JF' then
@@ -1341,6 +1361,7 @@ function sample_crow(volts)
 end
 
 
+--midi harmonizer input
 midi_event = function(data)
   local d = midi.to_msg(data)
   if d.type == "note_on" then
@@ -1349,7 +1370,7 @@ midi_event = function(data)
     if destination == 'Engine' then
       to_engine('midi', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), midi_duration)
+      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), midi_duration, params:get('midi_midi_out_port'))
     elseif destination == 'Crow' then
       to_crow('midi', note)
     elseif destination =='ii-JF' then
@@ -1393,9 +1414,10 @@ function to_engine(source, note)
     table.insert(engine_note_history, {dedupe_threshold_int, note, note_on_time})    
   end
 end
+  
+  
+function to_midi(note, velocity, channel, duration, port)
 
-
-function to_midi(note, velocity, channel, duration)
   local midi_note = note + 36
   local note_on_time = util.time()
   midi_play_note = true
@@ -1403,7 +1425,7 @@ function to_midi(note, velocity, channel, duration)
   
   -- Check for duplicate notes and process according to dedupe_threshold setting
   for i = 1, #midi_note_history do
-    if midi_note_history[i][2] == midi_note and midi_note_history[i][3] == channel then
+    if midi_note_history[i][2] == midi_note and midi_note_history[i][5] == port and midi_note_history[i][3] == channel then
 
       -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below which is not present in other destinations.
       
@@ -1424,10 +1446,10 @@ function to_midi(note, velocity, channel, duration)
   
   -- Play note and insert new note-on record if appropriate
   if midi_play_note == true then
-    out_midi:note_on((midi_note), velocity, channel)
+    midi_device[port]:note_on((midi_note), velocity, channel)
   end
   if midi_note_history_insert == true then
-    table.insert(midi_note_history, {duration, midi_note, channel, note_on_time})
+    table.insert(midi_note_history, {duration, midi_note, channel, note_on_time, port})
   end
 end
 
@@ -2487,8 +2509,8 @@ end
 function param_formatter(param)
   if param == 'source' then
     return('Clock:')
-  elseif param == 'midi out' then
-    return('Out:')
+  -- elseif param == 'midi out' then
+  --   return('Out:')
   else 
     return(param .. ':')
   end

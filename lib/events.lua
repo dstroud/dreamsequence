@@ -1,6 +1,5 @@
 -- Lookup table for events
 events_lookup = {
-  
   {	category= 'Global', 	event_type= 'function', 	id= 'crow_event_trigger', 	name= 'Crow trigger', 	value_type= 'trigger', 				},
   {	category= 'Global', 	event_type= 'function', 	id= 'event_chord_gen', 	name= 'Generate chords', 	value_type= 'trigger', 				},
   {	category= 'Global', 	event_type= 'function', 	id= 'event_arp_gen', 	name= 'Generate arp', 	value_type= 'trigger', 				},
@@ -25,6 +24,7 @@ events_lookup = {
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_pp_tracking', 	name= 'Engine fltr tracking', 	value_type= 'inc, set', 	formatter= 'percent', 			},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_pp_gain', 	name= 'Engine gain', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_pp_pw', 	name= 'Engine PW', 	value_type= 'inc, set', 	formatter= 'percent', 			},
+  {	category= 'Chord', 	event_type= 'param', 	id= 'chord_midi_out_port', 	name= 'MIDI out port', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_jf_amp', 	name= 'Just Friends amp', 	value_type= 'inc, set', 				},
@@ -44,6 +44,7 @@ events_lookup = {
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_pp_tracking', 	name= 'Engine fltr tracking', 	value_type= 'inc, set', 	formatter= 'percent', 			},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_pp_gain', 	name= 'Engine gain', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_pp_pw', 	name= 'Engine PW', 	value_type= 'inc, set', 	formatter= 'percent', 			},
+  {	category= 'Arp', 	event_type= 'param', 	id= 'arp_midi_out_port', 	name= 'MIDI out port', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_tr_env', 	name= 'Crow output', 	value_type= 'set', 		action= 'update_menus', 		},
@@ -60,6 +61,8 @@ events_lookup = {
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_pp_tracking', 	name= 'Engine fltr tracking', 	value_type= 'inc, set', 	formatter= 'percent', 			},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_pp_gain', 	name= 'Engine gain', 	value_type= 'inc, set', 				},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_pp_pw', 	name= 'Engine PW', 	value_type= 'inc, set', 	formatter= 'percent', 			},
+  {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_in_port', 	name= 'MIDI in port', 	value_type= 'inc, set', 				},
+  {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_midi_out_port', 	name= 'MIDI out port', 	value_type= 'inc, set', 				},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'do_midi_velocity_passthru', 	name= 'Pass velocity', 	value_type= 'set', 	formatter= 't_f_string', 	action= 'update_menus', 		},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
@@ -78,6 +81,7 @@ events_lookup = {
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_pp_tracking', 	name= 'Engine fltr tracking', 	value_type= 'inc, set', 	formatter= 'percent', 			},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_pp_gain', 	name= 'Engine gain', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_pp_pw', 	name= 'Engine PW', 	value_type= 'inc, set', 	formatter= 'percent', 			},
+  {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_midi_out_port', 	name= 'MIDI out port', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_tr_env', 	name= 'Crow output', 	value_type= 'set', 		action= 'update_menus', 		},
