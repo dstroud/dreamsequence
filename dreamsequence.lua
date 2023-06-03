@@ -18,12 +18,31 @@
 g = grid.connect()
 include("dreamsequence/lib/includes")
 
--- To-do, add options for selecting MIDI in/out ports
-in_midi = midi.connect(1)
-out_midi = midi.connect(1)
 -- transport messages will be sent to whatever is configured in the global midi parameters
 
 function init()
+-- To-do, add options for selecting MIDI in/out ports
+  in_midi = midi.connect(1)
+  in_midi.event = function(data)
+    local d = midi.to_msg(data)
+    -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
+    if d.type == "note_on" then
+      local note = params:get('chord_preload') == 0 and quantize_note(d.note - 35, 'midi') or pre_quantize_note(d.note - 35, 'midi')
+      local destination = params:string('midi_dest')
+      if destination == 'Engine' then
+        to_engine('midi', note)
+      elseif destination == 'MIDI' then
+        to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), midi_duration)
+      elseif destination == 'Crow' then
+        to_crow('midi', note)
+      elseif destination =='ii-JF' then
+        to_jf('midi', note, params:get('midi_jf_amp')/10)
+      elseif destination == 'Disting' then
+        to_disting(note, params:get('midi_disting_velocity'), midi_duration)      
+      end
+    end
+  end  
+  out_midi = midi.connect(1)  
   init_generator()
   crow.ii.jf.mode(1)
   -- Turn off built-in Crow clock so it doesn't conflict with ours which only fires when transport is running.
@@ -1329,28 +1348,6 @@ function sample_crow(volts)
   prev_note = note
   chord_seq_retrig = false -- Resets at chord advance
 end
-
-
-in_midi.event = function(data)
-  local d = midi.to_msg(data)
-  -- if params:get('clock_source') == 2 and d.type == 'stop' then -- placeholder for determining source of transport.stop
-  if d.type == "note_on" then
-    local note = params:get('chord_preload') == 0 and quantize_note(d.note - 35, 'midi') or pre_quantize_note(d.note - 35, 'midi')
-    local destination = params:string('midi_dest')
-    if destination == 'Engine' then
-      to_engine('midi', note)
-    elseif destination == 'MIDI' then
-      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), midi_duration)
-    elseif destination == 'Crow' then
-      to_crow('midi', note)
-    elseif destination =='ii-JF' then
-      to_jf('midi', note, params:get('midi_jf_amp')/10)
-    elseif destination == 'Disting' then
-      to_disting(note, params:get('midi_disting_velocity'), midi_duration)      
-    end
-  end
-end
-
 
 function to_engine(source, note)
   local note_on_time = util.time()
