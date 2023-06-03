@@ -33,7 +33,7 @@ function init()
     -- moving action to post-bang
     -- params:set_action('mode', function() update_chord_action() end)
     
-  params:add_number('midi_in_port', 'Midi in',1,#midi.vports,1)
+  params:add_number('midi_in_port', 'MIDI in',1,#midi.vports,1)
     params:set_action('midi_in_port', function(value)
       in_midi.event = nil
       in_midi = midi.connect(params:get('midi_in_port'))
@@ -43,7 +43,7 @@ function init()
   in_midi = midi.connect(params:get('midi_in_port'))
   in_midi.event = midi_event
   
-  params:add_number('midi_out_port', 'Midi out',1,#midi.vports,1)
+  params:add_number('midi_out_port', 'MIDI out',1,#midi.vports,1)
     params:set_action('midi_out_port', function() out_midi = midi.connect(params:get('midi_out_port')) end)
   -- (transport messages will be sent to whatever is configured in the global midi parameters)
     
@@ -776,21 +776,19 @@ function sequence_clock()
     
     -- ADVANCE CLOCK_STEP
     -- Wrap not strictly needed and could actually be used to count arranger position? 
-    -- 192 tics per measure * 8 (max a step can be, 0-indexed. 
-    clock_step = util.wrap(clock_step + 1,0, 1535)
-    
+    -- clock_step = util.wrap(clock_step + 1,0, 1535) -- 192 tics per measure * 8 (max a step can be, 0-indexed.
+    clock_step = clock_step + 1
     
     -- STOP beat-quantized
     if stop == true then
-      -- When internally clocked, stop is quantized to occur at the end of the beat
-      -- Default quantization is global_clock_div * 4 to stop at end of measure
-      -- To-do: add param for quantizing transport stop in different time signatures
+      -- When internally clocked, stop is quantized to occur at the end of the chord step
       if params:string('clock_source') == 'internal' then
-        if (clock_step) % (global_clock_div * 4) == 0 then  --stops at the end of the beat
+        if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
           print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
-          clock_step = util.wrap(clock_step - 1, 0, 1535)
-          print('clock_step reset to ' .. clock_step)
+          -- clock_step = util.wrap(clock_step - 1, 0, 1535)
+          clock_step = clock_step - 1, 0 -- min?
+          -- print('clock_step reset to ' .. clock_step)
           transport_multi_stop()
           print('Canceling clock_id ' .. (sequence_clock_id or 0))
           clock.cancel(sequence_clock_id)-- or 0)
@@ -817,7 +815,8 @@ function sequence_clock()
   
     -- Checking transport state again in case transport was just set to 'false' by Stop
     if transport_active then
-      if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
+      -- if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
+      if (dclock_step + chord_preload_tics) % chord_div == 0 then
         get_next_chord()
       end
     
