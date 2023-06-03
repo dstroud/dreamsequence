@@ -207,7 +207,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
 - K1: Not currently used
 
 - K2: Play/pause
-  - Play occurs immediately while pause is quantized to always occur at the end of the active beat (assumes 4/4 time signature).
+  - Play occurs immediately while pause is quantized to always occur at the end of the chord pattern step.
   - In certain states, alternate functions are enabled: 
     - While holding down an arranger Event Timeline key: jump the arranger playhead to the selected segment.
     - While in the Events editor screen: delete selected or all events.
