@@ -282,6 +282,10 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Tempo: sets Norns system clock tempo in BPM.
 
+- MIDI in: MIDI port used for the MIDI harmonizer
+
+- MIDI out: MIDI port used for sending sequences out (MIDI clock ports use the system clock parameter)
+
 - Clock: System clock setting. Internal is recommended, but MIDI will work assuming you are syncing to a delay/latency-compensated clock source. Link is not recommended since there is no latency compensation in Norns’ system clock AFAIK. Crow clock source is not supported at this time. _Note that MIDI clock out ports must be set in the system parameters:clock settings._
 
 - Crow clock: Frequency of the clock pulse from Crow out port 3. Defaults to note-style divisions but Pulses Per Quarter Note (PPQN) are also available by scrolling left. Note that higher PPQN settings are likely to result in instability. _At launch, Dreamsequence sets the Norns system clock "crow out" parameter to "off" since Dreamsequence generates its own clock pulses for Crow that only runs when the script's transport is playing._
