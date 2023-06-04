@@ -1,4 +1,4 @@
--- Dreamsequence v1.0.5
+-- Dreamsequence v1.0.6
 -- Dan Stroud @modularbeat
 --
 -- KEY 2: Play/pause
@@ -264,7 +264,8 @@ function init()
   arranger_seq_padded = {}
   arranger_seq_position = 0
   arranger_seq_length = 1
-  max_arranger_seq_length = 16
+  max_arranger_seq_length = 64 --(64 arranger segments * 8 chord step * 16 event slots = 8192 events... yikes)
+  arranger_grid_offset = 0 -- offset allows us to scroll the arrange grid view beyond 16 segments
   generate_arranger_seq_padded()  
   automator_events = {}
   for patt = 1,max_arranger_seq_length do
@@ -1600,13 +1601,15 @@ function grid_redraw()
     if grid_view_name == 'Arranger' then
       g:led(16,6,15)
       
-      for x = 1, max_arranger_seq_length do
+      for x = 1, 16 do
+        local x_offset = x + arranger_grid_offset
         for y = 1,4 do
-          g:led(x,y, x == arranger_seq_position and 6 or x == arranger_queue and 4 or x <= arranger_seq_length and 2 or 0)
-          if y == arranger_seq_padded[x] then g:led(x, y, x == arranger_seq_position and 9 or 7) end
-          if y == arranger_seq[x] then g:led(x, y, 15) end
+          g:led(x,y, x_offset == arranger_seq_position and 6 or x_offset == arranger_queue and 4 or x_offset <= arranger_seq_length and 2 or 0)
+          if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end
+          if y == arranger_seq[x_offset] then g:led(x, y, 15) end
         end
-        g:led(x, 5, (automator_events[x] ~= nil and automator_events[x].populated or 0) > 0 and 15 or x > arranger_seq_length and 3 or 7)
+        -- Events strip
+        g:led(x, 5, (automator_events[x_offset] ~= nil and automator_events[x_offset].populated or 0) > 0 and 15 or x > arranger_seq_length and 3 or 7)
       end
         
       g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
@@ -1621,7 +1624,18 @@ function grid_redraw()
         -- g:led(1,8, 4)
       -- end
 
-        g:led(2,8, params:get('playback') == 1 and 15 or 4) 
+        g:led(2,8, params:get('playback') == 1 and 15 or 4)
+        
+      -- Pagination for arranger grid view
+      for i = 0,3 do
+        local target = i * 16
+        g:led(i + 7, 8 , math.max(10 + util.round((math.min(target, arranger_grid_offset) - math.max(target, arranger_grid_offset))/2), 2) + 2)
+      end
+      if arranger_grid_offset == 0 then g:led(7, 8, 15)
+      elseif arranger_grid_offset == 16 then g:led(8, 8, 15)    
+      elseif arranger_grid_offset == 32 then g:led(9, 8, 15)
+      elseif arranger_grid_offset == 48 then g:led(10, 8, 15)
+      end  
       
     elseif grid_view_name == 'Chord' then
       if params:string('arranger_enabled') == 'True' and arranger_one_shot_last_pattern == false then
@@ -1738,6 +1752,7 @@ function g.key(x,y,z)
       
     --ARRANGER KEY DOWN-------------------------------------------------------
     elseif grid_view_name == 'Arranger' then
+      local x_offset = x + arranger_grid_offset
 
       -- enable/disable Arranger
       if x == 1 and y == 8 then
@@ -1747,12 +1762,18 @@ function g.key(x,y,z)
           params:set('arranger_enabled',0)
         end
 
-      -- enable/disable Arranger playback Loop mode
+      -- Switch between Arranger playback Loop or One-shot mode
       elseif x == 2 and y == 8 then
         if params:get('playback') == 1 then
           params:set('playback',2)
         else
           params:set('playback',1)
+        end
+        
+      -- Arranger pagination jumps
+      elseif y == 8 then
+        if x > 6 and x < 11 then
+          arranger_grid_offset = (x -7) * 16
         end
         
       -- Automator events strip key down
@@ -1761,7 +1782,7 @@ function g.key(x,y,z)
 
         -- Initial key down copies stuff. First touched pattern is the one we edit, effectively resetting on key_count = 0
         if arranger_loop_key_count == 1 then
-          event_edit_pattern = x
+          event_edit_pattern = x_offset
 
           -- Store original arranger sequence values so we can have non-destructive pattern shifting using ENC 3
           d_cuml = 0
@@ -1772,16 +1793,16 @@ function g.key(x,y,z)
 
         -- Subsequent keys down paste all automator events in segment, but not the segment pattern
         else
-          automator_events[x] = deepcopy(automator_events[event_edit_pattern])
+          automator_events[x_offset] = deepcopy(automator_events[event_edit_pattern])
           print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
         end
         
-      -- Arranger_seq patterns
+      -- ARRANGER SEGMENT PATTERNS
       elseif y < 5 then
-        if y == arranger_seq[x]then
-          arranger_seq[x] = 0
+        if y == arranger_seq[x_offset]then
+          arranger_seq[x_offset] = 0
         else
-          arranger_seq[x] = y
+          arranger_seq[x_offset] = y
         end  
         generate_arranger_seq_padded()
         
@@ -1957,8 +1978,9 @@ function key(n,z)
     elseif n == 2 then
   
       if keys[1] == 1 then
-        -- Nothing at the moment
-      -- Arranger loop strip held down
+      -- Not used at the moment
+        
+      -- Arranger Events strip held down
       elseif arranger_loop_key_count > 0 then        
         arranger_queue = event_edit_pattern
         grid_redraw()
@@ -2281,7 +2303,12 @@ function enc(n,d)
   
   -- Reserved for scrolling/extending Arranger, Chord, Arp sequences
   if n == 1 then
-  
+    ------- SCROLL ARRANGER GRID VIEW--------
+    if grid_view_name == 'Arranger' then -- and arranger_loop_key_count > 0 then
+      arranger_grid_offset = util.clamp(arranger_grid_offset + d, 0, max_arranger_seq_length -  16)
+      grid_redraw()
+    end
+            
   -- n == ENC 2 ------------------------------------------------
   elseif n == 2 then
     if view_key_count > 0 then
