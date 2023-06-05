@@ -31,26 +31,14 @@ function init()
   midi_device_names = {} -- container for their names
   refresh_midi_devices()
   
+  params:add_separator ('DREAMSEQUENCE')
 
   --GLOBAL PARAMS
-  params:add_separator ('Global')
+  params:add_group('global', 'GLOBAL', 5)
   params:add_number("transpose","Key",-12, 12, 0, function(param) return transpose_string(param:get()) end)
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end)
     -- moving action to post-bang
     -- params:set_action('mode', function() update_chord_action() end)
-    
-  params:add_number('midi_in_port', 'MIDI in',1,#midi.vports,1)
-    params:set_action('midi_in_port', function(value)
-      in_midi.event = nil
-      in_midi = midi.connect(params:get('midi_in_port'))
-      in_midi.event = midi_event      
-    end)
-    -- set in_midi port once before params:bang()
-  in_midi = midi.connect(params:get('midi_in_port'))
-  in_midi.event = midi_event
-  -- (transport messages will be sent to whatever is configured in the global midi parameters)
-    
-    
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
     params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
@@ -61,13 +49,14 @@ function init()
   -- params:add_number('count_in', 'Count-in', 0, 8, 0)
   -- params:add_number('clock_offset', 'Clock offset', -999, 999, 0)
 
+
   --ARRANGER PARAMS
-  params:add_separator ('Arranger')
+  params:add_group('arranger', 'ARRANGER', 2)
   params:add_number('arranger_enabled', 'Enabled', 0, 1, 0, function(param) return t_f_string(param:get()) end)
     params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_enabled() end)
-  params:add_option('playback', 'Arranger', {'Loop','One-shot'}, 1)
+  params:add_option('playback', 'Playback', {'Loop','One-shot'}, 1)
     params:set_action('playback', function() grid_redraw(); arranger_ending() end)
-  params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
+  -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
 
 
   -- EVENT PARAMS
@@ -88,12 +77,20 @@ function init()
   
   
   --CHORD PARAMS
-  params:add_separator ('Chord')
+  params:add_group('chord', 'CHORD', 22)  
   params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
     params:set_action('chord_div_index',function() set_div('chord') end)
   params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
     params:set_action("chord_dest",function() update_menus() end)
+  params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
+    params:set_action('chord_duration_index',function() set_duration('chord') end)
+  params:add_number('chord_octave','Octave',-2, 4, 0)
+  params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
+  params:add_number('chord_spread', 'Spread', 0, 6, 0)    
+    
+  params:add_separator ('chord_engine', 'Engine')
   params:add_number('chord_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
   params:add_number('chord_pp_tracking', 'Fltr tracking',0,100,50, function(param) return percent(param:get()) end)
@@ -107,98 +104,136 @@ function init()
     }
   params:add_control("chord_pp_gain","Gain",pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50, function(param) return percent(param:get()) end)
+  
+  params:add_separator ('chord_midi', 'MIDI')
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   params:add_number('chord_midi_out_port', 'MIDI out',1,#midi.vports,1)
     -- params:set_action('chord_midi_out_port', function(value) chord_midi_out = midi_device[value] end)    
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
-  params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
-  params:add_number('chord_disting_velocity','Velocity',0, 100, 50)
-  params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
-    params:set_action('chord_duration_index',function() set_duration('chord') end)
-  params:add_number('chord_octave','Octave',-2, 4, 0)
-  params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
-  params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
-  params:add_number('chord_spread', 'Spread', 0, 6, 0)
   
+  params:add_separator ('chord_jf', 'Just Friends')
+  params:add_number('chord_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  
+  params:add_separator ('chord_disting', 'Disting')
+  params:add_number('chord_disting_velocity','Velocity',0, 100, 50)
 
 
   --ARP PARAMS
-  params:add_separator ('Arp')
+  params:add_group('arp', 'ARP', 24)  
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("arp_dest",function() update_menus() end)
+  params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
+    params:set_action('arp_duration_index',function() set_duration('arp') end)
+  params:add_number('arp_octave','Octave',-2, 4, 0)
+  params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  params:add_option("arp_mode", "Mode", {'Loop','One-shot'},1)    
+    
+  params:add_separator ('arp_engine', 'Engine')
   params:add_number('arp_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
   params:add_number('arp_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
   params:add_control("arp_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
+  
+  params:add_separator ('arp_midi', 'MIDI')
   params:add_number('arp_midi_out_port', 'MIDI out',1,#midi.vports,1)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
+  
+  params:add_separator ('arp_jf', 'Just Friends')
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  
+  params:add_separator ('arp_disting', 'Disting')
   params:add_number('arp_disting_velocity','Velocity',0, 100, 50)
+  
+  params:add_separator ('arp_crow', 'Crow')
   params:add_option("arp_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("arp_tr_env",function() update_menus() end)
   params:add_number('arp_ar_skew','AD env. skew',0, 100, 0)
-  params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
-    params:set_action('arp_duration_index',function() set_duration('arp') end)
-  params:add_number('arp_octave','Octave',-2, 4, 0)
-  params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
-  params:add_option("arp_mode", "Mode", {'Loop','One-shot'},1)
   
   
   --MIDI PARAMS
-  params:add_separator ('MIDI')
+  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 23)  
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
+  params:add_number('midi_in_port', 'MIDI in',1,#midi.vports,1)
+    params:set_action('midi_in_port', function(value)
+      in_midi.event = nil
+      in_midi = midi.connect(params:get('midi_in_port'))
+      in_midi.event = midi_event      
+    end)
+    -- set in_midi port once before params:bang()
+  in_midi = midi.connect(params:get('midi_in_port'))
+  in_midi.event = midi_event
+  params:add_number('midi_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
+    params:set_action('midi_duration_index',function() set_duration('midi') end)
+  params:add_number('midi_octave','Octave',-2, 4, 0)
+  params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)  
+  
+  params:add_separator ('midi_harmonizer_engine', 'Engine')
   params:add_number('midi_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
   params:add_number('midi_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
   params:add_control("midi_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
-  params:add_number('midi_midi_out_port', 'MIDI out',1,#midi.vports,1)
+  
+  params:add_separator ('midi_harmonizer_midi', 'MIDI')
+  params:add_number('midi_midi_out_port', 'MIDI out',1,#midi.vports,1)   -- (clock out ports configured in global midi parameters) 
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
-  params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
-  params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
-  params:add_number('midi_disting_velocity','Velocity',0, 100, 50)
   params:add_number('do_midi_velocity_passthru', 'Pass velocity', 0, 1, 0, function(param) return t_f_string(param:get()) end)
-    params:set_action("do_midi_velocity_passthru",function() update_menus() end)
+    params:set_action("do_midi_velocity_passthru",function() update_menus() end)  
+  params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
+  
+  params:add_separator ('Just Friends')
+  params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  
+  params:add_separator ('Disting')
+  params:add_number('midi_disting_velocity','Velocity',0, 100, 50)
+  
+  params:add_separator ('midi_harmonizer_crow','Crow')
   params:add_option("midi_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("midi_tr_env",function() update_menus() end)
   params:add_number('midi_ar_skew','AD env. skew',0, 100, 0)
-  params:add_number('midi_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
-    params:set_action('midi_duration_index',function() set_duration('midi') end)
-  params:add_number('midi_octave','Octave',-2, 4, 0)
-  params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
 
   
   --CV/CROW PARAMS
-  params:add_separator ('Crow')
+  params:add_group('cv_harmonizer', 'CV HARMONIZER', 23)  
   -- Crow clock uses hybrid notation/PPQN
   params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
     params:set_action('crow_clock_index',function() set_crow_clock() end)
   params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("crow_dest",function() update_menus() end)
+  params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
+    params:set_action('crow_duration_index',function() set_duration('crow') end)
+  params:add_number('crow_octave','Octave',-2, 4, 0)
+  params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)    
+
+  params:add_separator ('cv_harmonizer_engine', 'Engine')
   params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_number('do_crow_auto_rest', 'Auto-rest', 0, 1, 0, function(param) return t_f_string(param:get()) end)
   params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
   params:add_number('crow_pp_tracking', 'Fltr tracking',0,100,50,function(param) return percent(param:get()) end)
   params:add_control("crow_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
   params:add_number("crow_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
+  
+  params:add_separator ('cv_harmonizer_midi', 'MIDI')
   params:add_number('crow_midi_out_port', 'MIDI out',1,#midi.vports,1)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
+  
+  params:add_separator ('cv_harmonizer_jf', 'Just Friends')
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
+  
+  params:add_separator ('cv_harmonizer_disting', 'Disting')
   params:add_number('crow_disting_velocity','Velocity',0, 100, 50)
+  
+  params:add_separator ('cv_harmonizer_crow', 'Crow')
   params:add_option("crow_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("crow_tr_env",function() update_menus() end)
   params:add_number('crow_ar_skew','AD env. skew',0, 100, 0)
-  params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
-    params:set_action('crow_duration_index',function() set_duration('crow') end)
-  params:add_number('crow_octave','Octave',-2, 4, 0)
-  params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
 
   
   glyphs = {
@@ -258,14 +293,14 @@ function init()
   arranger_queue = false
   pattern_copy_performed = false
   arranger_seq_retrig = false
-  -- Raw arranger_seq which can contain 0 patterns
-  arranger_seq = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+  max_arranger_seq_length = 64 --(64 arranger segments * 8 chord step * 16 event slots = 8192 events... yikes)
+  -- Raw arranger_seq which can contain nils
+  arranger_seq = {1}
   -- Version of arranger_seq which generates chord patterns for held segments
   arranger_seq_padded = {}
   arranger_seq_position = 0
   arranger_seq_length = 1
-  max_arranger_seq_length = 64 --(64 arranger segments * 8 chord step * 16 event slots = 8192 events... yikes)
-  arranger_grid_offset = 0 -- offset allows us to scroll the arrange grid view beyond 16 segments
+  arranger_grid_offset = 0 -- offset allows us to scroll the arranger grid view beyond 16 segments
   generate_arranger_seq_padded()  
   automator_events = {}
   for patt = 1,max_arranger_seq_length do
@@ -318,9 +353,9 @@ function init()
   next_chord_o = 0
   next_chord_c = 1  
   arp_seq = {{0,0,0,0,0,0,0,0},
-            {8,8,8,8,8,8,8,8},
-            {8,8,8,8,8,8,8,8},
-            {8,8,8,8,8,8,8,8}
+            {0,0,0,0,0,0,0,0},
+            {0,0,0,0,0,0,0,0},
+            {0,0,0,0,0,0,0,0},
             } -- sub table for multiple arp patterns
   arp_pattern_length = {8,8,8,8}
   arp_pattern = 1
@@ -331,6 +366,54 @@ function init()
   crow_note_history = {}
   jf_note_history = {}
   disting_note_history = {}
+  
+  
+  -- PSET callbacks- WAG as to where this needs to go
+  params.action_write = function(filename,name,number)
+    print("finished writing '"..filename.."' as '"..name.."'", number)
+    os.execute("mkdir -p "..norns.state.data.."/"..number.."/")
+
+    -- write arranger, chord, and arp patterns
+    tab.save(arranger_seq,norns.state.data.."/"..number.."/arranger_seq.data")
+    tab.save(automator_events,norns.state.data.."/"..number.."/automator_events.data")
+    tab.save(chord_seq,norns.state.data.."/"..number.."/chord_seq.data")
+    tab.save(pattern_length,norns.state.data.."/"..number.."/pattern_length.data")
+    tab.save(arp_seq,norns.state.data.."/"..number.."/arp_seq.data")
+    tab.save(arp_pattern_length,norns.state.data.."/"..number.."/arp_pattern_length.data")
+
+  end
+  
+  
+  params.action_read = function(filename,silent,number)
+    print("finished reading '"..filename.."'", number)
+    
+    arranger_seq = tab.load(norns.state.data.."/"..number.."/arranger_seq.data")
+    generate_arranger_seq_padded()
+    automator_events = tab.load(norns.state.data.."/"..number.."/automator_events.data")
+    print('Arranger loaded')
+    chord_seq = tab.load(norns.state.data.."/"..number.."/chord_seq.data")
+    pattern_length = tab.load(norns.state.data.."/"..number.."/pattern_length.data")
+    print('Chord patterns loaded')
+    arp_seq = tab.load(norns.state.data.."/"..number.."/arp_seq.data")
+    arp_pattern_length = tab.load(norns.state.data.."/"..number.."/arp_pattern_length.data")
+    print('Arp patterns loaded')
+    
+    -- reset some params to defaults. todo: look for way of excluding params from pset
+    params:set('event_category', 1)    
+    params:set('event_name', 1)
+    params:set('event_value_type', 1)
+    params:set('event_value', 0)
+    
+    grid_redraw()
+    redraw()
+  end
+  
+  params.action_delete = function(filename,name,number)
+    print("finished deleting '"..filename, number)
+    norns.system_cmd("rm -r "..norns.state.data.."/"..number.."/")
+  end
+
+
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   -- get_next_chord() -- Placeholder for when table loading from file is implemented
