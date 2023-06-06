@@ -4,6 +4,7 @@
 -- KEY 2: Play/pause
 -- KEY 3: Reset
 --
+-- ENC 1: Scroll (Arranger)
 -- ENC 2: Select
 -- ENC 3: Edit 
 --
@@ -12,7 +13,7 @@
 -- Crow OUT 1: V/oct out
 -- Crow OUT 2: Trigger/envelope out
 -- Crow OUT 3: Clock out
--- Crow OUT 4: Event triggers
+-- Crow OUT 4: Events out
 
 
 g = grid.connect()
@@ -159,6 +160,7 @@ function init()
   params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 23)  
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
+    
   params:add_number('midi_in_port', 'MIDI in',1,#midi.vports,1)
     params:set_action('midi_in_port', function(value)
       in_midi.event = nil
@@ -166,8 +168,9 @@ function init()
       in_midi.event = midi_event      
     end)
     -- set in_midi port once before params:bang()
-  in_midi = midi.connect(params:get('midi_in_port'))
-  in_midi.event = midi_event
+    in_midi = midi.connect(params:get('midi_in_port'))
+    in_midi.event = midi_event
+  
   params:add_number('midi_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
     params:set_action('midi_duration_index',function() set_duration('midi') end)
   params:add_number('midi_octave','Octave',-2, 4, 0)
@@ -347,7 +350,7 @@ function init()
   chord_seq_position = 0
   readout_chord_seq_position = 0
   chord = {}
-  chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
+  -- chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
   current_chord_o = 0
   current_chord_c = 1
   next_chord_o = 0
@@ -366,59 +369,69 @@ function init()
   crow_note_history = {}
   jf_note_history = {}
   disting_note_history = {}
+  dedupe_threshold()
+  reset_clock() -- will turn over to step 0 on first loop
+  get_next_chord()
+  chord = next_chord  
   
-  
-  -- PSET callbacks- WAG as to where this needs to go
-  params.action_write = function(filename,name,number)
-    print("finished writing '"..filename.."' as '"..name.."'", number)
+
+  -- PSET callbacks -- 
+  function params.action_write(filename,name,number)
     os.execute("mkdir -p "..norns.state.data.."/"..number.."/")
 
     -- write arranger, chord, and arp patterns
     tab.save(arranger_seq,norns.state.data.."/"..number.."/arranger_seq.data")
+    print('arranger >> write: ' .. norns.state.data .. number .. "/arranger_seq.data")
     tab.save(automator_events,norns.state.data.."/"..number.."/automator_events.data")
+    print('events >> write: ' .. norns.state.data .. number .. "/events.data")
     tab.save(chord_seq,norns.state.data.."/"..number.."/chord_seq.data")
     tab.save(pattern_length,norns.state.data.."/"..number.."/pattern_length.data")
+    print('chords >> write: ' .. norns.state.data .. number .. "/chord_seq.data")
     tab.save(arp_seq,norns.state.data.."/"..number.."/arp_seq.data")
     tab.save(arp_pattern_length,norns.state.data.."/"..number.."/arp_pattern_length.data")
-
+    print('arp >> write: ' .. norns.state.data .. number .. "/arp_seq.data")
   end
   
   
-  params.action_read = function(filename,silent,number)
-    print("finished reading '"..filename.."'", number)
-    
+  function params.action_read(filename,silent,number)
     arranger_seq = tab.load(norns.state.data.."/"..number.."/arranger_seq.data")
     generate_arranger_seq_padded()
+    print('arranger >> read: ' .. norns.state.data .. number .. "/arranger_seq.data")
     automator_events = tab.load(norns.state.data.."/"..number.."/automator_events.data")
-    print('Arranger loaded')
+    print('events >> read: ' .. norns.state.data .. number .. "/events.data")
     chord_seq = tab.load(norns.state.data.."/"..number.."/chord_seq.data")
     pattern_length = tab.load(norns.state.data.."/"..number.."/pattern_length.data")
-    print('Chord patterns loaded')
+    print('chords >> read: ' .. norns.state.data .. number .. "/chord_seq.data")
     arp_seq = tab.load(norns.state.data.."/"..number.."/arp_seq.data")
     arp_pattern_length = tab.load(norns.state.data.."/"..number.."/arp_pattern_length.data")
-    print('Arp patterns loaded')
+    print('arp >> read: ' .. norns.state.data .. number .. "/arp_seq.data")
     
-    -- reset some params to defaults. todo: look for way of excluding params from pset
+    -- reset events params to defaults and bang in case this read is called post-init
     params:set('event_category', 1)    
     params:set('event_name', 1)
     params:set('event_value_type', 1)
     params:set('event_value', 0)
+    params:bang()
     
+    -- get the first chord loaded so harmonizers are primed
+    get_next_chord()
+    chord = next_chord
+
     grid_redraw()
     redraw()
   end
   
-  params.action_delete = function(filename,name,number)
-    print("finished deleting '"..filename, number)
+  function params.action_delete(filename,name,number)
     norns.system_cmd("rm -r "..norns.state.data.."/"..number.."/")
+    print('directory >> delete: ' .. norns.state.data .. number)
   end
-
-
-  dedupe_threshold()
-  reset_clock() -- will turn over to step 0 on first loop
-  -- get_next_chord() -- Placeholder for when table loading from file is implemented
-  next_chord = chord
+  -- end of PSET callbacks --   
+  
+  -- load most recent pset
+  params:default()
+  
   params:bang()
+  
   -- Some actions need to occur post-bang
   params:set_action('mode', function() update_chord_action() end)
   grid_redraw()
