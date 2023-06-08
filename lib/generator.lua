@@ -93,7 +93,7 @@ function chord_generator(mode)
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()      
     
-    pattern_length[pattern] = 4
+    chord_pattern_length[pattern] = 4
     build_mode_chord_types()
     progression_valid = false
     progression = {}
@@ -137,7 +137,7 @@ function chord_generator(mode)
     end
     
     octave_split_up()
-    for i = 1, pattern_length[pattern] do
+    for i = 1, chord_pattern_length[pattern] do
       local x = progression[i]
       chord_seq[pattern][i].x = x --raw key x coordinate
       chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
@@ -197,8 +197,8 @@ function chord_generator(mode)
       load(chord_algos['func'][chord_algo])
     end
       
-    pattern_length[pattern] = 4
-    for i = 1, pattern_length[pattern] do
+    chord_pattern_length[pattern] = 4
+    for i = 1, chord_pattern_length[pattern] do
       local x = progression[i]
       chord_seq[pattern][i].x = x --raw key x coordinate
       chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
@@ -214,7 +214,7 @@ function chord_generator(mode)
   table.insert(chord_algos['func'], function()  
     
     params:set('chord_div_index', div_to_index('1/4'))
-    pattern_length[pattern] = 8
+    chord_pattern_length[pattern] = 8
     
     build_mode_chord_types()
 
@@ -374,7 +374,7 @@ function arp_generator(mode)
     
     -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
-    print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
+    -- print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
     local peak = math.random(2, arp_pattern_length[arp_pattern] - 1)
     for i = 1, peak do
       arp_seq[1][i] = arp_min - 1 + i
@@ -611,7 +611,7 @@ function arp_generator(mode)
   -- arp_generator index 1 is reserved for Randomize, otherwise fire the selected algo.
     local arp_algo = params:get('arp_generator') == 1 and math.random(2,#arp_algos['name']) or params:get('arp_generator')
     print('Arp algo: ' .. arp_algos['name'][arp_algo])
-    print(params:get('clock_tempo') .. ' ' .. params:get('arp_div_index') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
+    -- print(params:get('clock_tempo') .. ' ' .. params:get('arp_div_index') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
     load(arp_algos['func'][arp_algo])
   end
 end
