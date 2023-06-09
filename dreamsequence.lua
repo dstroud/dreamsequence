@@ -410,149 +410,108 @@ function init()
   end
 
 
-  function params.action_read(filename,silent,number)
+function params.action_read(filename,silent,number)
+  -- pset loading initiated from system menu will first read data from filesystem and save to cache
+  if pset_load_source == 'load_system' then
     local filepath = norns.state.data..number.."/"
     if util.file_exists(filepath) then
-      -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
-      screen_view_index = 1
-      screen_view_name = 'Session'
-      misc = {}
-      for i = 1,7 do
-        local tablename = pset_lookup[i]
-          if util.file_exists(filepath..tablename..".data") then
-          _G[tablename] = tab.load(filepath..tablename..".data")
-          print('table >> read: ' .. filepath..tablename..".data")
-        -- else
-        --   print('table >> skip: ' .. filepath..tablename..".data")
-        end
+      cache(number) -- read from filesystem and store in pset_cache
+    end
+  end
+
+  --TODO: for all pset reads (system and events)
+  if pset_data_cache[number] ~= nil then
+    -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
+    screen_view_index = 1
+    screen_view_name = 'Session'      
+    misc = {}
+    for i = 1,7 do
+      local tablename = pset_lookup[i]
+      if pset_data_cache[number][tablename] ~= nil then
+        -- point live table to cache
+        _G[tablename] = (pset_data_cache[number][tablename]) -- IMPORTANT: Probably need to deepcopy so it's not overwritten and left like that when it's called again by an event. TEST.
+        print('cache >> table: ' .. tablename)
       end
-      params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
-      generate_arranger_seq_padded()
-      -- set the load_pset param that is used for events so we can increment it
-      params:set('load_pset', tonumber(number))
-      params:set('event_category', 1)    
-      params:set('event_name', 1)
-      params:set('event_value_type', 1)
-      params:set('event_value', 0)
-      selected_events_menu = 'event_category'
-      events_index = 1
-      set_event_category_min_max()
-      -- Change event_name to first item in the selected Category and event_value to the current value (Set) or 0 (Increment)
-      params:set('event_name', event_category_min_index)
-      event_name = events_lookup[params:get('event_name')].id
-      set_event_range()
-      init_event_value()
+    end
+  end
       
-      -- 3 options for loading patterns and handling arranger status depending on how pset read is called
-      if pset_load_source == 'load_pset' then
-        -- print('event_load')
-        params:set('arranger_enabled', 1)
-        -- arranger_enabled = true -- ?
-        arranger_seq_position = 1
-        chord_seq_position = 1
-      	arp_seq_position = 0
-        pattern = arranger_seq_padded[1]
-        update_chord()
-        next_chord = chord
-      elseif pset_load_source == 'splice_pset' then
-        -- print('event_splice')
-        params:set('arranger_enabled', 1)
-        -- If segment we're on is > arranger length, reset arranger
-        if arranger_seq_position > arranger_seq_length then
-          arranger_seq_position = 1
-          chord_seq_position = 1
-        	arp_seq_position = 0
-          pattern = arranger_seq_padded[1]
-          update_chord()
-          next_chord = chord
-        else
-          pattern = arranger_seq_padded[arranger_seq_position]
-        	arp_seq_position = 0
-          update_chord()
-          next_chord = chord
-        end
-      else --  pset_load_source == 'system'
-        print('load_system')
-        -- leave arranger_enabled status as-is- just rest arrangement
-        reset_arrangement()
-        -- arranger_seq_position = 0
-        -- chord_seq_position = 1 -- nope
-      -- 	arp_seq_position = 0
-        -- pattern = arranger_seq_padded[1]
-        -- update_chord()   
-        -- next_chord = chord
-      end
+
+  -- Reset some params and load any system params that weren't included in the .pset (tempo)
+  params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
+  generate_arranger_seq_padded()
+  -- set the load_pset param that is used for events so we can increment it
+  params:set('load_pset', tonumber(number))
+  params:set('event_category', 1)    
+  params:set('event_name', 1)
+  params:set('event_value_type', 1)
+  params:set('event_value', 0)
+  selected_events_menu = 'event_category'
+  events_index = 1
+  set_event_category_min_max()
+  -- Change event_name to first item in the selected Category and event_value to the current value (Set) or 0 (Increment)
+  params:set('event_name', event_category_min_index)
+  event_name = events_lookup[params:get('event_name')].id
+  set_event_range()
+  init_event_value()
       
-      grid_redraw()
-      redraw()
-      pset_load_source = 'load_system'
-    end
+      
+-- Second check to determine how we handle cleanup after live tables are updated
+-- 3 options for loading patterns and handling arranger status depending on how pset read is called
+if pset_load_source == 'load_event' then
+--   -- print('event_load')
+--   params:set('arranger_enabled', 1)
+--   arranger_seq_position = 1
+--   chord_seq_position = 1
+-- 	arp_seq_position = 0
+--   pattern = arranger_seq_padded[1]
+--   update_chord()
+--   next_chord = chord
+  reset_arrangement()
+elseif pset_load_source == 'splice_event' then
+  -- print('event_splice')
+  params:set('arranger_enabled', 1)
+  -- If segment we're on is > arranger length, reset arranger
+  if arranger_seq_position > arranger_seq_length then
+    arranger_seq_position = 1
+    chord_seq_position = 1
+  	arp_seq_position = 0
+    pattern = arranger_seq_padded[1]
+    update_chord()
+    next_chord = chord
+  else
+    pattern = arranger_seq_padded[arranger_seq_position]
+  	arp_seq_position = 0
+    update_chord()
+    next_chord = chord
   end
-  
-  
-  -- caching data for any saved .psets -- 
-  function params.action_delete(filename,name,number)
-    norns.system_cmd("rm -r "..norns.state.data.."/"..number.."/")
-    print('directory >> delete: ' .. norns.state.data .. number)
-  end
-  -- end of PSET callbacks --   
-  
-  
+else --  pset_load_source == 'system'
+  print('load_system')
+  -- leave arranger_enabled status as-is- just rest arrangement
+  reset_arrangement()
+  -- arranger_seq_position = 0
+  -- chord_seq_position = 1 -- nope
+-- 	arp_seq_position = 0
+  -- pattern = arranger_seq_padded[1]
+  -- update_chord()   
+  -- next_chord = chord
+end
 
-  -- check if string ends with, uh, ends_with
-  function ends_with(string, ends_with)
-    return string:sub(-#ends_with) == ends_with
-  end
-  
-  
-  -- return first number from a string
-  function find_number(string)
-    return tonumber(string.match (string, "%d+"))
-  end
-  
-  
-  -- return .pset number as string assuming format is 'dreamsequence-xxxx.pset'
-  function pset_number(string)
-    return string.sub(string, 15, string.len(string) - 5)
-  end
-
-  
-  -- check /home/we/dust/data/dreamsequence/ for any .psets and store their "numbers" as strings in valid_psets
-  -- this table is used to search for matching table .data files that need to be loaded into the cache
-  script_data = util.scandir(norns.state.data)
-  valid_psets = {}
-  for i = 1, #script_data do
-    if ends_with(script_data[i], '.pset') then
-      table.insert(valid_psets, pset_number(script_data[i]))
-    end
-  end
-
-  -- cache all .data tables for numbered directories having a valid .pset
-  pset_data_cache = {}
-  for i = 1, #valid_psets do
-    local number = valid_psets[i] -- string
-    local filepath = norns.state.data..number.."/"
-    if util.file_exists(filepath) then
-      pset_data_cache[number] = {} -- init a table using the preset number AS A STRING
-      misc = {}
-      for tables = 1,7 do
-        local tablename = pset_lookup[tables]
-        if util.file_exists(filepath..tablename..".data") then
-          -- pset_data_cache[number] = {} -- init a table using the preset number AS A STRING
-          pset_data_cache[number][tablename] = tab.load(filepath..tablename..".data")
-        print('table >> cache: ' .. filepath..tablename..".data")
-        end
-      end
-    end
-  end
-  -- tab.print(pset_data_cache["01"])
-  -- end of caching data for any saved .psets -- 
+grid_redraw()
+redraw()
+pset_load_source = 'load_system'  
+end
 
 
+function params.action_delete(filename,name,number)
+  norns.system_cmd("rm -r "..norns.state.data.."/"..number.."/")
+  print('directory >> delete: ' .. norns.state.data .. number)
+end
+-- end of PSET callbacks --   
+  
+  
+  -- -- caching table data associated with saved .psets -- 
+  init_cache() -- TODO unsure of order
 
-
-
-    
   -- load most recent pset
   params:default()
   params:bang()
@@ -660,6 +619,60 @@ function update_menus()
 end
 
 
+-- check if string ends with, uh, ends_with
+function ends_with(string, ends_with)
+  return string:sub(-#ends_with) == ends_with
+end
+  
+  
+-- return first number from a string
+function find_number(string)
+  return tonumber(string.match (string, "%d+"))
+end
+  
+  
+-- return .pset number as string assuming format is 'dreamsequence-xxxx.pset'
+function pset_number(string)
+  return string.sub(string, 15, string.len(string) - 5)
+end
+
+
+function init_cache()  
+  -- check /home/we/dust/data/dreamsequence/ for any .psets and store their "numbers" as strings in valid_psets
+  -- this table is used to search for matching table .data files that need to be loaded into the cache
+  script_data = util.scandir(norns.state.data)
+  valid_psets = {}
+  for i = 1, #script_data do
+    if ends_with(script_data[i], '.pset') then
+      table.insert(valid_psets, pset_number(script_data[i]))
+    end
+  end
+
+  -- cache all .data tables for numbered directories having a valid .pset
+  pset_data_cache = {}
+  for i = 1, #valid_psets do
+    cache(valid_psets[i])
+  end
+  -- tab.print(pset_data_cache["01"])
+end
+
+
+function cache(number)  
+  local filepath = norns.state.data..number.."/"
+  if util.file_exists(filepath) then -- this can also fire upstream so might want to optimize
+    pset_data_cache[number] = {} -- init table using the preset number AS A STRING
+    misc = {}
+    for tables = 1,7 do
+      local tablename = pset_lookup[tables]
+      if util.file_exists(filepath..tablename..".data") then
+        -- pset_data_cache[number] = {} -- init a table using the preset number AS A STRING
+        pset_data_cache[number][tablename] = tab.load(filepath..tablename..".data")
+      print('table >> cache: ' .. filepath..tablename..".data")
+      end
+    end
+  end
+end
+  
 function refresh_midi_devices()
   for i = 1,#midi.vports do -- query all ports
     midi_device[i] = midi.connect(i) -- connect each device
@@ -1073,10 +1086,10 @@ function sequence_clock()
       end
     
       if clock_step % chord_div == 0 then
-        -- if pset_queue ~= nil then
-        --   params:read(pset_queue)
-        --   pset_queue = nil
-        -- end  
+        if pset_queue ~= nil then
+          params:read(pset_queue)
+          pset_queue = nil
+        end  
         advance_chord_seq()
         grid_dirty = true
         redraw() -- To update chord readout
@@ -2138,7 +2151,7 @@ function g.key(x,y,z)
           
           -- Resets current pattern immediately
           if y == pattern then
-            print('Manual reset of current pattern')
+            print('a -manual reset of current pattern')
             params:set('arranger_enabled', 0)
             pattern_queue = false
             arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
@@ -2148,7 +2161,7 @@ function g.key(x,y,z)
             
           -- Manual jump to queued pattern  
           elseif y == pattern_queue then
-            print('Manual jump to queued pattern')
+            print('b - manual jump to queued pattern')
             
             pattern_queue = false
             pattern = y
@@ -2159,7 +2172,7 @@ function g.key(x,y,z)
 
           -- Cue up a new pattern        
           else                       
-            print('New pattern queued')
+            print('c - new pattern queued')
             if pattern_copy_performed == false then
               pattern_queue = y
               params:set('arranger_enabled', 0)
@@ -2448,24 +2461,30 @@ end
 
 -- EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
 
--- Load pset and set flag to have arranger reset
+-- -- Load pset and set flag to have arranger reset
+-- function load_pset()
+--   pset_load_source = 'load_event'
+--   params:read(params:get('load_pset'))
+-- end
+
+--for queuing pset load in-advance
 function load_pset()
-  pset_load_source = 'load_pset'
-  params:read(params:get('load_pset'))
+  pset_load_source = 'load_event'
+  pset_queue = params:get('load_pset')
 end
 
--- for queuing pset load in-advance
--- function load_pset()
---   pset_load_source = 'load_pset'
---   pset_queue = params:get('load_pset')
---   -- params:read(params:get('load_pset'))
--- end
+
+--for queuing pset load in-advance
+function splice_pset()
+  pset_load_source = 'splice_event'
+  pset_queue = params:get('splice_pset')
+end
 
 
 -- -- Load pset and let arranger continue --- can't be combined with the above because we need to rely on the param index for menus 
 -- function splice_pset()
---   pset_load_source = 'splice_pset'
---   params:read(params:get('splice_pset'))
+--   pset_load_source = 'splice_event'
+--   params:read(params:get('splice_event'))
 -- end
 
 -- function save_pset()
