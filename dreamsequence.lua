@@ -375,14 +375,18 @@ function init()
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   get_next_chord()
-  chord = next_chord  
+  chord = next_chord
+  pset_queue = nil
+ 
  
   pset_load_source = 'load_system'
-   -- hidden param for firing pset load events
+   -- hidden param for selecting pset events
   params:add_number('load_pset', 'Load pset', 1,99, 1)
   params:hide(params.lookup['load_pset'])
   params:add_number('splice_pset', 'Splice pset', 1,99, 1)
-  params:hide(params.lookup['splice_pset'])  
+  params:hide(params.lookup['splice_pset'])
+  params:add_number('save_pset', 'Save pset', 1,99, 1)
+  params:hide(params.lookup['save_pset'])  
     
   -- table names we want pset callbacks to act on
   pset_lookup = {'arranger_seq', 'events', 'chord_seq', 'chord_pattern_length', 'arp_seq', 'arp_pattern_length', 'misc'}
@@ -390,10 +394,11 @@ function init()
 
   -- PSET callbacks -- 
   function params.action_write(filename,name,number)
-    local filepath = norns.state.data.."/"..number.."/"
+    local filepath = norns.state.data..number.."/"
     os.execute("mkdir -p "..filepath)
     -- Make table with version (for backward compatibility checks) and any useful system params
     misc = {}
+    misc.timestamp = 'dreamsequence ' ..os.date()
     misc.version = version
     misc.clock_tempo = params:get('clock_tempo')
     -- misc[3] = params:get('clock_source') -- Can't really think of a scenario in which we would want clock_source saved with pset    
@@ -406,7 +411,7 @@ function init()
 
 
   function params.action_read(filename,silent,number)
-    local filepath = norns.state.data.."/"..number.."/"
+    local filepath = norns.state.data..number.."/"
     if util.file_exists(filepath) then
       -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
       screen_view_index = 1
@@ -467,28 +472,87 @@ function init()
           next_chord = chord
         end
       else --  pset_load_source == 'system'
-        -- print('load_system')
-        -- leave arranger_enabled status as-is
-        arranger_seq_position = 0
-        chord_seq_position = 1
-      	arp_seq_position = 0
-        pattern = arranger_seq_padded[1]
-        update_chord()   
-        next_chord = chord
+        print('load_system')
+        -- leave arranger_enabled status as-is- just rest arrangement
+        reset_arrangement()
+        -- arranger_seq_position = 0
+        -- chord_seq_position = 1 -- nope
+      -- 	arp_seq_position = 0
+        -- pattern = arranger_seq_padded[1]
+        -- update_chord()   
+        -- next_chord = chord
       end
-
+      
       grid_redraw()
       redraw()
       pset_load_source = 'load_system'
     end
   end
   
+  
+  -- caching data for any saved .psets -- 
   function params.action_delete(filename,name,number)
     norns.system_cmd("rm -r "..norns.state.data.."/"..number.."/")
     print('directory >> delete: ' .. norns.state.data .. number)
   end
   -- end of PSET callbacks --   
   
+  
+
+  -- check if string ends with, uh, ends_with
+  function ends_with(string, ends_with)
+    return string:sub(-#ends_with) == ends_with
+  end
+  
+  
+  -- return first number from a string
+  function find_number(string)
+    return tonumber(string.match (string, "%d+"))
+  end
+  
+  
+  -- return .pset number as string assuming format is 'dreamsequence-xxxx.pset'
+  function pset_number(string)
+    return string.sub(string, 15, string.len(string) - 5)
+  end
+
+  
+  -- check /home/we/dust/data/dreamsequence/ for any .psets and store their "numbers" as strings in valid_psets
+  -- this table is used to search for matching table .data files that need to be loaded into the cache
+  script_data = util.scandir(norns.state.data)
+  valid_psets = {}
+  for i = 1, #script_data do
+    if ends_with(script_data[i], '.pset') then
+      table.insert(valid_psets, pset_number(script_data[i]))
+    end
+  end
+
+  -- cache all .data tables for numbered directories having a valid .pset
+  pset_data_cache = {}
+  for i = 1, #valid_psets do
+    local number = valid_psets[i] -- string
+    local filepath = norns.state.data..number.."/"
+    if util.file_exists(filepath) then
+      pset_data_cache[number] = {} -- init a table using the preset number AS A STRING
+      misc = {}
+      for tables = 1,7 do
+        local tablename = pset_lookup[tables]
+        if util.file_exists(filepath..tablename..".data") then
+          -- pset_data_cache[number] = {} -- init a table using the preset number AS A STRING
+          pset_data_cache[number][tablename] = tab.load(filepath..tablename..".data")
+        print('table >> cache: ' .. filepath..tablename..".data")
+        end
+      end
+    end
+  end
+  -- tab.print(pset_data_cache["01"])
+  -- end of caching data for any saved .psets -- 
+
+
+
+
+
+    
   -- load most recent pset
   params:default()
   params:bang()
@@ -1009,6 +1073,10 @@ function sequence_clock()
       end
     
       if clock_step % chord_div == 0 then
+        -- if pset_queue ~= nil then
+        --   params:read(pset_queue)
+        --   pset_queue = nil
+        -- end  
         advance_chord_seq()
         grid_dirty = true
         redraw() -- To update chord readout
@@ -1179,7 +1247,7 @@ end
 
 
 function advance_chord_seq()
-  chord_seq_retrig = true -- indicates when we're on a new chord seq step for crow auto-rest logic.
+  chord_seq_retrig = true -- indicates when we're on a new chord seq step for CV harmonizer auto-rest logic
   play_arp = true
   local arrangement_reset = false
 
@@ -1226,10 +1294,11 @@ function advance_chord_seq()
       chord_seq_position = util.wrap(chord_seq_position + 1, 1, chord_pattern_length[pattern])
     end
 
-    if arranger_enabled then readout_chord_seq_position = chord_seq_position end
-
-    -- Arranger automation step. To-do: also need to have some events fire on get_next_chord.
-    if arranger_enabled then do_events() end
+    if arranger_enabled then 
+      readout_chord_seq_position = chord_seq_position
+      do_events()
+    end
+    
     update_chord()
 
     -- Play the chord
@@ -2069,7 +2138,7 @@ function g.key(x,y,z)
           
           -- Resets current pattern immediately
           if y == pattern then
-            print('a - manual reset of current pattern')
+            print('Manual reset of current pattern')
             params:set('arranger_enabled', 0)
             pattern_queue = false
             arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
@@ -2079,7 +2148,7 @@ function g.key(x,y,z)
             
           -- Manual jump to queued pattern  
           elseif y == pattern_queue then
-            print('b - manual jump to queued pattern')
+            print('Manual jump to queued pattern')
             
             pattern_queue = false
             pattern = y
@@ -2090,7 +2159,7 @@ function g.key(x,y,z)
 
           -- Cue up a new pattern        
           else                       
-            print('c - new pattern queued')
+            print('New pattern queued')
             if pattern_copy_performed == false then
               pattern_queue = y
               params:set('arranger_enabled', 0)
@@ -2385,12 +2454,24 @@ function load_pset()
   params:read(params:get('load_pset'))
 end
 
+-- for queuing pset load in-advance
+-- function load_pset()
+--   pset_load_source = 'load_pset'
+--   pset_queue = params:get('load_pset')
+--   -- params:read(params:get('load_pset'))
+-- end
 
--- Load pset and let arranger continue --- can't be combined with the above because we need to rely on the param index for menus 
-function splice_pset()
-  pset_load_source = 'splice_pset'
-  params:read(params:get('splice_pset'))
-end
+
+-- -- Load pset and let arranger continue --- can't be combined with the above because we need to rely on the param index for menus 
+-- function splice_pset()
+--   pset_load_source = 'splice_pset'
+--   params:read(params:get('splice_pset'))
+-- end
+
+-- function save_pset()
+--   params:write(params:get('save_pset'), 'ds ' ..os.date())
+--   -- local filepath = norns.state.data.."/"..number.."/"
+-- end
 
 
 -- Variation on the standard generators that will just run the algos and reset arp (but not pattern or arranger)
