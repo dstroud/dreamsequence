@@ -309,10 +309,10 @@ function init()
   arranger_grid_offset = 0 -- offset allows us to scroll the arranger grid view beyond 16 segments
   generate_arranger_seq_padded()  
   events = {}
-  for patt = 1,max_arranger_seq_length do
-    events[patt] = {}
+  for segment = 1,max_arranger_seq_length do
+    events[segment] = {}
     for step = 1,8 do
-      events[patt][step] = {}
+      events[segment][step] = {}
     end
   end
   events_index = 1
@@ -377,6 +377,8 @@ function init()
   get_next_chord()
   chord = next_chord
   pset_queue = nil
+  pset_data_cache = {}
+  
  
  
   pset_load_source = 'load_system'
@@ -389,6 +391,7 @@ function init()
   params:hide(params.lookup['save_pset'])  
     
   -- table names we want pset callbacks to act on
+  -- pset_lookup = {'arranger_seq', 'events', 'chord_seq', 'chord_pattern_length', 'arp_seq', 'arp_pattern_length', 'misc'}
   pset_lookup = {'arranger_seq', 'events', 'chord_seq', 'chord_pattern_length', 'arp_seq', 'arp_pattern_length', 'misc'}
 
 
@@ -401,12 +404,12 @@ function init()
     misc.timestamp = 'dreamsequence ' ..os.date()
     misc.version = version
     misc.clock_tempo = params:get('clock_tempo')
-    -- misc[3] = params:get('clock_source') -- Can't really think of a scenario in which we would want clock_source saved with pset    
     for i = 1,7 do
       local tablename = pset_lookup[i]
       tab.save(_G[tablename],filepath..tablename..".data")
-      print('table >> write: ' .. filepath..tablename..".data")
+      -- print('table >> write: ' .. filepath..tablename..".data")
     end
+    cache(number) -- read from filesystem and store in pset_cache
   end
 
 
@@ -429,8 +432,8 @@ function params.action_read(filename,silent,number)
       local tablename = pset_lookup[i]
       if pset_data_cache[number][tablename] ~= nil then
         -- point live table to cache
-        _G[tablename] = (pset_data_cache[number][tablename]) -- IMPORTANT: Probably need to deepcopy so it's not overwritten and left like that when it's called again by an event. TEST.
-        print('cache >> table: ' .. tablename)
+        _G[tablename] = deepcopy(pset_data_cache[number][tablename]) -- TODO see if we can get more efficient than deepcopy
+        -- print('cache >> table: ' .. tablename)
       end
     end
   end
@@ -459,6 +462,8 @@ function params.action_read(filename,silent,number)
 -- 3 options for loading patterns and handling arranger status depending on how pset read is called
 if pset_load_source == 'load_event' then
 --   -- print('event_load')
+
+--  for immediate pset reads:
 --   params:set('arranger_enabled', 1)
 --   arranger_seq_position = 1
 --   chord_seq_position = 1
@@ -466,34 +471,47 @@ if pset_load_source == 'load_event' then
 --   pattern = arranger_seq_padded[1]
 --   update_chord()
 --   next_chord = chord
-  reset_arrangement()
+
+-- for queued reads
+  -- reset_arrangement()
+  
+-- function reset_arrangement() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
+  arranger_queue = nil
+  arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
+  pattern_queue = false
+  arp_seq_position = 0
+  chord_seq_position = 0
+  arranger_seq_position = 0
+  pattern = arranger_seq_padded[1]
+  -- if arranger_seq[1] > 0 then pattern = arranger_seq[1] end -- option to carry over held pattern
+
+
 elseif pset_load_source == 'splice_event' then
   -- print('event_splice')
-  params:set('arranger_enabled', 1)
+  -- params:set('arranger_enabled', 1)
   -- If segment we're on is > arranger length, reset arranger
+  arranger_seq_position = arranger_seq_position + 1
   if arranger_seq_position > arranger_seq_length then
-    arranger_seq_position = 1
-    chord_seq_position = 1
-  	arp_seq_position = 0
+    arranger_queue = nil
+    arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
+    pattern_queue = false
+    arp_seq_position = 0
+    chord_seq_position = 0
+    arranger_seq_position = 0
     pattern = arranger_seq_padded[1]
-    update_chord()
-    next_chord = chord
+    -- if arranger_seq[1] > 0 then pattern = arranger_seq[1] end -- option to carry over held pattern
   else
+    arranger_queue = nil
+    arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
+    pattern_queue = false    
     pattern = arranger_seq_padded[arranger_seq_position]
   	arp_seq_position = 0
-    update_chord()
-    next_chord = chord
+    chord_seq_position = 0
   end
 else --  pset_load_source == 'system'
-  print('load_system')
+  -- print('load_system')
   -- leave arranger_enabled status as-is- just rest arrangement
   reset_arrangement()
-  -- arranger_seq_position = 0
-  -- chord_seq_position = 1 -- nope
--- 	arp_seq_position = 0
-  -- pattern = arranger_seq_padded[1]
-  -- update_chord()   
-  -- next_chord = chord
 end
 
 grid_redraw()
@@ -510,7 +528,7 @@ end
   
   
   -- -- caching table data associated with saved .psets -- 
-  init_cache() -- TODO unsure of order
+  init_cache() -- Disable until event pset is finished
 
   -- load most recent pset
   params:default()
@@ -1122,6 +1140,7 @@ end
 
 
 -- Clock used to redraw screen 10x a second for arranger countdown timer
+-- todo: convert to metro
 -- To-do: Ideally only needs to fire once a second but the potential for it to get out of sync (tempo changes, reset, Generator) causes issues.
 -- Might create a reinitialization function to call when needed (param actions and when resetting etc...)
 function seconds_clock()
@@ -3052,7 +3071,7 @@ function redraw()
       screen.rect(dash_x,0,34,11)
       screen.fill()
 
-      -- STATE determination. To-do: move this out of Redraw
+      -- STATE determination. To-do: move this out of redraw
       if arranger_seq_position == 0 and chord_seq_position == 0 then
         state = 5 --stopped/reset
       else
