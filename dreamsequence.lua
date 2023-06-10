@@ -24,6 +24,7 @@
 g = grid.connect()
 include("dreamsequence/lib/includes")
 
+norns.version.required = 230526
 
 function init()
   
@@ -422,7 +423,7 @@ function params.action_read(filename,silent,number)
     end
   end
 
-  --TODO: for all pset reads (system and events)
+  -- for all pset reads (system and events)
   if pset_data_cache[number] ~= nil then
     -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
     screen_view_index = 1
@@ -431,8 +432,8 @@ function params.action_read(filename,silent,number)
     for i = 1,7 do
       local tablename = pset_lookup[i]
       if pset_data_cache[number][tablename] ~= nil then
-        -- point live table to cache
-        _G[tablename] = deepcopy(pset_data_cache[number][tablename]) -- TODO see if we can get more efficient than deepcopy
+        -- copy from data cache to live tables TODO see if we can get more efficient than deepcopy
+        _G[tablename] = deepcopy(pset_data_cache[number][tablename])
         -- print('cache >> table: ' .. tablename)
       end
     end
@@ -516,7 +517,114 @@ end
 
 grid_redraw()
 redraw()
-pset_load_source = 'load_system'  
+pset_load_source = 'load_system'
+end
+
+
+function manual_params_read(number, silent)
+  -- pset loading initiated from system menu will first read data from filesystem and save to cache
+  if pset_load_source == 'load_system' then
+    local filepath = norns.state.data..number.."/"
+    if util.file_exists(filepath) then
+      cache(number) -- read from filesystem and store in pset_cache
+    end
+  end
+
+  -- for all pset reads (system and events)
+  if pset_data_cache[number] ~= nil then
+    -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
+    screen_view_index = 1
+    screen_view_name = 'Session'      
+    misc = {}
+    for i = 1,7 do
+      local tablename = pset_lookup[i]
+      if pset_data_cache[number][tablename] ~= nil then
+        -- copy from data cache to live tables TODO see if we can get more efficient than deepcopy
+        _G[tablename] = deepcopy(pset_data_cache[number][tablename])
+        -- print('cache >> table: ' .. tablename)
+      end
+    end
+  end
+      
+
+  -- Reset some params and load any system params that weren't included in the .pset (tempo)
+  params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
+  generate_arranger_seq_padded()
+  -- set the load_pset param that is used for events so we can increment it
+  params:set('load_pset', tonumber(number))
+  params:set('event_category', 1)    
+  params:set('event_name', 1)
+  params:set('event_value_type', 1)
+  params:set('event_value', 0)
+  selected_events_menu = 'event_category'
+  events_index = 1
+  set_event_category_min_max()
+  -- Change event_name to first item in the selected Category and event_value to the current value (Set) or 0 (Increment)
+  params:set('event_name', event_category_min_index)
+  event_name = events_lookup[params:get('event_name')].id
+  set_event_range()
+  init_event_value()
+      
+      
+-- Second check to determine how we handle cleanup after live tables are updated
+-- 3 options for loading patterns and handling arranger status depending on how pset read is called
+if pset_load_source == 'load_event' then
+--   -- print('event_load')
+
+--  for immediate pset reads:
+--   params:set('arranger_enabled', 1)
+--   arranger_seq_position = 1
+--   chord_seq_position = 1
+-- 	arp_seq_position = 0
+--   pattern = arranger_seq_padded[1]
+--   update_chord()
+--   next_chord = chord
+
+-- for queued reads
+  -- reset_arrangement()
+  
+-- function reset_arrangement() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
+  arranger_queue = nil
+  arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
+  pattern_queue = false
+  arp_seq_position = 0
+  chord_seq_position = 0
+  arranger_seq_position = 0
+  pattern = arranger_seq_padded[1]
+  -- if arranger_seq[1] > 0 then pattern = arranger_seq[1] end -- option to carry over held pattern
+
+
+elseif pset_load_source == 'splice_event' then
+  -- print('event_splice')
+  -- params:set('arranger_enabled', 1)
+  -- If segment we're on is > arranger length, reset arranger
+  arranger_seq_position = arranger_seq_position + 1
+  if arranger_seq_position > arranger_seq_length then
+    arranger_queue = nil
+    arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
+    pattern_queue = false
+    arp_seq_position = 0
+    chord_seq_position = 0
+    arranger_seq_position = 0
+    pattern = arranger_seq_padded[1]
+    -- if arranger_seq[1] > 0 then pattern = arranger_seq[1] end -- option to carry over held pattern
+  else
+    arranger_queue = nil
+    arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
+    pattern_queue = false    
+    pattern = arranger_seq_padded[arranger_seq_position]
+  	arp_seq_position = 0
+    chord_seq_position = 0
+  end
+else --  pset_load_source == 'system'
+  -- print('load_system')
+  -- leave arranger_enabled status as-is- just rest arrangement
+  reset_arrangement()
+end
+
+grid_redraw()
+redraw()
+pset_load_source = 'load_system'
 end
 
 
@@ -1105,7 +1213,9 @@ function sequence_clock()
     
       if clock_step % chord_div == 0 then
         if pset_queue ~= nil then
-          params:read(pset_queue)
+          -- params:read(pset_queue)
+          -- manually fun pset read action
+          manual_params_read(pset_queue,false)
           pset_queue = nil
         end  
         advance_chord_seq()
