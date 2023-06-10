@@ -523,14 +523,24 @@ end
 
 function manual_params_read(number, silent)
   -- pset loading initiated from system menu will first read data from filesystem and save to cache
-  if pset_load_source == 'load_system' then
-    local filepath = norns.state.data..number.."/"
-    if util.file_exists(filepath) then
-      cache(number) -- read from filesystem and store in pset_cache
+  -- if pset_load_source == 'load_system' then
+  --   local filepath = norns.state.data..number.."/"
+  --   if util.file_exists(filepath) then
+  --     cache(number) -- read from filesystem and store in pset_cache
+  --   end
+  -- end
+  
+  --TODO: probably can drop the whole string number thing and just enforce this for all the cache tables
+  number = string.format("%02d",number)
+  print('number type = ' .. type(number))
+  
+  if pset_data_cache[number].pset ~= nil then
+    for i = 1, #pset_data_cache[number].pset do -- TODO: have this calculated and stored when caching to help performance
+      params.params[pset_data_cache[number].pset[i].id]:set(pset_data_cache[number].pset[i].value, false) -- val, silent
     end
   end
-
-  -- for all pset reads (system and events)
+  
+  -- this needs to check if any of the 7 subfolders are present (or move .pset to a different table might be better)
   if pset_data_cache[number] ~= nil then
     -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
     screen_view_index = 1
@@ -541,7 +551,7 @@ function manual_params_read(number, silent)
       if pset_data_cache[number][tablename] ~= nil then
         -- copy from data cache to live tables TODO see if we can get more efficient than deepcopy
         _G[tablename] = deepcopy(pset_data_cache[number][tablename])
-        -- print('cache >> table: ' .. tablename)
+        print('cache >> table: ' .. tablename)
       end
     end
   end
@@ -635,18 +645,18 @@ end
 -- end of PSET callbacks --   
   
   
-  -- -- caching table data associated with saved .psets -- 
-  init_cache() -- Disable until event pset is finished
+-- caching .psets and associated tables 
+init_cache()
 
-  -- load most recent pset
-  params:default()
-  params:bang()
-  
-  -- Some actions need to be added post-bang
-  params:set_action('mode', function() update_chord_action() end)
-  
-  grid_redraw()
-  redraw()
+-- load most recent pset
+-- params:default()
+params:bang()
+
+-- Some actions need to be added post-bang
+params:set_action('mode', function() update_chord_action() end)
+
+grid_redraw()
+redraw()
 end
 
 
@@ -773,32 +783,102 @@ function init_cache()
       table.insert(valid_psets, pset_number(script_data[i]))
     end
   end
-
-  -- cache all .data tables for numbered directories having a valid .pset
+  -- cache all .psets and .data tables for numbered directories having a valid .pset
   pset_data_cache = {}
   for i = 1, #valid_psets do
     cache(valid_psets[i])
   end
-  -- tab.print(pset_data_cache["01"])
 end
 
 
 function cache(number)  
-  local filepath = norns.state.data..number.."/"
-  if util.file_exists(filepath) then -- this can also fire upstream so might want to optimize
-    pset_data_cache[number] = {} -- init table using the preset number AS A STRING
+  local data_fp = norns.state.data..number.."/"
+  pset_data_cache[number] = {} -- init table using the preset number AS A STRING
+  manual_pset_cache(number)
+  
+  if util.file_exists(data_fp) then -- this can also fire upstream so might want to optimize
+    -- pset_data_cache[number] = {} -- init table using the preset number AS A STRING
     misc = {}
     for tables = 1,7 do
       local tablename = pset_lookup[tables]
-      if util.file_exists(filepath..tablename..".data") then
+      if util.file_exists(data_fp..tablename..".data") then
         -- pset_data_cache[number] = {} -- init a table using the preset number AS A STRING
-        pset_data_cache[number][tablename] = tab.load(filepath..tablename..".data")
-      print('table >> cache: ' .. filepath..tablename..".data")
+        pset_data_cache[number][tablename] = tab.load(data_fp..tablename..".data")
+      print('table >> cache: ' .. data_fp..tablename..".data")
       end
     end
   end
 end
+
+
+
+  -- hacked bit from paramset.lua
+  --- read from disk.
+  -- @tparam string filename either an absolute path, number (to read [scriptname]-[number].pset from local data folder) or nil (to read pset number specified by pset-last.txt in the data folder)
+  -- @tparam boolean silent if true, do not trigger parameter actions
+  -- TODO: does this also need to set norns.state.pset_last?
+function manual_pset_cache(number, silent)
+    -- filename = filename
+  -- filename = filename or norns.state.pset_last
   
+  local function unquote(s)
+    return s:gsub('^"', ''):gsub('"$', ''):gsub('\\"', '"')
+  end
+
+  -- local pset_number;
+  -- if type(filename) == "number" then
+    -- local n = filename
+    -- filename = norns.state.data .. norns.state.shortname
+    -- pset_number = string.format("%02d",n)
+    -- local pset_number = filename
+    filename = norns.state.data .. norns.state.shortname .. "-" .. number .. ".pset"
+  -- end
+  -- print(filename)
+  print("pset >> read: " .. filename)
+  local fd = io.open(filename, "r")
+  if fd then
+    io.close(fd)
+    local param_already_set = {}
+    pset_data_cache[number]["pset"] = {}
+    local line_count = 0 
+    for line in io.lines(filename) do
+      if util.string_starts(line, "--") then
+        params.name = string.sub(line, 4, -1)
+      else
+        local id, value = string.match(line, "(\".-\")%s*:%s*(.*)")
+        if id and value then
+          line_count = line_count + 1
+          pset_data_cache[number]["pset"][line_count] = {}
+          id = unquote(id)
+          local index = params.lookup[id]
+          if index and params.params[index] and not param_already_set[index] then
+            if tonumber(value) ~= nil then
+              pset_data_cache[number]["pset"][line_count].id = index
+              pset_data_cache[number]["pset"][line_count].value = tonumber(value)
+            elseif value == "-inf" then
+              pset_data_cache[number]["pset"][line_count].id = index
+              pset_data_cache[number]["pset"][line_count].value = -math.huge              
+            elseif value == "inf" then
+              pset_data_cache[number]["pset"][line_count].id = index
+              pset_data_cache[number]["pset"][line_count].value = math.huge      
+            elseif value then
+              pset_data_cache[number]["pset"][line_count].id = index
+              pset_data_cache[number]["pset"][line_count].value = value
+            end
+            param_already_set[index] = true
+          end
+        end
+      end
+    end
+    -- if self.action_read ~= nil then 
+    --   self.action_read(filename,silent,pset_number)
+    -- end
+  else
+    -- print("pset :: "..filename.." not read.")
+  end
+end
+
+
 function refresh_midi_devices()
   for i = 1,#midi.vports do -- query all ports
     midi_device[i] = midi.connect(i) -- connect each device
@@ -1215,7 +1295,8 @@ function sequence_clock()
         if pset_queue ~= nil then
           -- params:read(pset_queue)
           -- manually fun pset read action
-          manual_params_read(pset_queue,false)
+          -- manual_params_read(pset_queue,false)
+          manual_params_read(pset_queue, false)
           pset_queue = nil
         end  
         advance_chord_seq()
