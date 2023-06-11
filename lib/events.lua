@@ -6,8 +6,6 @@ events_lookup = {
   {	category= 'Global', 	event_type= 'function', 	id= 'event_gen', 	name= 'Generate c+a', 	value_type= 'trigger', 				},
   {	category= 'Global', 	event_type= 'param', 	id= 'chord_generator', 	name= 'Chord gen algo', 	value_type= 'inc, set', 				},
   {	category= 'Global', 	event_type= 'param', 	id= 'arp_generator', 	name= 'Arp gen algo', 	value_type= 'inc, set', 				},
-  {	category= 'Global', 	event_type= 'param', 	id= 'load_pset', 	name= 'Load pset', 	value_type= 'inc, set', 		action= 'load_pset', 		},
-  {	category= 'Global', 	event_type= 'param', 	id= 'splice_pset', 	name= 'Splice pset', 	value_type= 'inc, set', 		action= 'splice_pset', 		},
   {	category= 'Global', 	event_type= 'param', 	id= 'mode', 	name= 'Mode', 	value_type= 'set', 	formatter= 'mode_index_to_name', 			},
   {	category= 'Global', 	event_type= 'param', 	id= 'transpose', 	name= 'Key', 	value_type= 'inc, set', 	formatter= 'transpose_string', 			},
   {	category= 'Global', 	event_type= 'param', 	id= 'clock_tempo', 	name= 'Tempo', 	value_type= 'inc, set', 				},
@@ -90,4 +88,4 @@ events_lookup = {
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_ad_skew', 	name= 'Crow AD skew', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_jf_amp', 	name= 'Just Friends amp', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_disting_velocity', 	name= 'Disting velocity', 	value_type= 'inc, set', 				},
-}
+}									
