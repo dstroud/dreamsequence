@@ -414,7 +414,7 @@ function init()
 
 
  function params.action_read(filename,silent,number)
-  local filepath = norns.state.data.."/"..number.."/"
+  local filepath = norns.state.data..number.."/"
   if util.file_exists(filepath) then
     -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
     screen_view_index = 1
@@ -465,6 +465,7 @@ function init()
     chord = next_chord
     chord_no = 0 -- wipe chord readout
     generate_chord_names()
+    generate_steps_per_segment()
     
     -- if transport_active, reset and continue playing so user can demo psets from the system menu
     if transport_active == true then
@@ -963,6 +964,7 @@ function generate_arranger_seq_padded()
       arranger_seq_padded[i] = (patt or pattern)
     end
   end
+  generate_steps_per_segment()
 end
 
 
@@ -1172,10 +1174,10 @@ end
 -- To-do: Ideally only needs to fire once a second but the potential for it to get out of sync (tempo changes, reset, Generator) causes issues.
 -- Might create a reinitialization function to call when needed (param actions and when resetting etc...)
 function seconds_clock()
-  while true do
-    redraw()
-    clock.sleep(.1)
-  end
+  -- while true do
+  --   redraw()
+  --   clock.sleep(.1)
+  -- end
 end
     
     
@@ -1260,6 +1262,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   reset_clock()
   get_next_chord()
   chord = next_chord
+  generate_steps_per_segment()
   grid_redraw()
   redraw()
 end
@@ -1281,6 +1284,7 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   reset_clock()
   get_next_chord()
   chord = next_chord
+  generate_steps_per_segment()
   grid_redraw()
   redraw()
 end
@@ -1356,6 +1360,7 @@ function advance_chord_seq()
 
     if arranger_enabled then 
       readout_chord_seq_position = chord_seq_position
+      generate_steps_per_segment() --wag on placement here
       do_events()
     end
     
@@ -2120,8 +2125,11 @@ function g.key(x,y,z)
         end
         chord_no = util.wrap(x,1,7) + (params:get('chord_type') == 4 and 7 or 0) -- or 0
         generate_chord_names()
+        
+      -- set chord_pattern_length  
       elseif x == 15 then
         chord_pattern_length[pattern] = y
+        generate_steps_per_segment()
 
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
         pattern_key_count = pattern_key_count + 1
@@ -2362,10 +2370,11 @@ function key(n,z)
     
           -- For now, doing a pattern reset but not an arranger reset since it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
           -- if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end
-          reset_pattern()
+          reset_pattern() -- also runs generate_steps_per_segment() now
           
         elseif grid_view_name == 'Chord' then       
           chord_generator_lite()
+          generate_steps_per_segment()
         elseif grid_view_name == 'Arp' then       
           arp_generator('run')
         end
@@ -2868,6 +2877,45 @@ function scroll_offset(index, total, in_view, height)
 end
 
 
+-- generates table showing remaining chord steps per arranger segment for dashboard chart.
+-- run any time pattern length changes (generator, events, g.key, key pset load, arranger/pattern reset)
+-- todo p0: make sure this works when arrange seq length is reduced suddenly
+function generate_steps_per_segment()
+  steps_per_segment = {}
+  local arranger_seq_position_min_1 = math.max(arranger_seq_position, 1) -- for reset state
+  
+  -- pattern_sticky handles instances where the chord patttern has changed but the old pattern needs to continue playing for a bit
+  -- Scenarios to test for:
+  -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
+  -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_enabled to false and should suspend the arranger mini chart until Arranger pickup occurs.
+  -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
+  -- We DO want this to update if the arranger is reset (arranger_seq_position = 0, however)
+  -- -- alternate logic that is a bit more readable but I suspect not as efficient?:
+  -- if arranger_seq_position == 0 or arranger_enabled == false then
+  --   pattern_sticky = arranger_seq_padded[arranger_seq_position_min_1]
+  -- else
+  --   pattern_sticky = pattern
+  -- end
+  pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
+
+  -- todo p0: bit of a wag here TBH. Need to test and see if readout_chord_seq_position always refers to pattern_stable! If not, might need to look at having a readout_chord_pattern generated at the same time as _position. readout_chord_seq_position might also be obsolete now?
+
+  -- todo p1: seems to work okay without readout_chord_seq_position. Need to investigate what that was for.
+  -- Can probably simplify by adjusting when readout_chord_seq_position updates so we don't have to deduct 1.
+  -- We basically want to count the current step as a "remaining" step
+  -- local steps = chord_pattern_length[(pattern_sticky or 1)] - math.max((readout_chord_seq_position or 1) - 1, 0)
+  -- steps = math.max(steps, 0)
+  -- steps_per_segment[1] = math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((readout_chord_seq_position or 1) - 1, 0), 0)
+  steps_per_segment[1] = math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((chord_seq_position or 1) - 1, 0), 0)
+
+  
+  -- iterate through any remaining arranger segments to grab their step lengths
+  for i = arranger_seq_position_min_1 + 1, arranger_seq_length do
+    table.insert(steps_per_segment, chord_pattern_length[arranger_seq_padded[i]])
+  end    
+end
+      
+      
 function redraw()
   screen.clear()
   local dash_x = 94
@@ -3136,7 +3184,7 @@ function redraw()
       local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 2) -- If arranger is reset, add an initial gap to the x position
       local events_rect_x = rect_x
       steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
-    
+
       for i = math.max(arranger_seq_position, 1), arranger_seq_length do
         if arranger_enabled then
           steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position - 1,0) or 0) or 0
@@ -3154,6 +3202,19 @@ function redraw()
         
         -- Min of 0 since changing the number of pattern steps mid-play can otherwise result in a negative (possibly obsolete now?)
         steps_remaining_in_pattern = math.max(chord_pattern_length[pattern_stable] - steps_elapsed, 0)  --rect_w
+        -- if i == 1 then
+        --   print ('steps_remaining_in_pattern ' .. steps_remaining_in_pattern .. '   steps_per_segment ' .. (steps_per_segment[i] or 0))
+        -- end
+        
+        -- todo p3: remove debug check
+        -- steps_per_segment is always indexed starting with 1 so there is some goofy math here on the if statement
+        if steps_remaining_in_pattern ~= steps_per_segment[i - (math.max(arranger_seq_position, 1) - 1)] or i == 1 and (pattern_stable ~= pattern_sticky) then 
+          print('i = ' .. i ..  ' | pattern ' .. pattern_stable .. ' ' .. pattern_sticky.. ' | steps remaining ' .. steps_remaining_in_pattern .. ' ' .. (steps_per_segment[i] or 0))
+          -- print ('steps_remaining_in_pattern ' .. steps_remaining_in_pattern .. '   steps_per_segment ' .. (steps_per_segment[i] or 0))
+        end
+        -- print('i = ' .. i .. ' ' .. i - (math.max(arranger_seq_position, 1) - 1))
+      
+      
         steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
         seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
       
