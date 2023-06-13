@@ -2915,6 +2915,7 @@ function generate_steps_per_segment()
   events_timeline_flat = {}
   steps_remaining_in_arrangement = 0
   local arranger_seq_position_min_1 = math.max(arranger_seq_position, 1) -- for reset state
+  -- local index = 1
   
   -- pattern_sticky handles instances where the chord patttern has changed but the old pattern needs to continue playing for a bit
   -- Scenarios to test for:
@@ -2930,7 +2931,8 @@ function generate_steps_per_segment()
   -- end
   
   -- todo p0: check logic for drawing segment x position when disabling and re-enabling arranger. Load pset 6, play until segment 1.8 then disable arranger. Switch segment 1 between patterns A and B. It reduces the x for all segments each time then cycles.
-  pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
+  -- moving this to end of function so it can be used in redraw. Kinda sucks and should be a todo p1
+  -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
 
   -- pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
 
@@ -2949,12 +2951,14 @@ function generate_steps_per_segment()
   -- steps_remaining_in_arrangement = steps
   
   -- iterate through arranger segments to grab their step lengths
-  -- might also iterate in reverse and do pattern_sticky here using i so it ends up with the active pattern for later in the script 
+  -- might also iterate in reverse and do pattern_sticky here using i so it ends up with the active pattern for later in the script
 
   for i = arranger_seq_position_min_1, arranger_seq_length do
+    -- for i = arranger_seq_length, arranger_seq_position_min_1, -1 do -- reverse so we can leave pattern_sticky at the end (TBH if this is useful but it's picked up in redraw now)
+
     -- table.insert(steps_per_segment, steps)
-    
-    if i == arranger_seq_position_min_1 then -- special handling for current step
+      pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
+    -- if i == arranger_seq_position_min_1 then -- special handling for current step
       -- todo p0: bit of a wag here TBH. Need to test and see if readout_chord_seq_position always refers to pattern_stable! If not, might need to look at having a readout_chord_pattern generated at the same time as _position. readout_chord_seq_position might also be obsolete now?
       -- todo p1: seems to work okay without readout_chord_seq_position. Need to investigate what that was for.
       -- Can probably simplify by adjusting when readout_chord_seq_position updates so we don't have to deduct 1.
@@ -2962,41 +2966,51 @@ function generate_steps_per_segment()
       -- local steps = chord_pattern_length[(pattern_sticky or 1)] - math.max((readout_chord_seq_position or 1) - 1, 0)
       -- steps = math.max(steps, 0)
       -- steps_per_segment[1] = math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((readout_chord_seq_position or 1) - 1, 0), 0)
-      local steps = math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((chord_seq_position or 1) - 1, 0), 0) -- steps remaining in active segment
+      local steps = 
+        -- special handling for current step
+        i == arranger_seq_position_min_1
+        and (math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((chord_seq_position or 1) - 1, 0), 0)) -- steps remaining in active segment
+        or chord_pattern_length[arranger_seq_padded[i]]
       -- steps_per_segment[1] = steps
       -- steps_per_segment[arranger_seq_position_min_1] = steps
       -- steps_remaining_in_arrangement = steps
+      -- steps_per_segment[i] = steps
+      -- steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps
+    -- else -- remaining segments
+      -- local steps = chord_pattern_length[arranger_seq_padded[i]]
       steps_per_segment[i] = steps
       steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps
-    else -- remaining segments
-      local steps = chord_pattern_length[arranger_seq_padded[i]]
-      steps_per_segment[i] = steps
-      steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps
-    end
-    
-    -- -- Arranger event indicator. To-do: This is simpler than the above and can probably be used to draw the primary chart too.
-    -- -- subbing readout_chord_seq_position with chord_seq_position
-    -- for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
-    --   -- check for 3 states:
-    --   -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
-    --   -- 2. Arranger is enabled so upcoming segments should be bright
-    --   -- 3. Arranger is disabled completely and should be dimmed
-    --   if params:get('arranger_enabled') == 1 then
-    --     if arranger_enabled == false and i == arranger_seq_position then
-    --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-    --       else
-    --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
-    --     end  
-    --   else
-    --     screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-    --   end
-  
-    --   screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-    --   screen.fill()
-    --   events_rect_x = events_rect_x + 1
-    -- end
+      
+      
+        -- subbing readout_chord_seq_position with chord_seq_position. todo p1: untested
+        for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
+          -- for s = chord_pattern_length[pattern_sticky], i == arranger_seq_position and chord_seq_position or 1, -1 do
+          -- check for 3 states:
+          -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
+          -- 2. Arranger is enabled so upcoming segments should be bright
+          -- 3. Arranger is disabled completely and should be dimmed
+          if params:get('arranger_enabled') == 1 then
+            -- if arranger_enabled == false and i == arranger_seq_position then
+              -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+              -- else
+              -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
+            -- end  
+          -- else
+            -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+            -- events_timeline_flat[index] = ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
+            table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
+)
+            -- index = index + 1
+          end
+      
+          -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+          -- screen.fill()
+          -- events_rect_x = events_rect_x + 1
+        end
         
-        
+        -- Used in redraw currently
+        pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
+
   end
   calc_percent_step_elapsed()
 end
@@ -3332,6 +3346,7 @@ function redraw()
 
 
 
+
         ----------------------------------
         -- performance killer right here
         ----------------------------------
@@ -3352,9 +3367,14 @@ function redraw()
         --     screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
         --   end
 
-        --   screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-        --   screen.fill()
-        --   events_rect_x = events_rect_x + 1
+          --events_timeline_flat-- look up tbl for events
+          screen.level(events_timeline_flat[i])
+
+          screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+          
+          -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+          screen.fill()
+          events_rect_x = events_rect_x + 1
         -- end
         
         
