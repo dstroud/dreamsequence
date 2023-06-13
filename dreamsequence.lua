@@ -65,7 +65,7 @@ function init()
   --ARRANGER PARAMS
   params:add_group('arranger', 'ARRANGER', 2)
   params:add_number('arranger_enabled', 'Enabled', 0, 1, 0, function(param) return t_f_string(param:get()) end)
-    params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_enabled() end)
+    params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_active() end)
   params:add_option('playback', 'Playback', {'Loop','One-shot'}, 1)
     params:set_action('playback', function() grid_redraw(); arranger_ending() end)
   -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
@@ -268,7 +268,7 @@ function init()
 
   -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
-  arranger_enabled = false      
+  arranger_active = false
   chord_seq_retrig = true
   crow.input[1].stream = sample_crow
   crow.input[1].mode("none")
@@ -340,7 +340,7 @@ function init()
   -- print('CHORD DIV ' .. chord_div)
   -- percent_step_elapsed()
   
-    -- if arranger_enabled then
+    -- if arranger_active then
     -- percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
     -- end
 
@@ -478,7 +478,7 @@ function init()
     chord = next_chord
     chord_no = 0 -- wipe chord readout
     generate_chord_names()
-    generate_steps_per_segment()
+    generate_dash()
     
     -- if transport_active, reset and continue playing so user can demo psets from the system menu
     if transport_active == true then
@@ -978,7 +978,7 @@ function generate_arranger_seq_padded()
       arranger_seq_padded[i] = (patt or pattern)
     end
   end
-  generate_steps_per_segment()
+  generate_dash()
 end
 
 
@@ -1126,7 +1126,7 @@ function sequence_clock()
         print('Canceling clock_id ' .. (sequence_clock_id or 0))
         clock.cancel(sequence_clock_id)-- or 0)
         
-        if arranger_enabled then
+        if arranger_active then
           reset_arrangement()
         else
           reset_pattern()
@@ -1185,10 +1185,10 @@ end
 
 function calc_percent_step_elapsed()
   -- if arranger_seq_position == 0 then percent_step_elapsed = 0
-  -- elseif arranger_enabled then
+  -- elseif arranger_active then
   --   percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
   -- end
-  if arranger_enabled then
+  if arranger_active then
     percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
     
     -- todo p0: verify this actually works
@@ -1293,7 +1293,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   reset_clock()
   get_next_chord()
   chord = next_chord
-  generate_steps_per_segment()
+  generate_dash()
   grid_redraw()
   redraw()
 end
@@ -1311,11 +1311,11 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   
   if arranger_seq[1] > 0 then pattern = arranger_seq[1] end
 
-  if params:string('arranger_enabled') == 'True' then arranger_enabled = true end
+  if params:string('arranger_enabled') == 'True' then arranger_active = true end
   reset_clock()
   get_next_chord()
   chord = next_chord
-  generate_steps_per_segment()
+  generate_dash()
   grid_redraw()
   redraw()
 end
@@ -1354,7 +1354,7 @@ function advance_chord_seq()
     if (arranger_seq_position == 0 and chord_seq_position == 0) or chord_seq_position >= chord_pattern_length[pattern] then
       
       -- This variable is only set when the 'arranger_enabled' param is 'True' and we're moving into a new Arranger segment (or after reset)
-      arranger_enabled = true
+      arranger_active = true
       
       -- Check if it's the last pattern in the arrangement.
       if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
@@ -1389,9 +1389,9 @@ function advance_chord_seq()
       chord_seq_position = util.wrap(chord_seq_position + 1, 1, chord_pattern_length[pattern])
     end
 
-    if arranger_enabled then 
+    if arranger_active then 
       readout_chord_seq_position = chord_seq_position
-      generate_steps_per_segment() --wag on placement here
+      generate_dash() --wag on placement here
       do_events()
     end
     
@@ -1414,13 +1414,13 @@ function arranger_ending()
 end
 
 
--- Checks each time arrange_enabled param changes to see if we need to also immediately set the corresponding arranger_enabled var to false. arranger_enabled will be false until Arranger is re-synched/resumed.
+-- Checks each time arrange_enabled param changes to see if we need to also immediately set the corresponding arranger_active var to false. arranger_active will be false until Arranger is re-synched/resumed.
 -- Also sets pattern_queue to false to clear anything previously set
-function update_arranger_enabled()
+function update_arranger_active()
   if params:string('arranger_enabled') == 'False' then 
-    arranger_enabled = false
+    arranger_active = false
   elseif params:string('arranger_enabled') == 'True' then
-    if chord_seq_position == 0 then arranger_enabled = true end
+    if chord_seq_position == 0 then arranger_active = true end
     pattern_queue = false
   end
 end  
@@ -1944,7 +1944,7 @@ function grid_redraw()
       g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
       -- Optionally: Arranger enable/disable key has 3 states. on/re-sync/off
       -- if params:get('arranger_enabled') == 1 then
-        -- if arranger_enabled == false then
+        -- if arranger_active == false then
         --   g:led(1,8, math.random(12,15))
         -- else
           -- g:led(1,8, 15)
@@ -2160,7 +2160,7 @@ function g.key(x,y,z)
       -- set chord_pattern_length  
       elseif x == 15 then
         chord_pattern_length[pattern] = y
-        generate_steps_per_segment()
+        generate_dash()
 
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
         pattern_key_count = pattern_key_count + 1
@@ -2401,11 +2401,11 @@ function key(n,z)
     
           -- For now, doing a pattern reset but not an arranger reset since it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
           -- if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end
-          reset_pattern() -- also runs generate_steps_per_segment() now
+          reset_pattern() -- also runs generate_dash() now
           
         elseif grid_view_name == 'Chord' then       
           chord_generator_lite()
-          generate_steps_per_segment()
+          generate_dash()
         elseif grid_view_name == 'Arp' then       
           arp_generator('run')
         end
@@ -2911,32 +2911,24 @@ end
 -- generates table showing remaining chord steps per arranger segment for dashboard chart.
 -- run any time pattern length changes (generator, events, g.key, key pset load, arranger/pattern reset)
 -- todo p0: make sure this works when arrange seq length is reduced suddenly
-function generate_steps_per_segment()
+function generate_dash()
+  -- print('generating arranger dash')
   steps_per_segment = {}
   arranger_dash_flat = {}
   events_dash_flat = {}
   local events_count = 0 -- can also be derived from #events_dash_flat - need to check performance of each method
   steps_remaining_in_arrangement = 0
   local arranger_seq_position_min_1 = math.max(arranger_seq_position, 1) -- for reset state
- 
-  
-  -- if 1 == 1 then
-  --   tab.print(events)
-  -- else  
-  --   tab.print(events)
-  -- end
-  
-  
-  -- local index = 1
-  
+
+
   -- pattern_sticky handles instances where the chord patttern has changed but the old pattern needs to continue playing for a bit
   -- Scenarios to test for:
   -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
-  -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_enabled to false and should suspend the arranger mini chart until Arranger pickup occurs.
+  -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_active to false and should suspend the arranger mini chart until Arranger pickup occurs.
   -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
   -- We DO want this to update if the arranger is reset (arranger_seq_position = 0, however)
   -- -- alternate logic that is a bit more readable but I suspect not as efficient?:
-  -- if arranger_seq_position == 0 or arranger_enabled == false then
+  -- if arranger_seq_position == 0 or arranger_active == false then
   --   pattern_sticky = arranger_seq_padded[arranger_seq_position_min_1]
   -- else
   --   pattern_sticky = pattern
@@ -2944,20 +2936,20 @@ function generate_steps_per_segment()
   
   -- todo p0: check logic for drawing segment x position when disabling and re-enabling arranger. Load pset 6, play until segment 1.8 then disable arranger. Switch segment 1 between patterns A and B. It reduces the x for all segments each time then cycles.
   -- moving this to end of function so it can be used in redraw. Kinda sucks and should be a todo p1
-  -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
+  -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_active == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
 
 
-  pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
+  -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_active == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
   
-  -- if arranger_seq_position == 0 then -- or arranger_enabled == false then
+  -- if arranger_seq_position == 0 then -- or arranger_active == false then
   --   pattern_sticky = arranger_seq_padded[arranger_seq_position_min_1]
   -- else
   --   pattern_sticky = pattern
   -- end
 
-  --todo p0: arranger countdown timer doesn't update if arranger_enabled param is 0 and arranger_seq_position == 0
+  --todo p0: arranger countdown timer doesn't update if arranger_active param is 0 and arranger_seq_position == 0
 
-  -- pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
+  -- pattern_sticky = (arranger_seq_position == i and arranger_active == true) and pattern or arranger_seq_padded[i] -- original
 
 
 
@@ -2976,11 +2968,25 @@ function generate_steps_per_segment()
   -- iterate through arranger segments to grab their step lengths
   -- might also iterate in reverse and do pattern_sticky here using i so it ends up with the active pattern for later in the script
 
+  -- record the remaining steps in the active segment if arranger is active
+  pattern_sticky = arranger_active == true and pattern or arranger_seq_padded[arranger_seq_position_min1] -- todo p1 make local after verification
+  if arranger_active then 
+    steps_sticky = (math.max(chord_pattern_length[pattern_sticky] - math.max((chord_seq_position or 1) - 1, 0), 0)) -- steps remaining in active segment
+    chord_seq_position_sticky = math.max((chord_seq_position or 1),1)
+  end
+  
+  ---------------------------------------------------------------------------------------------------
+  -- iterate through all steps in arranger so we can get a total for steps_remaining_in_arrangement
+  -- then build the arranger dash charts, limited to area drawn on screen (~30px)
+  ---------------------------------------------------------------------------------------------------
   for i = arranger_seq_position_min_1, arranger_seq_length do
     -- for i = arranger_seq_length, arranger_seq_position_min_1, -1 do -- reverse so we can leave pattern_sticky at the end (TBH if this is useful but it's picked up in redraw now)
 
     -- table.insert(steps_per_segment, steps)
-      local pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
+    
+      pattern_sticky = (arranger_seq_position == i and arranger_active == true) and pattern or arranger_seq_padded[i] -- todo p1 make local after verification
+      -- steps = chord_pattern_length[pattern_sticky] -- might need to do a max 1 here todo p1 make local too
+      
     -- if i == arranger_seq_position_min_1 then -- special handling for current step
       -- todo p0: bit of a wag here TBH. Need to test and see if readout_chord_seq_position always refers to pattern_stable! If not, might need to look at having a readout_chord_pattern generated at the same time as _position. readout_chord_seq_position might also be obsolete now?
       -- todo p1: seems to work okay without readout_chord_seq_position. Need to investigate what that was for.
@@ -2989,11 +2995,16 @@ function generate_steps_per_segment()
       -- local steps = chord_pattern_length[(pattern_sticky or 1)] - math.max((readout_chord_seq_position or 1) - 1, 0)
       -- steps = math.max(steps, 0)
       -- steps_per_segment[1] = math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((readout_chord_seq_position or 1) - 1, 0), 0)
-      local steps = 
+      
+      steps =  --todo p1 make local
         -- special handling for current step
         i == arranger_seq_position_min_1
-        and (math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((chord_seq_position or 1) - 1, 0), 0)) -- steps remaining in active segment
+        -- this needs to freeze and not update when 1st segment is interrupted
+        -- and (math.max(chord_pattern_length[(pattern_sticky or 1)] - math.max((chord_seq_position or 1) - 1, 0), 0)) -- steps remaining in active segment
+        and steps_sticky
         or chord_pattern_length[arranger_seq_padded[i]]
+        
+        
       -- steps_per_segment[1] = steps
       -- steps_per_segment[arranger_seq_position_min_1] = steps
       -- steps_remaining_in_arrangement = steps
@@ -3009,8 +3020,18 @@ function generate_steps_per_segment()
         -- Also capping this so we just draw what is needed for the arranger dashboard. todo p2: also cap arranger segments (but be aware the count is used for seconds countdown)
         -- some sort of weird race condition is happening that requires nil check on events todo p2
         if events ~= nil and events_count < 24 then
-          for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
-            if events_count > 23 then break end -- kinda redundant with if statement above but does chop the length down a bit
+          -- 2023-06-13 added max chord_seq_position to avoid looking up invalid events[i][s] index
+          -- 2023-06-13 chord_seq_position needs to be made sticky for first segment
+          -- for s = i == arranger_seq_position and math.max(chord_seq_position, 1) or 1, chord_pattern_length[pattern_sticky] do
+          
+          -- for current segment, use the "sticky" sequence position that freezes on arranger_active == false, otherwise start from 1
+          -- this sorta works but doesn't account for changing the active segment on arranger, which needs to update
+          -- Desired behavior: if we change the interrupted chord segment's pattern, update the interrupted segment but keep it dimmed so we know it's skipped
+          -- A little weird behaviour: moving from pattern A with 3 steps remaining to pattern B then back to pattern A would I guess reset so it shows all 8 steps remaining?
+          -- Alternative option would be to somehow give an indication of 
+          for s = i == arranger_seq_position and chord_seq_position_sticky or 1, steps do
+          
+            if events_count > 23 then break end -- kinda redundant with if statement above but does chop the length down a bit I think on long patterns
             table.insert(arranger_dash_flat, pattern_sticky)
             
             -- check for 3 states:
@@ -3018,12 +3039,18 @@ function generate_steps_per_segment()
             -- 2. Arranger is enabled so upcoming segments should be bright
             -- 3. Arranger is disabled completely and should be dimmed
             if params:get('arranger_enabled') == 1 then
-              if arranger_enabled == false and i == arranger_seq_position then
+              if arranger_active == false and i == arranger_seq_position then
                   table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
                 else
                   table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 15 or 1) 
               end  
             else
+
+              -- debug leading to math.max(chord_seq_position, 1) change          
+              -- print('events[i][s].populated:')
+              -- print('i = ' .. i .. ' | s = ' .. s)
+              -- print(events[i][s].populated)
+              
               table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
             end
           events_count = events_count + 1
@@ -3032,15 +3059,9 @@ function generate_steps_per_segment()
         table.insert(arranger_dash_flat, 0) -- insert blanks so we don't have to do it in redraw
         table.insert(events_dash_flat, 0) -- insert blanks so we don't have to do it in redraw  
         end
-        -- events_count = events_count + 1
-
-
-        -- -- Used in redraw currently
-        -- pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
-
   end
   -- Used in redraw currently
-  -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
+  -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_active == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
   calc_percent_step_elapsed()
 end
 
@@ -3354,7 +3375,7 @@ function redraw()
 
       
       -- Draw arranger patterns and events timeline straight from x_dash_flat
-      for i = 1, #arranger_dash_flat do
+      for i = 1, 30 do --hardcoding in the arranger's draw area. #arranger_dash_flat should be about the same but runs a little long for some reason
         screen.level(15)
         
         if arranger_dash_flat[i] ~= 0 then
@@ -3370,167 +3391,146 @@ function redraw()
       end
       
       
-      -- -- Draw arranger chart straight from arranger_dash_flat
-      -- for i = 1, #arranger_dash_flat do  
-      --   -- screen.level(events_dash_flat[i] or 0)
-      --   -- screen.pixel(events_rect_x, arranger_dash_y + 27, 1, 1)
-      --   -- screen.fill()
-      --   -- events_rect_x = events_rect_x + 1
+      --------------------------------------
+      -- Old redraw loop we're killing off
+      --------------------------------------
+      
+      -- for i = math.max(arranger_seq_position, 1), arranger_seq_length do
+      --   -- if arranger_active then
+      --   --   steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position - 1,0) or 0) or 0
+      --   --   -- percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
+      --   -- else
+      --   --   -- Uses readout_chord_seq_position which is updated when chord advances and arranger_active == true
+      --   --   steps_elapsed = (i == arranger_seq_position and math.max(readout_chord_seq_position - 1,0) or 0) or 0          
+      --   -- end
         
-      --   -- Dim interrupted segment if Arranger is re-syncing
-      --   if params:get('arranger_enabled') == 1 then
-      --     screen.level(arranger_enabled == false and i == arranger_seq_position and 2 or 15)
+      --   -- This is used as a replacement for arranger_seq_padded[i] in several places to handle situations where the chord pattern is changed unexpectedly:
+      --   -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
+      --   -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_active to false and should suspend the arranger mini chart until Arranger pickup occurs.
+      --   -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
+      --   -- local pattern_stable = (arranger_seq_position == i and arranger_active == true) and pattern or arranger_seq_padded[i]
+      --   -- steps_remaining_in_pattern = math.max(chord_pattern_length[pattern_stable] - steps_elapsed, 0)  --rect_w. math.max in case pattern length is set < current pos
+      --   -- if i == 1 then
+      --   --   print ('steps_remaining_in_pattern ' .. steps_remaining_in_pattern .. '   steps_per_segment ' .. (steps_per_segment[i] or 0))
+      --   -- end
+        
+      --   -- todo p1: temporary hack since index in lookup table starts with 1
+      --   -- steps_remaining_in_pattern = steps_per_segment[i - (math.max(arranger_seq_position, 1) - 1)]
+        
+      --   steps_remaining_in_pattern = steps_per_segment[i]
+
+        
+      --   -- if i == math.max(arranger_seq_position, 1) then print(steps_remaining_in_pattern) end
+        
+      --   -- todo p3: remove debug check
+      --   -- steps_per_segment is always indexed starting with 1 so there is some goofy math here on the if statement
+      --   -- if steps_remaining_in_pattern ~= steps_per_segment[i - (math.max(arranger_seq_position, 1) - 1)] or i == 1 and (pattern_stable ~= pattern_sticky) then 
+      --   --   print('i = ' .. i ..  ' | pattern ' .. pattern_stable .. ' ' .. pattern_sticky.. ' | steps remaining ' .. steps_remaining_in_pattern .. ' ' .. (steps_per_segment[i] or 0))
+      --     -- print ('steps_remaining_in_pattern ' .. steps_remaining_in_pattern .. '   steps_per_segment ' .. (steps_per_segment[i] or 0))
+      --   -- end
+      --   -- print('i = ' .. i .. ' ' .. i - (math.max(arranger_seq_position, 1) - 1))
+      
+      --   -- unused?
+      --   -- steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
+      --   -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
+
+
+      --   -- todo p0: verify this works!
+      --   -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
+
+
+      --   -- todo p2: temporary hack
+      --   if i == math.max(arranger_seq_position, 1) then
+      --     -- print('sticky')
+      --     pattern_stable = pattern_sticky 
       --   else
-      --     screen.level(2)
-      --   end
-      --   -- screen.rect(rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2) -- original
-        
-      --   -- screen.pixel(events_rect_x, arranger_dash_y + 27, 1, 1)
-
-      --     screen.rect(events_rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2)
-
-
-      --   screen.fill()
-        
+      --     pattern_stable = arranger_seq_padded[i]
       -- end
       
-      
-      for i = math.max(arranger_seq_position, 1), arranger_seq_length do
-        -- if arranger_enabled then
-        --   steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position - 1,0) or 0) or 0
-        --   -- percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
-        -- else
-        --   -- Uses readout_chord_seq_position which is updated when chord advances and arranger_enabled == true
-        --   steps_elapsed = (i == arranger_seq_position and math.max(readout_chord_seq_position - 1,0) or 0) or 0          
-        -- end
+      -- -- if i == 1 then pattern_stable
         
-        -- This is used as a replacement for arranger_seq_padded[i] in several places to handle situations where the chord pattern is changed unexpectedly:
-        -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
-        -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_enabled to false and should suspend the arranger mini chart until Arranger pickup occurs.
-        -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
-        -- local pattern_stable = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i]
-        -- steps_remaining_in_pattern = math.max(chord_pattern_length[pattern_stable] - steps_elapsed, 0)  --rect_w. math.max in case pattern length is set < current pos
-        -- if i == 1 then
-        --   print ('steps_remaining_in_pattern ' .. steps_remaining_in_pattern .. '   steps_per_segment ' .. (steps_per_segment[i] or 0))
-        -- end
+      --   local rect_y = arranger_dash_y + (pattern_stable * 2) + pattern_stable
+
+
+      --   -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
+      --   local rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
+
+
+
+
+      --   ----------------------------------
+      --   -- performance killer right here
+      --   ----------------------------------
         
-        -- todo p1: temporary hack since index in lookup table starts with 1
-        -- steps_remaining_in_pattern = steps_per_segment[i - (math.max(arranger_seq_position, 1) - 1)]
+      --   -- -- Arranger event indicator. To-do: This is simpler than the above and can probably be used to draw the primary chart too.
+      --   -- for s = i == arranger_seq_position and readout_chord_seq_position or 1, chord_pattern_length[pattern_stable] do
         
-        steps_remaining_in_pattern = steps_per_segment[i]
+      --   --   -- check for 3 states:
+      --   --   -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
+      --   --   -- 2. Arranger is enabled so upcoming segments should be bright
+      --   --   -- 3. Arranger is disabled completely and should be dimmed
+      --   --   if params:get('arranger_enabled') == 1 then
+      --   --     if arranger_active == false and i == arranger_seq_position then
+      --   --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+      --   --       else
+      --   --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
+      --   --     end  
+      --   --   else
+      --   --     screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+      --   --   end
 
-        
-        -- if i == math.max(arranger_seq_position, 1) then print(steps_remaining_in_pattern) end
-        
-        -- todo p3: remove debug check
-        -- steps_per_segment is always indexed starting with 1 so there is some goofy math here on the if statement
-        -- if steps_remaining_in_pattern ~= steps_per_segment[i - (math.max(arranger_seq_position, 1) - 1)] or i == 1 and (pattern_stable ~= pattern_sticky) then 
-        --   print('i = ' .. i ..  ' | pattern ' .. pattern_stable .. ' ' .. pattern_sticky.. ' | steps remaining ' .. steps_remaining_in_pattern .. ' ' .. (steps_per_segment[i] or 0))
-          -- print ('steps_remaining_in_pattern ' .. steps_remaining_in_pattern .. '   steps_per_segment ' .. (steps_per_segment[i] or 0))
-        -- end
-        -- print('i = ' .. i .. ' ' .. i - (math.max(arranger_seq_position, 1) - 1))
-      
-        -- unused?
-        -- steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
-        -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
+      --     --events_dash_flat-- look up tbl for events
+      --     -- screen.level(events_dash_flat[i] or 0)
+      --     -- -- print(i)
+      --     -- -- screen.level(math.min(i,15))
 
-
-        -- todo p0: verify this works!
-        -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
-
-
-        -- todo p2: temporary hack
-        if i == math.max(arranger_seq_position, 1) then
-          -- print('sticky')
-          pattern_stable = pattern_sticky 
-        else
-          pattern_stable = arranger_seq_padded[i]
-      end
-      
-      -- if i == 1 then pattern_stable
-        
-        local rect_y = arranger_dash_y + (pattern_stable * 2) + pattern_stable
-
-
-        -- Cosmetic adjustment to gap if arranger_seq_position == 0 (reset)
-        local rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1
-
-
-
-
-        ----------------------------------
-        -- performance killer right here
-        ----------------------------------
-        
-        -- -- Arranger event indicator. To-do: This is simpler than the above and can probably be used to draw the primary chart too.
-        -- for s = i == arranger_seq_position and readout_chord_seq_position or 1, chord_pattern_length[pattern_stable] do
-        
-        --   -- check for 3 states:
-        --   -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
-        --   -- 2. Arranger is enabled so upcoming segments should be bright
-        --   -- 3. Arranger is disabled completely and should be dimmed
-        --   if params:get('arranger_enabled') == 1 then
-        --     if arranger_enabled == false and i == arranger_seq_position then
-        --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-        --       else
-        --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
-        --     end  
-        --   else
-        --     screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-        --   end
-
-          --events_dash_flat-- look up tbl for events
-          -- screen.level(events_dash_flat[i] or 0)
-          -- -- print(i)
-          -- -- screen.level(math.min(i,15))
-
-          -- -- screen.pixel(events_rect_x + 1, arranger_dash_y + 27, 1, 1)
-          -- screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-          -- screen.fill()
-          -- events_rect_x = events_rect_x + 1
-          -- if i == math.max(arranger_seq_position, 1) then events_rect_x = events_rect_x + 1 end
+      --     -- -- screen.pixel(events_rect_x + 1, arranger_dash_y + 27, 1, 1)
+      --     -- screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+      --     -- screen.fill()
+      --     -- events_rect_x = events_rect_x + 1
+      --     -- if i == math.max(arranger_seq_position, 1) then events_rect_x = events_rect_x + 1 end
           
           
           
-          -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-          -- screen.fill()
-          -- events_rect_x = events_rect_x + 1
-        -- end
+      --     -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+      --     -- screen.fill()
+      --     -- events_rect_x = events_rect_x + 1
+      --   -- end
         
         
         
-        -- -- Arranger event indicator. To-do: This is simpler than the above and can probably be used to draw the primary chart too.
-        -- for s = i == arranger_seq_position and readout_chord_seq_position or 1, chord_pattern_length[pattern_stable] do
-        --   if params:get('arranger_enabled') == 1 then
-        --     -- Dim the interrupted segment upon resume
-        --     if arranger_enabled == false and i == arranger_seq_position then
-        --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-        --       else
-        --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
-        --     end  
-        --   else
-        --     screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-        --   end
+      --   -- -- Arranger event indicator. To-do: This is simpler than the above and can probably be used to draw the primary chart too.
+      --   -- for s = i == arranger_seq_position and readout_chord_seq_position or 1, chord_pattern_length[pattern_stable] do
+      --   --   if params:get('arranger_enabled') == 1 then
+      --   --     -- Dim the interrupted segment upon resume
+      --   --     if arranger_active == false and i == arranger_seq_position then
+      --   --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+      --   --       else
+      --   --       screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
+      --   --     end  
+      --   --   else
+      --   --     screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+      --   --   end
 
-        --   screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-        --   screen.fill()
-        --   events_rect_x = events_rect_x + 1
-        -- end
-        ----------------------------------
-        -- performance killer right here
-        ----------------------------------
+      --   --   screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+      --   --   screen.fill()
+      --   --   events_rect_x = events_rect_x + 1
+      --   -- end
+      --   ----------------------------------
+      --   -- performance killer right here
+      --   ----------------------------------
 
-        -- -- Dim interrupted segment if Arranger is re-syncing
-        -- if params:get('arranger_enabled') == 1 then
-        --   screen.level(arranger_enabled == false and i == arranger_seq_position and 2 or 15)
-        -- else
-        --   screen.level(2)
-        -- end
-        -- screen.rect(rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2)
-        -- screen.fill()
+      --   -- -- Dim interrupted segment if Arranger is re-syncing
+      --   -- if params:get('arranger_enabled') == 1 then
+      --   --   screen.level(arranger_active == false and i == arranger_seq_position and 2 or 15)
+      --   -- else
+      --   --   screen.level(2)
+      --   -- end
+      --   -- screen.rect(rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2)
+      --   -- screen.fill()
         
-        rect_x = rect_x + steps_remaining_in_pattern
-      end
+      --   rect_x = rect_x + steps_remaining_in_pattern
+      -- end
 
       -- Arranger dash rect (rendered after chart to cover chart edge overlap)
       screen.level(params:get('arranger_enabled') == 1 and 9 or 2)
@@ -3572,7 +3572,7 @@ function redraw()
       -- Arranger position readout
       --------------------------------------------      
       screen.move(dash_x + 3,arranger_dash_y + 9)
-      if params:string('arranger_enabled') == 'True' and arranger_enabled == false then
+      if params:string('arranger_enabled') == 'True' and arranger_active == false then
         screen.text('T-' .. chord_pattern_length[pattern] - chord_seq_position + 1)
       else          
         screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
@@ -3599,19 +3599,19 @@ function redraw()
       -- steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
 
       -- for i = math.max(arranger_seq_position, 1), arranger_seq_length do
-      --   if arranger_enabled then
+      --   if arranger_active then
       --     steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position - 1,0) or 0) or 0
       --     -- percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
       --   else
-      --     -- Uses readout_chord_seq_position which is updated when chord advances and arranger_enabled == true
+      --     -- Uses readout_chord_seq_position which is updated when chord advances and arranger_active == true
       --     steps_elapsed = (i == arranger_seq_position and math.max(readout_chord_seq_position - 1,0) or 0) or 0          
       --   end
         
       --   -- This is used as a replacement for arranger_seq_padded[i] in several places to handle situations where the chord pattern is changed unexpectedly:
       --   -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
-      --   -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_enabled to false and should suspend the arranger mini chart until Arranger pickup occurs.
+      --   -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_active to false and should suspend the arranger mini chart until Arranger pickup occurs.
       --   -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
-      --   local pattern_stable = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i]
+      --   local pattern_stable = (arranger_seq_position == i and arranger_active == true) and pattern or arranger_seq_padded[i]
       --   steps_remaining_in_pattern = math.max(chord_pattern_length[pattern_stable] - steps_elapsed, 0)  --rect_w. math.max in case pattern length is set < current pos
       --   -- if i == 1 then
       --   --   print ('steps_remaining_in_pattern ' .. steps_remaining_in_pattern .. '   steps_per_segment ' .. (steps_per_segment[i] or 0))
@@ -3638,7 +3638,7 @@ function redraw()
       --   for s = i == arranger_seq_position and readout_chord_seq_position or 1, chord_pattern_length[pattern_stable] do
       --     if params:get('arranger_enabled') == 1 then
       --       -- Dim the interrupted segment upon resume
-      --       if arranger_enabled == false and i == arranger_seq_position then
+      --       if arranger_active == false and i == arranger_seq_position then
       --         screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
       --         else
       --         screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
@@ -3654,7 +3654,7 @@ function redraw()
         
       --   -- Dim interrupted segment if Arranger is re-syncing
       --   if params:get('arranger_enabled') == 1 then
-      --     screen.level(arranger_enabled == false and i == arranger_seq_position and 2 or 15)
+      --     screen.level(arranger_active == false and i == arranger_seq_position and 2 or 15)
       --   else
       --     screen.level(2)
       --   end
@@ -3704,7 +3704,7 @@ function redraw()
       -- -- Arranger position readout
       -- --------------------------------------------      
       -- screen.move(dash_x + 3,arranger_dash_y + 9)
-      -- if params:string('arranger_enabled') == 'True' and arranger_enabled == false then
+      -- if params:string('arranger_enabled') == 'True' and arranger_active == false then
       --   screen.text('T-' .. chord_pattern_length[pattern] - chord_seq_position + 1)
       -- else          
       --   screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
