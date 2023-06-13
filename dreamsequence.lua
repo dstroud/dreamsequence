@@ -2913,8 +2913,9 @@ end
 -- todo p0: make sure this works when arrange seq length is reduced suddenly
 function generate_steps_per_segment()
   steps_per_segment = {}
-  events_timeline_flat = {}
-  events_count = 0
+  arranger_dash_flat = {}
+  events_dash_flat = {}
+  local events_count = 0 -- can also be derived from #events_dash_flat - need to check performance of each method
   steps_remaining_in_arrangement = 0
   local arranger_seq_position_min_1 = math.max(arranger_seq_position, 1) -- for reset state
  
@@ -2945,6 +2946,17 @@ function generate_steps_per_segment()
   -- moving this to end of function so it can be used in redraw. Kinda sucks and should be a todo p1
   -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
 
+
+  pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
+  
+  -- if arranger_seq_position == 0 then -- or arranger_enabled == false then
+  --   pattern_sticky = arranger_seq_padded[arranger_seq_position_min_1]
+  -- else
+  --   pattern_sticky = pattern
+  -- end
+
+  --todo p0: arranger countdown timer doesn't update if arranger_enabled param is 0 and arranger_seq_position == 0
+
   -- pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
 
 
@@ -2968,7 +2980,7 @@ function generate_steps_per_segment()
     -- for i = arranger_seq_length, arranger_seq_position_min_1, -1 do -- reverse so we can leave pattern_sticky at the end (TBH if this is useful but it's picked up in redraw now)
 
     -- table.insert(steps_per_segment, steps)
-      pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
+      local pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
     -- if i == arranger_seq_position_min_1 then -- special handling for current step
       -- todo p0: bit of a wag here TBH. Need to test and see if readout_chord_seq_position always refers to pattern_stable! If not, might need to look at having a readout_chord_pattern generated at the same time as _position. readout_chord_seq_position might also be obsolete now?
       -- todo p1: seems to work okay without readout_chord_seq_position. Need to investigate what that was for.
@@ -2994,78 +3006,68 @@ function generate_steps_per_segment()
       
       
         -- subbing readout_chord_seq_position with chord_seq_position. todo p1: untested
+        -- Also capping this so we just draw what is needed for the arranger dashboard. todo p2: also cap arranger segments (but be aware the count is used for seconds countdown)
         -- some sort of weird race condition is happening that requires nil check on events todo p2
-        -- Also capping this so we just draw what is needed for the events timeline chart. todo p2: also cap arranger segments (but be aware the count is used for seconds countdown)
-        if events ~= nil and events_count < 29 then
+        if events ~= nil and events_count < 24 then
           for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
-            -- for s = chord_pattern_length[pattern_sticky], i == arranger_seq_position and chord_seq_position or 1, -1 do
+            if events_count > 23 then break end -- kinda redundant with if statement above but does chop the length down a bit
+            table.insert(arranger_dash_flat, pattern_sticky)
+            
             -- check for 3 states:
             -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
             -- 2. Arranger is enabled so upcoming segments should be bright
             -- 3. Arranger is disabled completely and should be dimmed
             if params:get('arranger_enabled') == 1 then
               if arranger_enabled == false and i == arranger_seq_position then
-                -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-                              table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
-
+                  table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
                 else
-                -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
-                              table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 15 or 1)
-
+                  table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 15 or 1) 
               end  
-  
             else
-              -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-              -- events_timeline_flat[index] = ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
-              -- table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
-              -- print(events[1][1].populated)
-              
-              table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
-              
-              -- index = index + 1
+              table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
             end
-        
-            -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-            -- screen.fill()
-            -- events_rect_x = events_rect_x + 1
           events_count = events_count + 1
           end
-          
+          -- if events_count > 12 then break end
+        table.insert(arranger_dash_flat, 0) -- insert blanks so we don't have to do it in redraw
+        table.insert(events_dash_flat, 0) -- insert blanks so we don't have to do it in redraw  
         end
-        table.insert(events_timeline_flat, 0) -- insert blanks so we don't have to do it in redraw
+        -- events_count = events_count + 1
 
 
-        -- Used in redraw currently
-        pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
+        -- -- Used in redraw currently
+        -- pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
 
   end
+  -- Used in redraw currently
+  -- pattern_sticky = (arranger_seq_position ~= 0 and arranger_enabled == true) and pattern or arranger_seq_padded[arranger_seq_position_min_1]
   calc_percent_step_elapsed()
 end
 
 
-function test(cycles)
-  nClock = os.clock()
-  arranger_seq_position_min_1 = 1
-  for c = 1, cycles do
-    for i = arranger_seq_position_min_1, arranger_seq_length do
-      for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
+-- function test(cycles)
+--   nClock = os.clock()
+--   arranger_seq_position_min_1 = 1
+--   for c = 1, cycles do
+--     for i = arranger_seq_position_min_1, arranger_seq_length do
+--       for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
         
-        -- fastest but skips indices (might be useful to keep table size down)
-        -- if (events[i].populated or 0) > 0 then
-          -- table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
-        -- end  
+--         -- fastest but skips indices (might be useful to keep table size down)
+--         -- if (events[i].populated or 0) > 0 then
+--           -- table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
+--         -- end  
         
-        -- a tiny bit slower
-        -- table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
+--         -- a tiny bit slower
+--         -- table.insert(events_dash_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
 
-        -- considerably slower
-        -- table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+--         -- considerably slower
+--         -- table.insert(events_dash_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
 
-      end
-    end
-  end
-  print("Elapsed time: " .. os.clock()-nClock)
-end
+--       end
+--     end
+--   end
+--   print("Elapsed time: " .. os.clock()-nClock)
+-- end
 
 
 function redraw()
@@ -3338,30 +3340,61 @@ function redraw()
       local events_rect_x = rect_x + 1
       -- steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
       
-      
       local rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1 -- duplicated
 
 
-      -- for i = math.max(arranger_seq_position, 1), #events_timeline_flat do
-      for i = 1, #events_timeline_flat do  
-        screen.level(events_timeline_flat[i] or 0)
-        -- print(i)
-        -- screen.level(math.min(i,15))
-  
-        -- screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+      -- -- Draw events timeline straight from events_dash_flat
+      -- for i = 1, #events_dash_flat do  
+      --   screen.level(events_dash_flat[i] or 0)
+      --   screen.pixel(events_rect_x, arranger_dash_y + 27, 1, 1)
+      --   screen.fill()
+      --   events_rect_x = events_rect_x + 1
+      -- end
+          
+
+      
+      -- Draw arranger patterns and events timeline straight from x_dash_flat
+      for i = 1, #arranger_dash_flat do
+        screen.level(15)
+        
+        if arranger_dash_flat[i] ~= 0 then
+          screen.rect(events_rect_x, arranger_dash_y + 12 + (arranger_dash_flat[i] * 3), 1, 2)
+          screen.fill()
+        end
+
+        screen.level(events_dash_flat[i] or 0)
         screen.pixel(events_rect_x, arranger_dash_y + 27, 1, 1)
-      -- screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
         screen.fill()
+
         events_rect_x = events_rect_x + 1
-        
-        
-        -- starts right then shift left each segment
-        -- screen.pixel(events_rect_x + 1 , arranger_dash_y + 27, 1, 1)
-        -- screen.fill()
-        -- events_rect_x = events_rect_x + 1
       end
-          
-          
+      
+      
+      -- -- Draw arranger chart straight from arranger_dash_flat
+      -- for i = 1, #arranger_dash_flat do  
+      --   -- screen.level(events_dash_flat[i] or 0)
+      --   -- screen.pixel(events_rect_x, arranger_dash_y + 27, 1, 1)
+      --   -- screen.fill()
+      --   -- events_rect_x = events_rect_x + 1
+        
+      --   -- Dim interrupted segment if Arranger is re-syncing
+      --   if params:get('arranger_enabled') == 1 then
+      --     screen.level(arranger_enabled == false and i == arranger_seq_position and 2 or 15)
+      --   else
+      --     screen.level(2)
+      --   end
+      --   -- screen.rect(rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2) -- original
+        
+      --   -- screen.pixel(events_rect_x, arranger_dash_y + 27, 1, 1)
+
+      --     screen.rect(events_rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2)
+
+
+      --   screen.fill()
+        
+      -- end
+      
+      
       for i = math.max(arranger_seq_position, 1), arranger_seq_length do
         -- if arranger_enabled then
         --   steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position - 1,0) or 0) or 0
@@ -3412,7 +3445,9 @@ function redraw()
           pattern_stable = pattern_sticky 
         else
           pattern_stable = arranger_seq_padded[i]
-        end
+      end
+      
+      -- if i == 1 then pattern_stable
         
         local rect_y = arranger_dash_y + (pattern_stable * 2) + pattern_stable
 
@@ -3444,8 +3479,8 @@ function redraw()
         --     screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
         --   end
 
-          --events_timeline_flat-- look up tbl for events
-          -- screen.level(events_timeline_flat[i] or 0)
+          --events_dash_flat-- look up tbl for events
+          -- screen.level(events_dash_flat[i] or 0)
           -- -- print(i)
           -- -- screen.level(math.min(i,15))
 
@@ -3485,14 +3520,14 @@ function redraw()
         -- performance killer right here
         ----------------------------------
 
-        -- Dim interrupted segment if Arranger is re-syncing
-        if params:get('arranger_enabled') == 1 then
-          screen.level(arranger_enabled == false and i == arranger_seq_position and 2 or 15)
-        else
-          screen.level(2)
-        end
-        screen.rect(rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2)
-        screen.fill()
+        -- -- Dim interrupted segment if Arranger is re-syncing
+        -- if params:get('arranger_enabled') == 1 then
+        --   screen.level(arranger_enabled == false and i == arranger_seq_position and 2 or 15)
+        -- else
+        --   screen.level(2)
+        -- end
+        -- screen.rect(rect_x + i - rect_gap_adj, rect_y + 12, steps_remaining_in_pattern, 2)
+        -- screen.fill()
         
         rect_x = rect_x + steps_remaining_in_pattern
       end
