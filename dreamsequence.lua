@@ -27,9 +27,11 @@ include("dreamsequence/lib/includes")
 norns.version.required = 230526
 
 function init()
-  
+  -----------------------------
+  -- UPDATE BEFORE RELEASE!
   -- saved with pset files to address compatibility checks in the future
   version = 'v1.0.6'
+  -----------------------------
   init_generator()
   crow.ii.jf.mode(1)
   -- Turn off built-in Crow clock so it doesn't conflict with ours which only fires when transport is running.
@@ -834,7 +836,6 @@ end
 --Creates a variable for each source's div.
 function set_div(source)
   _G[source .. '_div'] = division_names[params:get(source .. '_div_index')][1]
-    print('DEBUG chord_div ' .. chord_div)
 end
 
 
@@ -2913,8 +2914,18 @@ end
 function generate_steps_per_segment()
   steps_per_segment = {}
   events_timeline_flat = {}
+  events_count = 0
   steps_remaining_in_arrangement = 0
   local arranger_seq_position_min_1 = math.max(arranger_seq_position, 1) -- for reset state
+ 
+  
+  -- if 1 == 1 then
+  --   tab.print(events)
+  -- else  
+  --   tab.print(events)
+  -- end
+  
+  
   -- local index = 1
   
   -- pattern_sticky handles instances where the chord patttern has changed but the old pattern needs to continue playing for a bit
@@ -2983,39 +2994,55 @@ function generate_steps_per_segment()
       
       
         -- subbing readout_chord_seq_position with chord_seq_position. todo p1: untested
-        for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
-          -- for s = chord_pattern_length[pattern_sticky], i == arranger_seq_position and chord_seq_position or 1, -1 do
-          -- check for 3 states:
-          -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
-          -- 2. Arranger is enabled so upcoming segments should be bright
-          -- 3. Arranger is disabled completely and should be dimmed
-          if params:get('arranger_enabled') == 1 then
-            -- if arranger_enabled == false and i == arranger_seq_position then
+        -- some sort of weird race condition is happening that requires nil check on events todo p2
+        -- Also capping this so we just draw what is needed for the events timeline chart. todo p2: also cap arranger segments (but be aware the count is used for seconds countdown)
+        if events ~= nil and events_count < 29 then
+          for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
+            -- for s = chord_pattern_length[pattern_sticky], i == arranger_seq_position and chord_seq_position or 1, -1 do
+            -- check for 3 states:
+            -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
+            -- 2. Arranger is enabled so upcoming segments should be bright
+            -- 3. Arranger is disabled completely and should be dimmed
+            if params:get('arranger_enabled') == 1 then
+              if arranger_enabled == false and i == arranger_seq_position then
+                -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+                              table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
+
+                else
+                -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
+                              table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 15 or 1)
+
+              end  
+  
+            else
               -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-              -- else
-              -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 15 or 1)
-            -- end  
-          -- else
-            -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
-            -- events_timeline_flat[index] = ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
-            -- table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
-            table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
-            -- index = index + 1
-          end
-      
-          -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-          -- screen.fill()
-          -- events_rect_x = events_rect_x + 1
-        end
+              -- events_timeline_flat[index] = ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
+              -- table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
+              -- print(events[1][1].populated)
+              
+              table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
+              
+              -- index = index + 1
+            end
         
+            -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+            -- screen.fill()
+            -- events_rect_x = events_rect_x + 1
+          events_count = events_count + 1
+          end
+          
+        end
+        table.insert(events_timeline_flat, 0) -- insert blanks so we don't have to do it in redraw
+
+
         -- Used in redraw currently
         pattern_sticky = (arranger_seq_position == i and arranger_enabled == true) and pattern or arranger_seq_padded[i] -- original
 
   end
   calc_percent_step_elapsed()
 end
- 
-      
+
+
 function test(cycles)
   nClock = os.clock()
   arranger_seq_position_min_1 = 1
@@ -3308,9 +3335,33 @@ function redraw()
       
       -- Calculations for 1. ARRANGEMENT TIMER and 2. ARRANGER MINI CHART
       local rect_x = dash_x + (arranger_seq_position == 0 and 4 or 2) -- If arranger is reset, add an initial gap to the x position
-      local events_rect_x = rect_x
+      local events_rect_x = rect_x + 1
       -- steps_remaining_in_arrangement = 0  -- Reset this before getting a running sum from the DO below
+      
+      
+      local rect_gap_adj = arranger_seq_position == 0 and 0 or arranger_seq_position - 1 -- duplicated
 
+
+      -- for i = math.max(arranger_seq_position, 1), #events_timeline_flat do
+      for i = 1, #events_timeline_flat do  
+        screen.level(events_timeline_flat[i] or 0)
+        -- print(i)
+        -- screen.level(math.min(i,15))
+  
+        -- screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+        screen.pixel(events_rect_x, arranger_dash_y + 27, 1, 1)
+      -- screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+        screen.fill()
+        events_rect_x = events_rect_x + 1
+        
+        
+        -- starts right then shift left each segment
+        -- screen.pixel(events_rect_x + 1 , arranger_dash_y + 27, 1, 1)
+        -- screen.fill()
+        -- events_rect_x = events_rect_x + 1
+      end
+          
+          
       for i = math.max(arranger_seq_position, 1), arranger_seq_length do
         -- if arranger_enabled then
         --   steps_elapsed = (i == arranger_seq_position and math.max(chord_seq_position - 1,0) or 0) or 0
@@ -3378,6 +3429,7 @@ function redraw()
         
         -- -- Arranger event indicator. To-do: This is simpler than the above and can probably be used to draw the primary chart too.
         -- for s = i == arranger_seq_position and readout_chord_seq_position or 1, chord_pattern_length[pattern_stable] do
+        
         --   -- check for 3 states:
         --   -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
         --   -- 2. Arranger is enabled so upcoming segments should be bright
@@ -3393,13 +3445,21 @@ function redraw()
         --   end
 
           --events_timeline_flat-- look up tbl for events
-          screen.level(events_timeline_flat[i] or 1)
+          -- screen.level(events_timeline_flat[i] or 0)
+          -- -- print(i)
+          -- -- screen.level(math.min(i,15))
 
-          screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+          -- -- screen.pixel(events_rect_x + 1, arranger_dash_y + 27, 1, 1)
+          -- screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
+          -- screen.fill()
+          -- events_rect_x = events_rect_x + 1
+          -- if i == math.max(arranger_seq_position, 1) then events_rect_x = events_rect_x + 1 end
+          
+          
           
           -- screen.pixel(events_rect_x + i - rect_gap_adj, arranger_dash_y + 27, 1, 1)
-          screen.fill()
-          events_rect_x = events_rect_x + 1
+          -- screen.fill()
+          -- events_rect_x = events_rect_x + 1
         -- end
         
         
