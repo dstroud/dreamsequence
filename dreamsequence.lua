@@ -2998,8 +2998,8 @@ function generate_steps_per_segment()
           -- else
             -- screen.level(((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
             -- events_timeline_flat[index] = ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
-            table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
-)
+            -- table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1
+            table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
             -- index = index + 1
           end
       
@@ -3016,6 +3016,31 @@ function generate_steps_per_segment()
 end
  
       
+function test(cycles)
+  nClock = os.clock()
+  arranger_seq_position_min_1 = 1
+  for c = 1, cycles do
+    for i = arranger_seq_position_min_1, arranger_seq_length do
+      for s = i == arranger_seq_position and chord_seq_position or 1, chord_pattern_length[pattern_sticky] do
+        
+        -- fastest but skips indices (might be useful to keep table size down)
+        -- if (events[i].populated or 0) > 0 then
+          -- table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
+        -- end  
+        
+        -- a tiny bit slower
+        -- table.insert(events_timeline_flat, ((events[i][s].populated or 0) > 0) and 4 or 1)
+
+        -- considerably slower
+        -- table.insert(events_timeline_flat, ((events[i].populated or 0) > 0 and (events[i][s].populated or 0) > 0) and 4 or 1)
+
+      end
+    end
+  end
+  print("Elapsed time: " .. os.clock()-nClock)
+end
+
+
 function redraw()
   screen.clear()
   local dash_x = 94
@@ -3368,7 +3393,7 @@ function redraw()
         --   end
 
           --events_timeline_flat-- look up tbl for events
-          screen.level(events_timeline_flat[i])
+          screen.level(events_timeline_flat[i] or 1)
 
           screen.pixel(events_rect_x + 1 - rect_gap_adj, arranger_dash_y + 27, 1, 1)
           
