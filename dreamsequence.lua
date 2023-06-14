@@ -2968,7 +2968,6 @@ function generate_dash()
   -- iterate through arranger segments to grab their step lengths
   -- might also iterate in reverse and do pattern_sticky here using i so it ends up with the active pattern for later in the script
 
-  -- record the remaining steps in the active segment if arranger is active
   pattern_sticky = arranger_active == true and pattern or arranger_seq_padded[arranger_seq_position_min1] -- todo p1 make local after verification
   if arranger_active then 
     steps_sticky = (math.max(chord_pattern_length[pattern_sticky] - math.max((chord_seq_position or 1) - 1, 0), 0)) -- steps remaining in active segment
@@ -3032,7 +3031,14 @@ function generate_dash()
           for s = i == arranger_seq_position and chord_seq_position_sticky or 1, steps do
           
             if events_count > 23 then break end -- kinda redundant with if statement above but does chop the length down a bit I think on long patterns
-            table.insert(arranger_dash_flat, pattern_sticky)
+            -- table.insert(arranger_dash_flat, pattern_sticky)
+            
+            -- attempt to lock down pattern_sticky jfc
+            if arranger_active == false and i == arranger_seq_position then -- print(pattern_sticky) end
+              table.insert(arranger_dash_flat, 0)
+            else
+              table.insert(arranger_dash_flat, pattern_sticky)
+            end
             
             -- check for 3 states:
             -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
@@ -3573,7 +3579,8 @@ function redraw()
       --------------------------------------------      
       screen.move(dash_x + 3,arranger_dash_y + 9)
       if params:string('arranger_enabled') == 'True' and arranger_active == false then
-        screen.text('T-' .. chord_pattern_length[pattern] - chord_seq_position + 1)
+        -- screen.text('T-' .. chord_pattern_length[pattern] - chord_seq_position + 1)
+        screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '.-' .. chord_pattern_length[pattern] - chord_seq_position + 1)
       else          
         screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
       end         
