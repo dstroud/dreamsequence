@@ -36,7 +36,7 @@ function init()
   crow.ii.jf.mode(1)
   -- Turn off built-in Crow clock so it doesn't conflict with ours which only fires when transport is running.
   params:set('clock_crow_out', 1)
-  
+
   
   -- midi stuff
   midi_device = {} -- container for connected midi devices
@@ -266,6 +266,7 @@ function init()
   
   clock_start_method = 'start'
   global_clock_div = 48
+  -- steps_remaining_in_active_pattern = 0
 
   -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
@@ -1197,19 +1198,26 @@ function calc_percent_step_elapsed()
   -- -- print('DEBUG FROM calc_percent_step_elapsed: chord_div ' .. chord_div)
 
 
-
-
-  -- todo p1: set this up so seconds_remaining_in_arrangement always updates but percent_step_elapsed freezes
+  -- todo p1: Desired behavior is to back out the interrupted segment's contribution to seconds_remaining_in_arrangement. Right now it locks it in but adjusts for upcoming segment change
   -- if arranger_seq_position == 0 then percent_step_elapsed = 0
   -- elseif arranger_active then
   --   percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
   -- end
   if arranger_active then -- or arranger_seq_position == 0 then -- 2023-06-14 updated to refresh when arranger is reset, even if inactive
     percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
-  end
-    -- todo p0: verify this actually works
     seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0))
-    
+  else
+    -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0) - steps_remaining_in_active_pattern or 0)
+    seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - steps_remaining_in_active_pattern or 0)
+
+  end
+  
+  -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0))
+  
+    -- if arranger_active then
+      
+    -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0) - (arranger_active or false) and steps_remaining_in_active_pattern or 0)
+
   -- print('DEBUG FROM calc_percent_step_elapsed: chord_div ' .. chord_div)
   
 end
@@ -2943,6 +2951,7 @@ function gen_dash(source)
   dash_events = {}
   dash_steps = 0 -- todo p2 make local again if not being used instead of #dash_patterns in redraw
   -- steps_remaining_in_pattern = 0
+  steps_remaining_in_active_pattern = 0
   steps_remaining_in_arrangement = 0
   arranger_seq_position_min_1 = math.max(arranger_seq_position, 1) -- for reset state todo p2 make local
 
@@ -2974,7 +2983,12 @@ function gen_dash(source)
       pattern_sticky = active_pattern
       chord_pattern_length_sticky = active_chord_pattern_length
       chord_seq_position_sticky = active_chord_seq_position
-      steps_remaining_in_pattern = math.max(active_chord_pattern_length - math.max((active_chord_seq_position or 1) - 1, 0), 0)
+      -- steps_remaining_in_pattern = math.max(active_chord_pattern_length - math.max((active_chord_seq_position or 1) - 1, 0), 0)
+      
+      local steps_incr = math.max(active_chord_pattern_length - math.max((active_chord_seq_position or 1) - 1, 0), 0)
+      steps_remaining_in_pattern = steps_incr
+      steps_remaining_in_active_pattern = steps_remaining_in_active_pattern + steps_incr
+
     else -- upcoming segments always grab their current values from arranger
       pattern_sticky = arranger_seq_padded[i]
       chord_pattern_length_sticky = chord_pattern_length[pattern_sticky]
@@ -2994,13 +3008,8 @@ function gen_dash(source)
         end -- second length check for each step iteration cuts down on what is saved for long segments
         table.insert(dash_patterns, pattern_sticky)
         table.insert(dash_levels, segment_level)
-        -- if events[i].populated or 0) > 0 then -- todo p1: someting is up with the following line. Seeing if this helps but IDK how to reproduce.
-          table.insert(dash_events, ((events[i][s].populated or 0) > 0) and math.min(segment_level + 1, 15) or 1)
-        -- end
+        table.insert(dash_events, ((events[i][s].populated or 0) > 0) and math.min(segment_level + 1, 15) or 1)
         dash_steps = dash_steps + 1
-        -- print('incremented dash_steps to ' .. dash_steps)
-        if dash_steps > 30 then print('dash_steps = ' .. dash_steps) end
-
       end
     -- insert blanks between segments
     table.insert(dash_patterns, 0)
@@ -3356,14 +3365,24 @@ function redraw()
       -- Arranger position readout
       --------------------------------------------      
       screen.move(dash_x + 3,arranger_dash_y + 9)
-      if params:string('arranger_enabled') == 'True' and arranger_active == false then
-        screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+      -- if params:string('arranger_enabled') == 'True' and arranger_active == false then
+      --   screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+      -- else          
+      --   screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
+      --   --DEBUG REMOVE BEFORE RELEASE todo p2
+      --   -- if readout_chord_seq_position ~= chord_seq_position then print('readout_chord_seq_position mismatch ' .. readout_chord_seq_position .. ' vs ' .. chord_seq_position .. ' vs ' .. chord_seq_position_sticky) end
+      -- end         
+      if arranger_active == false then
+        if params:string('arranger_enabled') == 'True' then -- resyncing
+          screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+        else -- disabled
+          screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '...')
+        end
       else          
         screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
         --DEBUG REMOVE BEFORE RELEASE todo p2
         -- if readout_chord_seq_position ~= chord_seq_position then print('readout_chord_seq_position mismatch ' .. readout_chord_seq_position .. ' vs ' .. chord_seq_position .. ' vs ' .. chord_seq_position_sticky) end
-      end         
-      
+      end      
       screen.fill()
       
       
