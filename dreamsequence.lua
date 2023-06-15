@@ -36,7 +36,6 @@ function init()
   crow.ii.jf.mode(1)
   -- Turn off built-in Crow clock so it doesn't conflict with ours which only fires when transport is running.
   params:set('clock_crow_out', 1)
-
   
   -- midi stuff
   midi_device = {} -- container for connected midi devices
@@ -337,7 +336,7 @@ function init()
   steps_remaining_in_arrangement = 0
   elapsed = 0
   percent_step_elapsed = 0
-  seconds_remaining_in_arrangement = 0
+  seconds_remaining = 0
   chord_no = 0
   arranger_loop_key_count = 0    
   pattern_keys = {}
@@ -453,7 +452,7 @@ function init()
     -- Reset arranger or pattern
     reset_external_clock() -- todo: check if this fires when syncing externally
     if sequence_clock_id ~= nil then
-      print('Canceling clock_id ' .. (sequence_clock_id or 0))
+      print('PSET READ canceling sequence_clock_id ' .. (sequence_clock_id or 0))
       clock.cancel(sequence_clock_id)-- or 0)
     end
     stop = false
@@ -502,9 +501,29 @@ countdown_timer = metro.init()
 countdown_timer.event = countdown -- call the 'countdown' function below,
 countdown_timer.time = .1 -- 1/10s
 countdown_timer.count = -1 -- for.evarrr
-  
+
+--thanks @dndrks for this little bit of magic to check crow version!
+norns.crow.events.version = function(...)
+  crow_version = ...
+end
+crow.version() -- now redefined to perform the above!
+crow_version_clock = clock.run(
+  function()
+    clock.sleep(0.005) -- a small hold for usb round-trip
+    if crow_version ~= nil then
+      local crow_major_version = find_number(crow_version)
+      if crow_version == 'v3.0.1' then
+        print('Crow v.3.0.1 detected')
+      elseif crow_major_version > 3 then 
+        print('---- Crow ' .. crow_version .. ' detected. PLEASE DOWNGRADE TO CROW v3.0.1 TO USE WITH DREAMSEQUENCE----')
+      else
+        print('---- Crow ' .. crow_version .. ' detected. PLEASE UPGRADE TO CROW v3.0.1 TO USE WITH DREAMSEQUENCE----')
+      end
+    end
+  end
+)
+
 grid_redraw()
--- percent_step_elapsed()
 redraw()
 end
 
@@ -610,10 +629,10 @@ end
 -- end
   
   
--- -- return first number from a string
--- function find_number(string)
---   return tonumber(string.match (string, "%d+"))
--- end
+-- return first number from a string
+function find_number(string)
+  return tonumber(string.match (string, "%d+"))
+end
   
   
 -- -- return .pset number as string assuming format is 'dreamsequence-xxxx.pset'
@@ -1111,7 +1130,7 @@ function sequence_clock()
           clock_step = clock_step - 1, 0 -- min?
           -- print('clock_step reset to ' .. clock_step)
           transport_multi_stop()
-          print('Canceling clock_id ' .. (sequence_clock_id or 0))
+          print('STOP canceling sequence_clock_id ' .. (sequence_clock_id or 0))
           clock.cancel(sequence_clock_id)-- or 0)
           transport_active = false
           stop = false
@@ -1120,7 +1139,7 @@ function sequence_clock()
       else -- External clock_source. No quantization. Just resets pattern/arrangement
         transport_multi_stop()  
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
-        print('Canceling clock_id ' .. (sequence_clock_id or 0))
+        print('EXTERNAL canceling sequence_clock_id ' .. (sequence_clock_id or 0))
         clock.cancel(sequence_clock_id)-- or 0)
         
         if arranger_active then
@@ -1180,61 +1199,20 @@ function sequence_clock()
 end
 
 
-function calc_percent_step_elapsed()
-  -- -- todo p1: set this up so seconds_remaining_in_arrangement always updates but percent_step_elapsed freezes
-  -- -- if arranger_seq_position == 0 then percent_step_elapsed = 0
-  -- -- elseif arranger_active then
-  -- --   percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
-  -- -- end
-  -- if arranger_active then -- or arranger_seq_position == 0 then -- 2023-06-14 updated to refresh when arranger is reset, even if inactive
-  --   percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
-    
-  --   -- todo p0: verify this actually works
-  --   seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - percent_step_elapsed)
-  -- end  
-  -- -- print('DEBUG FROM calc_percent_step_elapsed: chord_div ' .. chord_div)
-
-
-  -- todo p1: Desired behavior is to back out the interrupted segment's contribution to seconds_remaining_in_arrangement. Right now it locks it in but adjusts for upcoming segment change
-  -- if arranger_seq_position == 0 then percent_step_elapsed = 0
-  -- elseif arranger_active then
-  --   percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
-  -- end
-  if arranger_active then -- or arranger_seq_position == 0 then -- 2023-06-14 updated to refresh when arranger is reset, even if inactive
+function calc_seconds_remaining()
+  if arranger_active then
     percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
-    seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0))
+    seconds_remaining = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0))
   else
-    -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0) - steps_remaining_in_active_pattern or 0)
-    seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - steps_remaining_in_active_pattern or 0)
-
+    seconds_remaining = chord_steps_to_seconds(steps_remaining_in_arrangement - steps_remaining_in_active_pattern or 0)
   end
-  
-  -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0))
-  
-    -- if arranger_active then
-      
-    -- seconds_remaining_in_arrangement = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0) - (arranger_active or false) and steps_remaining_in_active_pattern or 0)
-
-  -- print('DEBUG FROM calc_percent_step_elapsed: chord_div ' .. chord_div)
-  
-end
+  seconds_remaining = s_to_min_sec(math.ceil(seconds_remaining))
+  end
 
 
 -- Clock used to redraw screen 10x a second for arranger countdown timer
--- todo: convert to metro
--- To-do: Ideally only needs to fire once a second but the potential for it to get out of sync (tempo changes, reset, Generator) causes issues.
--- Might create a reinitialization function to call when needed (param actions and when resetting etc...)
--- function seconds_clock()
---   while true do
---     calc_percent_step_elapsed()
---     redraw()
---     clock.sleep(.1)
---   end
--- end
-
-
 function countdown()
-  calc_percent_step_elapsed()
+  calc_seconds_remaining()
   redraw()  
 end  
     
@@ -1295,15 +1273,14 @@ function clock.transport.start()
   transport_active = true
   
   -- Clock for note duration, note-off events
+  print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
   clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
   
   -- Clock for chord/arp/arranger sequences
   sequence_clock_id = clock.run(sequence_clock)
   
-  --Clock used to refresh screen once a second for the arranger countdown timer
-  -- clock.cancel(seconds_clock_id or 0) 
-  -- seconds_clock_id = clock.run(seconds_clock)
+  --Clock used to refresh screen 10x a second for the arranger countdown timer
   countdown_timer:start()
   
 end
@@ -2774,8 +2751,31 @@ function enc(n,d)
       d_cuml = d_cuml + d
       arranger_seq_length = util.clamp(arranger_seq_length_og + d_cuml, 1, max_arranger_seq_length)
 
+      -- -- Shifting pattern to the right and opening up blank(s)
+      -- if d > 0 then
+      --   local d = 1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
+      --   for i = max_arranger_seq_length, 1, -1 do -- Process in reverse
+      --     if i >= event_edit_pattern_og + d_cuml then
+      --       arranger_seq[i] = arranger_seq_og[i - d_cuml]
+      --       events[i] = deepcopy(events_og[i - d_cuml])
+            
+      --     elseif i >= event_edit_pattern_og and i < event_edit_pattern_og + d_cuml then
+      --       arranger_seq[i] = 0
+      --       for s = 1,8 do -- To-do: hardcoded number of steps will eventually be extended
+      --         events[i][s] = {}
+      --         events[i].populated = nil 
+      --       end
+            
+      --     elseif i < event_edit_pattern_og then
+      --       arranger_seq[i] = arranger_seq_og[i]
+      --       events[i] = deepcopy(events_og[i])
+      --     end
+          
+      --   end
+
       -- Shifting pattern to the right and opening up blank(s)
       if d > 0 then
+        -- arranger_seq_
         local d = 1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
         for i = max_arranger_seq_length, 1, -1 do -- Process in reverse
           if i >= event_edit_pattern_og + d_cuml then
@@ -2795,6 +2795,8 @@ function enc(n,d)
           end
           
         end
+        
+        
       -- Shifting pattern to the left and overwriting existing patterns
       elseif d < 0 then
         local d = -1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
@@ -2817,6 +2819,7 @@ function enc(n,d)
         
         end
       end
+      
     generate_arranger_seq_padded()
     grid_redraw()
     end
@@ -3025,28 +3028,8 @@ function gen_dash(source)
     dash_steps = dash_steps + 1 -- and 1 to grow on!
     end
   end
-  calc_percent_step_elapsed()
+  calc_seconds_remaining()
 end
-
-
-
--- function test(cycles)
-
---   nClock = os.clock()
---   for i = 1, cycles do
---     test_var = dash_steps
---   end
---   print("Test 1 elapsed time: " .. os.clock()-nClock)
-
---   nClock = os.clock()
---   for i = 1, cycles do
---     test_var = #dash_patterns
---   end
---   print("Test 2 elapsed time: " .. os.clock()-nClock)
-  
--- --   Test 1 elapsed time: 0.109354
--- --   Test 2 elapsed time: 0.122072
--- end
 
 
 function redraw()
@@ -3352,7 +3335,7 @@ function redraw()
 
       -- Bottom left
       screen.move(dash_x +3, arranger_dash_y + 36)
-      screen.text(s_to_min_sec(math.ceil(seconds_remaining_in_arrangement)))      
+      screen.text(seconds_remaining)
       
       -- Arranger mode glyph
       screen.level(0)
