@@ -337,14 +337,6 @@ function init()
   steps_remaining_in_arrangement = 0
   elapsed = 0
   percent_step_elapsed = 0
-  -- clock_step = -1 -- todo p3: check if needed
-  -- print('CHORD DIV ' .. chord_div)
-  -- percent_step_elapsed()
-  
-  -- if arranger_active then
-  -- percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
-  -- end
-  
   seconds_remaining_in_arrangement = 0
   chord_no = 0
   arranger_loop_key_count = 0    
@@ -506,6 +498,11 @@ params:bang()
 -- Some actions need to be added post-bang
 params:set_action('mode', function() update_chord_action() end)
 
+countdown_timer = metro.init()
+countdown_timer.event = countdown -- call the 'countdown' function below,
+countdown_timer.time = .1 -- 1/10s
+countdown_timer.count = -1 -- for.evarrr
+  
 grid_redraw()
 -- percent_step_elapsed()
 redraw()
@@ -1227,17 +1224,24 @@ end
 -- todo: convert to metro
 -- To-do: Ideally only needs to fire once a second but the potential for it to get out of sync (tempo changes, reset, Generator) causes issues.
 -- Might create a reinitialization function to call when needed (param actions and when resetting etc...)
-function seconds_clock()
-  while true do
-    calc_percent_step_elapsed()
-    redraw()
-    clock.sleep(.1)
-  end
-end
+-- function seconds_clock()
+--   while true do
+--     calc_percent_step_elapsed()
+--     redraw()
+--     clock.sleep(.1)
+--   end
+-- end
+
+
+function countdown()
+  calc_percent_step_elapsed()
+  redraw()  
+end  
     
     
 -- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic
 -- Unlike the sequence_clock, this continues to run after transport stops in order to turn off playing notes
+-- todo p3: This should probably serve as the main clock and have sequence_clock sync to it?
 function timing_clock()
   while true do
     clock.sync(1/global_clock_div)
@@ -1255,7 +1259,6 @@ function timing_clock()
       disting_note_history[i][1] = disting_note_history[i][1] - 1
       if disting_note_history[i][1] == 0 then
         -- print('note_off')
-        -- out_midi:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- note, vel, ch.
         crow.ii.disting.note_off(disting_note_history[i][2])
         table.remove(disting_note_history, i)
       end
@@ -1299,8 +1302,10 @@ function clock.transport.start()
   sequence_clock_id = clock.run(sequence_clock)
   
   --Clock used to refresh screen once a second for the arranger countdown timer
-  clock.cancel(seconds_clock_id or 0) 
-  seconds_clock_id = clock.run(seconds_clock)
+  -- clock.cancel(seconds_clock_id or 0) 
+  -- seconds_clock_id = clock.run(seconds_clock)
+  countdown_timer:start()
+  
 end
 
 
@@ -2975,7 +2980,7 @@ function gen_dash(source)
       if arranger_active == true then
         active_pattern = pattern
         active_chord_pattern_length = chord_pattern_length[active_pattern]
-        active_chord_seq_position = math.max((chord_seq_position or 1))
+        active_chord_seq_position = math.max(chord_seq_position, 1)
         segment_level = 15
       else
         segment_level = 2 -- interrupted segment pattern, event pips add +1 for better contrast
@@ -3002,7 +3007,9 @@ function gen_dash(source)
     
     -- todo p3 some sort of weird race condition is happening that requires nil check on events
     if events ~= nil and dash_steps < 30 then -- capped so we only store what is needed for the dash (including inserted blanks)
-      for s = chord_seq_position_sticky, chord_pattern_length_sticky do
+      for s = chord_seq_position_sticky, chord_pattern_length_sticky do -- todo p0 this is letting 0 values through
+        -- print('chord_seq_position_sticky = ' .. chord_seq_position_sticky)
+        -- print('chord_pattern_length_sticky = ' .. chord_pattern_length_sticky)
         if dash_steps == 30 then
          break 
         end -- second length check for each step iteration cuts down on what is saved for long segments
@@ -3365,23 +3372,28 @@ function redraw()
       -- Arranger position readout
       --------------------------------------------      
       screen.move(dash_x + 3,arranger_dash_y + 9)
-      -- if params:string('arranger_enabled') == 'True' and arranger_active == false then
-      --   screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
-      -- else          
-      --   screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
-      --   --DEBUG REMOVE BEFORE RELEASE todo p2
-      --   -- if readout_chord_seq_position ~= chord_seq_position then print('readout_chord_seq_position mismatch ' .. readout_chord_seq_position .. ' vs ' .. chord_seq_position .. ' vs ' .. chord_seq_position_sticky) end
-      -- end         
-      if arranger_active == false then
-        if params:string('arranger_enabled') == 'True' then -- resyncing
-          screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
-        else -- disabled
-          screen.text(math.min(arranger_seq_position + 1, arranger_seq_length) .. '...')
+
+      if arranger_seq_position == 0 then
+        if arranger_queue == nil then
+          screen.text('RST')
+        elseif arranger_active == false then
+          screen.text((arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+        else
+          screen.text(arranger_queue .. '.0')
         end
-      else          
+      elseif arranger_active == false then
+        if arranger_seq_position == arranger_seq_length then
+          if params:string('playback') == "Loop"  then
+            screen.text('LP.' .. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+          else
+            screen.text('ST.' .. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+          end
+        else
+          screen.text((arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+        end
+      else
         screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
-        --DEBUG REMOVE BEFORE RELEASE todo p2
-        -- if readout_chord_seq_position ~= chord_seq_position then print('readout_chord_seq_position mismatch ' .. readout_chord_seq_position .. ' vs ' .. chord_seq_position .. ' vs ' .. chord_seq_position_sticky) end
+        
       end      
       screen.fill()
       
