@@ -301,20 +301,24 @@ function init()
   pattern_name = {'A','B','C','D'}
   -- steps_remaining_in_pattern = chord_pattern_length[pattern]
   pattern_queue = false
-  arranger_queue = false
   pattern_copy_performed = false
   arranger_seq_retrig = false
   max_arranger_seq_length = 64 --(64 arranger segments * 8 chord step * 16 event slots = 8192 events... yikes)
-  -- Raw arranger_seq which can contain nils
-  arranger_seq = {1}
+  -- Raw arranger_seq which can contain nils although we're moving away from this I think
+  arranger_seq = {}
+  for segment = 1, max_arranger_seq_length do
+    arranger_seq[segment] = 0
+  end
+  arranger_seq[1] = 1 -- setting this so new users aren't confused about the pattern padding
   -- Version of arranger_seq which generates chord patterns for held segments
   arranger_seq_padded = {}
   arranger_seq_position = 0
   arranger_seq_length = 1
   arranger_grid_offset = 0 -- offset allows us to scroll the arranger grid view beyond 16 segments
-  generate_arranger_seq_padded()  
+  generate_arranger_seq_padded()
+  d_cuml = 0
   events = {}
-  for segment = 1,max_arranger_seq_length do
+  for segment = 1, max_arranger_seq_length do
     events[segment] = {}
     for step = 1,8 do
       events[segment][step] = {}
@@ -490,8 +494,8 @@ function init()
   -- end of PSET callbacks --   
   ---------------------------
 
--- load most recent pset on init
-params:default()
+-- Optional: load most recent pset on init
+-- params:default()
 params:bang()
 
 -- Some actions need to be added post-bang
@@ -1941,146 +1945,96 @@ function grid_redraw()
       ----------------------------------------------------------------------------
       -- Arranger shifting rework here
       ----------------------------------------------------------------------------
-      if arranger_loop_key_count > 0 then -- splitting/shrinking arranger
+      -- todo p3 limit how far off the screen we can shift for when encoders flip out
+      if arranger_loop_key_count > 0 then
         x_draw_shift = 0
-        -- for x = 1, 16 do
-        if d_cuml >= 0 then -- Shifting arranger pattern to the right and opening up blank(s)
-          for x = 16, 1, -1 do
-            x_offset = x + arranger_grid_offset -- todo p1 make local again after fix
-            if x_offset >= event_edit_pattern then
-              x_draw_shift = d_cuml
+        local within_seq = event_edit_pattern <= arranger_seq_length -- some weird stuff needs to be handled if user is shifting events past the end of the pattern length
+        if d_cuml >= 0 then -- Shifting arranger pattern to the right and opening up this many segments between event_edit_pattern and event_edit_pattern + d_cuml
+   
+        ------------------------------------------------
+        -- positive d_cuml shifts arranger to the right and opens a gap
+        ------------------------------------------------
+        -- x_offsets fall into 3 groups:
+        --  >= event_edit_pattern + d_cuml will shift to the right by d_cuml segments
+        --  < event_edit_pattern draw as usual
+        --  Remaining are in the "gap" and we need to grab the previous pattern and repeat it
+          for x = 16, 1, -1 do -- draw from right to left
+            local x_offset = x + arranger_grid_offset -- Grid x + the offset for whatever page or E1 shift is happening
+
+            for y = 1,4 do
+              g:led(x, y, x_offset == arranger_seq_position and 6                                               -- playhead
+                or x_offset == arranger_queue and 4                                                             -- queued
+                or x_offset <= (arranger_seq_length + (within_seq and d_cuml or 0)) and 2                       -- seq length
+                or 0)
             end
 
-            -- playhead, jump point, and sequence length indicator (light fill)
-            if arranger_seq_length >= event_edit_pattern then
-              for y = 1,4 do
-                g:led(x,y, x_offset == arranger_seq_position and 6 or x_offset == arranger_queue and 4 or x_offset <= (arranger_seq_length + x_draw_shift) and 2 or 0)
+            if x_offset >= event_edit_pattern + d_cuml then
+              local x_offset = x_offset - d_cuml
+              for y = 1,4 do -- patterns
+                if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
+                if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
               end
-            else
-              for y = 1,4 do
-                g:led(x,y, x_offset == arranger_seq_position and 6 or x_offset == arranger_queue and 4 or x_offset <= (arranger_seq_length) and 2 or 0)
-              end
-            end
-
-
-            g:led(x, 5, 3) -- set background on the events strip. todo: simplify the events strip drawing as a result?
-
-            -- if x + x_draw_shift >= event_edit_pattern and x + x_draw_shift < 17 then
-            if x >= (event_edit_pattern - arranger_grid_offset) and x + x_draw_shift < 17 then
-              for y = 1,4 do
-                -- patterns
-                if y == arranger_seq[x_offset] then
-                  g:led(x + x_draw_shift, y, 15)
-                end
-              end
+              g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
               
-              -- Events strip
-              g:led(x + x_draw_shift, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7)
-      
-            elseif x < (event_edit_pattern - arranger_grid_offset) then -- and x + x_draw_shift < 17 then
-              for y = 1,4 do
-                -- patterns
-                if y == arranger_seq[x_offset] then
-                  g:led(x, y, 15)
+            elseif x_offset < event_edit_pattern then
+              for y = 1,4 do -- patterns
+                if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
+                if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
+              end
+              g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
+              
+            else
+              -- no need to do anything with patterns if extending beyond arranger_seq_length
+              if within_seq then
+                local pattern_padded = arranger_seq_padded[math.max(event_edit_pattern - 1, 1)]
+                for y = 1,4 do -- patterns
+                  if y == pattern_padded then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end
                 end
               end
-              -- Events strip
-              g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7)
+              -- can still move around events even if they are beyond the current sequence
+              g:led(x, 5, x_offset > arranger_seq_length + d_cuml and 3 or 7) -- events
+            end
+          end  
             
-            end -- if x >= whatever
-            
-          end -- of 16,1 reverse drawing for positive d_cuml
         
-        -----------------------------------
-        ---- negative shift to the left
-        -----------------------------------
-        else --d_cuml < 0
-          
-              -- for y = 1,4 do
-              --   if y == arranger_seq[x_offset] then --left shift
-              --   -- if x is >= event_edit_pattern then shift to the left
-              --   -- if x is < event_edit_pattern - d_cuml then draw as usual
-              --   -- if x is between, don't draw because it needs to be overwritten by #1
-              --     if x_offset >= event_edit_pattern and x + d_cuml > 0 then
-              --       x_draw_shift = d_cuml
-              --       g:led(x + x_draw_shift, y, 15)
-              --     elseif x_offset < (event_edit_pattern + d_cuml) then
-              --       g:led(x, y, 15)
-              --     end
-              --   end
-              -- end
-              
+        ------------------------------------------------
+        -- negative d_cuml shifts arranger to the left
+        ------------------------------------------------
+        -- x_offsets fall into 2 groups:
+        --  >= event_edit_pattern + d_cuml will shift to the left by d_cuml segments
+        --  < event_edit_pattern + d_cuml are drawn as usual
+        else
           for x = 1, 16 do
-            x_offset = x + arranger_grid_offset -- todo p1 make local again after fix
-            if x_offset >= event_edit_pattern then
-              x_draw_shift = d_cuml -- does this still make sense for the negative shift? I think so since these segments are the ones being shifted
-            end
-
-            g:led(x, 5, 3) -- fill in events dimly because IDK what is going on at this point
-
-            -- playhead, jump point, and sequence length indicator (light fill)
-            if arranger_seq_length >= event_edit_pattern then
-              -- if x == 4 then print(1) end
-              for y = 1,4 do
-                g:led(x,y, x_offset == arranger_seq_position and 6 or x_offset == arranger_queue and 4 or x_offset <= (arranger_seq_length + d_cuml) and 2 or 0)
-              end
-            elseif arranger_seq_length >= (event_edit_pattern + d_cuml) then
-              -- if x == 4 then print(2) end
-              for y = 1,4 do
-                g:led(x,y, x_offset == arranger_seq_position and 6 or x_offset == arranger_queue and 4 or x_offset < (event_edit_pattern + d_cuml) and 2 or 0)
-              end
-            else
-              -- if x == 4 then print(3) end
-              for y = 1,4 do
-                g:led(x,y, x_offset == arranger_seq_position and 6 or x_offset == arranger_queue and 4 or x_offset <= (arranger_seq_length) and 2 or 0)
-              end              
-            end
-
-
-            -- stuff to the right of edit point
-            -- if x >= (event_edit_pattern - arranger_grid_offset) and x + x_draw_shift < 17 then
-            if x >= (event_edit_pattern - arranger_grid_offset) and (x + x_draw_shift) > 0 then
-              for y = 1,4 do
-                -- patterns
-                if y == arranger_seq[x_offset] then
-                  g:led(x + x_draw_shift, y, 15)
-                end
-                -- g:led(x, 5, 3)
-                
-                -- events got here somehow. Not shifting over arranger segments from page 2 to page 1. Think we need to switch from operating on the draw to operating on the events table
-                -- if x + x_draw_shift > 0 then -- and x + x_draw_shift < 17 then -- todo p1 not shifting over from page 2 to page 1
-                  -- g:led(x + x_draw_shift, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7)
-                  g:led(x, 5, (events[x_offset - d_cuml] ~= nil and events[x_offset - d_cuml].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7)
-                                    
-                -- end
-    
-              end
-              
-
-            -- stuff to the left of the edit point that hasn't been drawn over yet
-            elseif x < (event_edit_pattern - arranger_grid_offset + d_cuml) then -- and x + x_draw_shift < 17 then.  todo why is this a minus ehh?
-              for y = 1,4 do
-                -- patterns
-                if y == arranger_seq[x_offset] then
-                  g:led(x, y, 15)
-                end
-              end
-              -- Events strip
-              if x < (event_edit_pattern + arranger_grid_offset + d_cuml) then -- and x + x_draw_shift < 17 then
-                g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7)
-              end
-            else
-              g:led(x, 5, (events[x_offset - d_cuml] ~= nil and events[x_offset - d_cuml].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7)
-
-            end -- if x >= whatever
+            local x_offset = x + arranger_grid_offset -- Grid x + the offset for whatever page or E1 shift is happening
             
-          end -- of 1,16 drawing for negative d_cuml              
-          
+            -- draw playhead, arranger_queue, adjusted sequence length, blanks
+            if within_seq then
+              for y = 1,4 do 
+                g:led(x, y, x_offset == arranger_seq_position and 6                                             -- playhead
+                  or x_offset == arranger_queue and 4                                                           -- queued
+                  or x_offset <= (arranger_seq_length + d_cuml) and 2                                           -- seq length
+                  or 0)                                    
+              end
+            else
+              for y = 1,4 do
+                g:led(x, y, x_offset == arranger_seq_position and 6                                             -- playhead
+                  or x_offset == arranger_queue and 4                                                           -- queued
+                  or x_offset <= arranger_seq_length and x_offset < (d_cuml + event_edit_pattern) and 2         -- seq length
+                  or 0)
+              end              
+            end  
+
+            -- Redefine x_offset only for group #1: patterns that need to be shifted left. Group 2 will be handled as usual
+            local x_offset = (x_offset >= event_edit_pattern + d_cuml) and (x_offset - d_cuml) or x_offset
+            for y = 1,4 do -- patterns
+              if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
+              if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
+            end
+            g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
+          end -- of drawing for negative d_cuml shift              
         end
-      else -- no shrink/grow happening
       
-      ----------------------------------------------------------------------------
-      
+      else -- arranger_loop_key_count == 0: no arranger shifting
         for x = 1, 16 do
           local x_offset = x + arranger_grid_offset
           for y = 1,4 do
@@ -2094,7 +2048,6 @@ function grid_redraw()
       end
   
 
-        
       g:led(1,8, params:get('arranger_enabled') == 1 and 15 or 4)
       -- Optionally: Arranger enable/disable key has 3 states. on/re-sync/off
       -- if params:get('arranger_enabled') == 1 then
@@ -2263,19 +2216,13 @@ function g.key(x,y,z)
       elseif y == 5 then
         arranger_loop_key_count = arranger_loop_key_count + 1
 
-        -- Initial key down copies stuff. First touched pattern is the one we edit, effectively resetting on key_count = 0
+        -- First touched pattern is the one we edit, effectively resetting on key_count = 0
         if arranger_loop_key_count == 1 then
           event_edit_pattern = x_offset
 
-          -- Store original arranger sequence values so we can have non-destructive pattern shifting using ENC 3
-          d_cuml = 0
-          arranger_seq_length_og = arranger_seq_length
-          arranger_seq_og = deepcopy(arranger_seq)
-          events_og = deepcopy(events)
-          event_edit_pattern_og = event_edit_pattern
-
         -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
-        else
+        -- d_cuml == 0 blocks copy+paste from occurring if we're in the midst of using E3 to do a pattern shift (since that is technically a "preview"). Corner case here is that user can shift the pattern back to d_cuml == 0 and then copy and paste, which is fine but might raise questions about why they can't past to other seeminly valid spots.
+        elseif d_cuml == 0 then
           events[x_offset] = deepcopy(events[event_edit_pattern])
           print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
           gen_dash('Event copy+paste')
@@ -2435,20 +2382,44 @@ function g.key(x,y,z)
       -- Arranger loop strip
       if y == 5 then
         arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
+        
+        
+        -- Insert/remove patters/events after arranger shift with K3
+        -- todo p1 page-change mid shift
+        -- not initializing .populated fields in events but it seems fine AFAIK
+        if arranger_loop_key_count == 0 then --only do the copy after the last key is released so we don't keep resetting d_cuml if multiple events are held for some reason
+          if d_cuml > 0 then
+            for i = 1, d_cuml do
+              table.insert(arranger_seq, event_edit_pattern, 0)
+              table.remove(arranger_seq, max_arranger_seq_length + 1)
+              table.insert(events, event_edit_pattern, nil)
+              events[event_edit_pattern] = {{},{},{},{},{},{},{},{}}
+              table.remove(events, max_arranger_seq_length + 1)
+            end
+            generate_arranger_seq_padded()
+            d_cuml = 0
+  
+          elseif d_cuml < 0 then
+            for i = 1, math.abs(d_cuml) do
+              table.remove(arranger_seq, math.max(event_edit_pattern - i, 1))
+              table.insert(arranger_seq, 0)
+              table.remove(events, math.max(event_edit_pattern - i, 1))
+              table.insert(events, {})
+            end
+            generate_arranger_seq_padded()
+            d_cuml = 0
+          end       
+        end
+        
       end
     end
-    
-  -- -- GRID VIEW SWITCHER KEYS  
-  -- if x == 16 and y > 5 then
-  --   view_key_count = view_key_count - 1
-  -- end
   
-  if pattern_key_count == 0 then
-    pattern_copy_performed = false
+    if pattern_key_count == 0 then
+      pattern_copy_performed = false
+    end
   end
-end
-redraw()
-grid_redraw()
+  redraw()
+  grid_redraw()
 end
 
 
@@ -2894,82 +2865,9 @@ function enc(n,d)
   -- moving from arranger keys 1-4 to the arranger loop strip on row 5. This still trips me up but avoids weirdness around handling dual-use keypress (enable/disable vs. entering event editor)
   elseif grid_view_name == 'Arranger' and arranger_loop_key_count > 0 then
     -- Arranger segment detail options are on-screen
-    if arranger_loop_key_count > 0 then -- redundant?
-      d_cuml = d_cuml + d
-      -- arranger_seq_length = util.clamp(arranger_seq_length_og + d_cuml, 1, max_arranger_seq_length)
-
-      -- -- Shifting pattern to the right and opening up blank(s)
-      -- if d > 0 then
-      --   local d = 1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
-      --   for i = max_arranger_seq_length, 1, -1 do -- Process in reverse
-      --     if i >= event_edit_pattern_og + d_cuml then
-      --       arranger_seq[i] = arranger_seq_og[i - d_cuml]
-      --       events[i] = deepcopy(events_og[i - d_cuml])
-            
-      --     elseif i >= event_edit_pattern_og and i < event_edit_pattern_og + d_cuml then
-      --       arranger_seq[i] = 0
-      --       for s = 1,8 do -- To-do: hardcoded number of steps will eventually be extended
-      --         events[i][s] = {}
-      --         events[i].populated = nil 
-      --       end
-            
-      --     elseif i < event_edit_pattern_og then
-      --       arranger_seq[i] = arranger_seq_og[i]
-      --       events[i] = deepcopy(events_og[i])
-      --     end
-          
-      --   end
-
-      -- -- Shifting pattern to the right and opening up blank(s)
-      -- if d > 0 then
-        -- local d = 1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
-      --   for i = max_arranger_seq_length, 1, -1 do -- Process in reverse
-      --     if i >= event_edit_pattern_og + d_cuml then
-      --       arranger_seq[i] = arranger_seq_og[i - d_cuml]
-      --       events[i] = deepcopy(events_og[i - d_cuml])
-            
-      --     elseif i >= event_edit_pattern_og and i < event_edit_pattern_og + d_cuml then
-      --       arranger_seq[i] = 0
-      --       for s = 1,8 do -- To-do: hardcoded number of steps will eventually be extended
-      --         events[i][s] = {}
-      --         events[i].populated = nil 
-      --       end
-            
-      --     elseif i < event_edit_pattern_og then
-      --       arranger_seq[i] = arranger_seq_og[i]
-      --       events[i] = deepcopy(events_og[i])
-      --     end
-          
-        -- end
-        
-        
-      -- -- Shifting pattern to the left and overwriting existing patterns
-      -- elseif d < 0 then
-      --   local d = -1 -- Addresses some weirdness if encoder delta is more than 1 increment that I don't want to troubleshoot LOL
-      --   for i = 1, max_arranger_seq_length do
-          
-      --     -- if arranger column is >= the newly-shifted pattern, shift over arranger_seq and events.
-      --     -- if the shift exceeds what is in events_og, it will deepcopy over nothing which kinda breaks stuff
-      --     if i >= event_edit_pattern_og + d_cuml then
-      --       arranger_seq[i] = arranger_seq_og[i - d_cuml]
-      --       events[i] = deepcopy(events_og[i - d_cuml])
-      --     end
-          
-      --     -- 2023-04-11 adding something to pad out blank events after deep copy since redraw+others break if missing
-      --     if events[i] == nil then
-      --       events[i] = {}
-      --         for step = 1,8 do -- needs to be expanded eventually for more than 8 steps
-      --           events[i][step] = {}
-      --         end
-      --     end
-        
-      --   end
-      -- end
-      
-    -- generate_arranger_seq_padded()
+    d_cuml = d_cuml + d -- ~= 0 value here will also be used to block event copy+paste
     grid_redraw()
-    end
-   
+
     elseif screen_view_name == 'Session' then
       if menu_index == 0 then
         menu_index = 0
