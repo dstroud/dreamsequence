@@ -265,7 +265,6 @@ function init()
   
   clock_start_method = 'start'
   global_clock_div = 48
-  -- steps_remaining_in_active_pattern = 0
 
   -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
@@ -317,6 +316,7 @@ function init()
   arranger_grid_offset = 0 -- offset allows us to scroll the arranger grid view beyond 16 segments
   generate_arranger_seq_padded()
   d_cuml = 0
+  interaction = nil
   events = {}
   for segment = 1, max_arranger_seq_length do
     events[segment] = {}
@@ -360,7 +360,6 @@ function init()
     end
   end
   chord_seq_position = 0
-  readout_chord_seq_position = 0
   chord = {}
   -- chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
   current_chord_o = 0
@@ -466,7 +465,6 @@ function init()
     pattern_queue = false
     arp_seq_position = 0
     chord_seq_position = 0
-    readout_chord_seq_position = 0
     arranger_seq_position = 0
     pattern = arranger_seq_padded[1]
     get_next_chord()
@@ -526,6 +524,7 @@ crow_version_clock = clock.run(
     end
   end
 )
+-- clock.cancel(crow_version_clock) -- todo research: not sure if it's even necessary to cancel all these clocks or if we just need to break the coroutines?
 
 grid_redraw()
 redraw()
@@ -1316,7 +1315,6 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
-  readout_chord_seq_position = 0
   arranger_seq_position = 0
   
   if arranger_seq[1] > 0 then pattern = arranger_seq[1] end
@@ -1399,10 +1397,9 @@ function advance_chord_seq()
       chord_seq_position = util.wrap(chord_seq_position + 1, 1, chord_pattern_length[pattern])
     end
 
-    if arranger_active then 
-      readout_chord_seq_position = chord_seq_position
-      gen_dash('advance_chord_seq') --wag on placement here
+    if arranger_active then
       do_events()
+      gen_dash('advance_chord_seq')
     end
     
     update_chord()
@@ -1526,7 +1523,7 @@ function spread_chord()
 end
 
 
--- Simpler chord update that just picks up the current mode (for mode param action)
+-- This triggers when mode param changes and allows arp and harmonizers to pick up the new mode immediately. Doesn't affect the chords and doesn't need chord transformations since the chord advancement will overwrite
 function update_chord_action()
   chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
   next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
@@ -1967,13 +1964,17 @@ function grid_redraw()
                 or x_offset <= (arranger_seq_length + (within_seq and d_cuml or 0)) and 2                       -- seq length
                 or 0)
             end
-
+            
+            -- group 1.
             if x_offset >= event_edit_pattern + d_cuml then
               local x_offset = x_offset - d_cuml
               for y = 1,4 do -- patterns
-                if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
+                if within_seq then
+                  if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
+                end
                 if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
               end
+              -- if x == 3 then print('1') end
               g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
               
             elseif x_offset < event_edit_pattern then
@@ -1981,18 +1982,21 @@ function grid_redraw()
                 if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
                 if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
               end
+              -- if x == 3 then print('2') end
               g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
               
             else
               -- no need to do anything with patterns if extending beyond arranger_seq_length
+              -- can still move around events beyond
               if within_seq then
                 local pattern_padded = arranger_seq_padded[math.max(event_edit_pattern - 1, 1)]
                 for y = 1,4 do -- patterns
                   if y == pattern_padded then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end
                 end
+                g:led(x, 5, 7)
+              else
+                g:led(x, 5, 3)
               end
-              -- can still move around events even if they are beyond the current sequence
-              g:led(x, 5, x_offset > arranger_seq_length + d_cuml and 3 or 7) -- events
             end
           end  
             
@@ -2116,7 +2120,7 @@ end
 -- GRID KEYS
 function g.key(x,y,z)
   if z == 1 then
-    
+
     if screen_view_name == 'Events' then
       -- Setting of events past the pattern length is permitted
       event_key_count = event_key_count + 1
@@ -2221,8 +2225,8 @@ function g.key(x,y,z)
           event_edit_pattern = x_offset
 
         -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
-        -- d_cuml == 0 blocks copy+paste from occurring if we're in the midst of using E3 to do a pattern shift (since that is technically a "preview"). Corner case here is that user can shift the pattern back to d_cuml == 0 and then copy and paste, which is fine but might raise questions about why they can't past to other seeminly valid spots.
-        elseif d_cuml == 0 then
+        -- arranger shift interaction will block this
+        elseif interaction == nil then
           events[x_offset] = deepcopy(events[event_edit_pattern])
           print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
           gen_dash('Event copy+paste')
@@ -2304,6 +2308,7 @@ function g.key(x,y,z)
   --G.KEY RELEASED
   --------------
   elseif z == 0 then
+
     -- Events key up
     if screen_view_name == 'Events' then
       event_key_count = math.max(event_key_count - 1,0)
@@ -2384,9 +2389,7 @@ function g.key(x,y,z)
         arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
         
         
-        -- Insert/remove patters/events after arranger shift with K3
-        -- todo p1 page-change mid shift
-        -- not initializing .populated fields in events but it seems fine AFAIK
+        -- Insert/remove patterns/events after arranger shift with K3
         if arranger_loop_key_count == 0 then --only do the copy after the last key is released so we don't keep resetting d_cuml if multiple events are held for some reason
           if d_cuml > 0 then
             for i = 1, d_cuml do
@@ -2400,15 +2403,17 @@ function g.key(x,y,z)
             d_cuml = 0
   
           elseif d_cuml < 0 then
-            for i = 1, math.abs(d_cuml) do
+            for i = 1, math.abs(d_cuml) do --math.min(math.abs(d_cuml), 1) do
               table.remove(arranger_seq, math.max(event_edit_pattern - i, 1))
               table.insert(arranger_seq, 0)
               table.remove(events, math.max(event_edit_pattern - i, 1))
               table.insert(events, {})
+              events[max_arranger_seq_length] = {{},{},{},{},{},{},{},{}}
             end
             generate_arranger_seq_padded()
             d_cuml = 0
-          end       
+          end
+        interaction = nil
         end
         
       end
@@ -2425,7 +2430,6 @@ end
 
 function key(n,z)
   if z == 1 then
-    
   -- KEY 1 just increments keys and key_count to bring up alt menu (disabled currently but whatever) 
   keys[n] = 1
   key_count = key_count + 1
@@ -2439,7 +2443,7 @@ function key(n,z)
       -- Not used at the moment
         
       -- Arranger Events strip held down
-      elseif arranger_loop_key_count > 0 then        
+      elseif arranger_loop_key_count > 0 and interaction == nil then        
         arranger_queue = event_edit_pattern
         grid_redraw()
       
@@ -2493,7 +2497,7 @@ function key(n,z)
         grid_redraw()
         
       -- Start/resume  
-      elseif params:string('clock_source') == 'internal' then
+      elseif interaction == nil and params:string('clock_source') == 'internal' then
         if transport_active then
           clock.transport.stop()
           clock_start_method = 'continue'
@@ -2532,7 +2536,7 @@ function key(n,z)
           
         elseif grid_view_name == 'Chord' then       
           chord_generator_lite()
-          -- gen_dash()
+          -- gen_dash('chord_generator_lite') -- will run when called from event but not from keys
         elseif grid_view_name == 'Arp' then       
           arp_generator('run')
         end
@@ -2541,7 +2545,7 @@ function key(n,z)
       ---------------------------------------------------------------------------  
       -- K3 with Event Timeline key held down enters Event editor
       ---------------------------------------------------------------------------        
-      elseif arranger_loop_key_count > 0 then
+      elseif arranger_loop_key_count > 0 and interaction == nil then -- blocked by d_cuml if shifting arranger
         arranger_loop_key_count = 0        
         event_edit_step = 0
         event_edit_lane = 0
@@ -2625,11 +2629,10 @@ function key(n,z)
           grid_redraw()
         end
         
-      else
+      elseif interaction == nil then
         -- Reset pattern/arp/arranger for standard K3 functionality-----------------
           reset_external_clock()
   
-        -- To-do: think about this some. What behavior makes sense if a reset occurs while waiting for Arranger to re-sync?
         if params:get('arranger_enabled') == 1 then
           reset_arrangement()
         else
@@ -2697,8 +2700,7 @@ end
 -- end
 
 
--- Variation on the standard generators that will just run the algos and reset arp (but not pattern or arranger)
--- function generator_and_reset()
+-- Variation on the standard generators that will just run the algos and reset arp (but not chord pattern seq position or arranger)
 function event_gen()
   generator()
   arp_seq_position = 0
@@ -2781,15 +2783,15 @@ end
 
           
 function enc(n,d)
-  -- if keys[1] == 1 then -- fn key (KEY1) held down mode
+  local d = util.clamp(d, -1, 1)
   
   -- Reserved for scrolling/extending Arranger, Chord, Arp sequences
   if n == 1 then
-    ------- SCROLL ARRANGER GRID VIEW--------
-    if grid_view_name == 'Arranger' then -- and arranger_loop_key_count > 0 then
-      arranger_grid_offset = util.clamp(arranger_grid_offset + d, 0, max_arranger_seq_length -  16)
-      grid_redraw()
-    end
+    -- ------- SCROLL ARRANGER GRID VIEW--------
+    -- if grid_view_name == 'Arranger' then
+    --   arranger_grid_offset = util.clamp(arranger_grid_offset + d, 0, max_arranger_seq_length -  16)
+    --   grid_redraw()
+    -- end
             
   -- n == ENC 2 ------------------------------------------------
   elseif n == 2 then
@@ -2865,7 +2867,10 @@ function enc(n,d)
   -- moving from arranger keys 1-4 to the arranger loop strip on row 5. This still trips me up but avoids weirdness around handling dual-use keypress (enable/disable vs. entering event editor)
   elseif grid_view_name == 'Arranger' and arranger_loop_key_count > 0 then
     -- Arranger segment detail options are on-screen
-    d_cuml = d_cuml + d -- ~= 0 value here will also be used to block event copy+paste
+    -- block event copy+paste, K2 and K3 (arranger jump and event editor)
+    -- new global to identify types of user interactions that should block certain other interactions e.g. copy+paste, arranger jump, and entering event editor
+    interaction = 'arranger_shift'
+    d_cuml = util.clamp(d_cuml + d, -64, 64)
     grid_redraw()
 
     elseif screen_view_name == 'Session' then
@@ -2989,58 +2994,50 @@ end
 
 
 -- generates truncated flat tables at the chord step level for the arranger mini dashboard
--- runs any time pattern length changes (generator, events, pattern changes, length changes, key pset load, arranger/pattern reset, event edits)
--- todo p0: arranger countdown timer doesn't update if params:get(arranger_enabled) == 0 and arranger_seq_position == 0
--- todo p0: readout_chord_seq_position handling for when arranger is interrupted
+-- runs any time the arranger changes (generator, events, pattern changes, length changes, key pset load, arranger/pattern reset, event edits)
 function gen_dash(source)
   print('gen_dash called by ' .. (source or ''))
   dash_patterns = {}
   -- dash_levels correspond to 3 arranger states:
-  -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
-  -- 2. Arranger is enabled so upcoming segments should be bright
-  -- 3. Arranger is disabled completely and should be dimmed  
+  -- 1. Arranger was disabl
   dash_levels = {}
   dash_events = {}
-  dash_steps = 0 -- todo p2 make local again if not being used instead of #dash_patterns in redraw
-  -- steps_remaining_in_pattern = 0
+  dash_steps = 0
   steps_remaining_in_active_pattern = 0
   steps_remaining_in_arrangement = 0
-  arranger_seq_position_min_1 = math.max(arranger_seq_position, 1) -- for reset state todo p2 make local
 
   ---------------------------------------------------------------------------------------------------
   -- iterate through all steps in arranger so we can get a total for steps_remaining_in_arrangement
   -- then build the arranger dash charts, limited to area drawn on screen (~30px)
   ---------------------------------------------------------------------------------------------------
-  for i = arranger_seq_position_min_1, arranger_seq_length do
-  
-    -- active segment (arranger_seq_position == i) indicator. Note: implicitly false when arranger is reset (arranger_seq_position 0) todo p2 make local
-    active_segment = arranger_seq_position == i
+  for i = math.max(arranger_seq_position, 1), arranger_seq_length do
     
-  -- _sticky vars handle instances when the active arranger segment is interrupted, in which case we want to freeze its vars to stop the segment from updating on the dash (while still allowing upcoming segments to update). todo p2 refactor so these can be local
+  -- _sticky vars handle instances when the active arranger segment is interrupted, in which case we want to freeze its vars to stop the segment from updating on the dash (while still allowing upcoming segments to update)
   -- Scenarios to test for:
     -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
     -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_active to false and should suspend the arranger mini chart until Arranger pickup occurs.
     -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
     -- 4. We DO want this to update if the arranger is reset (arranger_seq_position = 0, however)
-
-    if active_segment then
+    
+    -- Note: arranger_seq_position == i idenifies if we're on the active segment. Implicitly false when arranger is reset (arranger_seq_position 0) todo p2 make local
+    if arranger_seq_position == i then
+      -- todo p2 would be nice to rewrite this so these can be local
       if arranger_active == true then
         active_pattern = pattern
         active_chord_pattern_length = chord_pattern_length[active_pattern]
         active_chord_seq_position = math.max(chord_seq_position, 1)
         segment_level = 15
       else
-        segment_level = 2 -- interrupted segment pattern, event pips add +1 for better contrast
+        segment_level = 2 -- interrupted segment pattern, redraw will add +1 for better contrast only on events
       end
       pattern_sticky = active_pattern
       chord_pattern_length_sticky = active_chord_pattern_length
       chord_seq_position_sticky = active_chord_seq_position
-      -- steps_remaining_in_pattern = math.max(active_chord_pattern_length - math.max((active_chord_seq_position or 1) - 1, 0), 0)
-      
+
       local steps_incr = math.max(active_chord_pattern_length - math.max((active_chord_seq_position or 1) - 1, 0), 0)
       steps_remaining_in_pattern = steps_incr
       steps_remaining_in_active_pattern = steps_remaining_in_active_pattern + steps_incr
-
+    -- print('active_pattern = ' .. active_pattern) --todo debug to see if this is always set
     else -- upcoming segments always grab their current values from arranger
       pattern_sticky = arranger_seq_padded[i]
       chord_pattern_length_sticky = chord_pattern_length[pattern_sticky]
@@ -3052,11 +3049,10 @@ function gen_dash(source)
     -- used to total remaining time in arrangement (beyond what is drawn in the dash)  
     steps_remaining_in_arrangement = steps_remaining_in_arrangement + steps_remaining_in_pattern
     
-    -- todo p3 some sort of weird race condition is happening that requires nil check on events
+    -- todo p3 some sort of weird race condition is happening at init that requires nil check on events
     if events ~= nil and dash_steps < 30 then -- capped so we only store what is needed for the dash (including inserted blanks)
-      for s = chord_seq_position_sticky, chord_pattern_length_sticky do -- todo p0 this is letting 0 values through
-        -- print('chord_seq_position_sticky = ' .. chord_seq_position_sticky)
-        -- print('chord_pattern_length_sticky = ' .. chord_pattern_length_sticky)
+      for s = chord_seq_position_sticky, chord_pattern_length_sticky do -- todo debug this was letting 0 values through at some point. Debug if errors surface.
+        -- if s == 0 then print('s == 0 ' .. chord_seq_position_sticky .. '  ' .. chord_pattern_length_sticky) end -- p0 debug looking for 0000s
         if dash_steps == 30 then
          break 
         end -- second length check for each step iteration cuts down on what is saved for long segments
@@ -3079,7 +3075,7 @@ end
 function redraw()
   screen.clear()
   local dash_x = 94
-  
+  -- todo p2: this can be improved quite a bit by just having these custom screens be generated at the key/g.key level. Should be a fun refactor.
   -- Screens that pop up when g.keys are being held down take priority--------
   
   -- POP-up g.key tip always takes priority
@@ -3136,7 +3132,7 @@ function redraw()
       --   screen.text_right('(K3) LOOP')
       -- end
         
-    elseif grid_view_name == 'Chord' then --or grid_view_name == 'Arp') then-- Chord/Arp 
+    elseif grid_view_name == 'Chord' then
       screen.level(15)
       screen.move(2,8)
       screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
@@ -3169,14 +3165,30 @@ function redraw()
       screen.text_right('(K3) GEN. ARP')  
       end
       
-  -- Events editor intro
+  -- Arranger shift interaction
+  elseif interaction == 'arranger_shift' then
+    screen.level(15)
+    screen.move(2,8)
+    screen.text('ARRANGER SEGMENT ' .. event_edit_pattern)
+    -- To-do: might be cool to add a scrollable (K2) list of events in this segment here
+    screen.move(2,38)
+    screen.text('ENC 3: Shift segments ←→')
+    screen.level(4)
+    screen.move(1,54)
+    screen.line(128,54)
+    screen.stroke()    
+  
+    
+    -- Arranger events strip held down
   elseif arranger_loop_key_count > 0 then
     screen.level(15)
     screen.move(2,8)
-    screen.text('Arranger segment ' .. event_edit_pattern)
+    screen.text('ARRANGER SEGMENT ' .. event_edit_pattern)
     -- To-do: might be cool to add a scrollable (K2) list of events in this segment here
     screen.move(2,28)
-    screen.text('ENC 3: Shift pattern ←→')
+    screen.text('Tap to paste events')
+    screen.move(2,38)
+    screen.text('ENC 3: Shift segments ←→')
     screen.level(4)
     screen.move(1,54)
     screen.line(128,54)
@@ -3185,7 +3197,33 @@ function redraw()
     screen.move(1,62)
     screen.text('(K2) JUMP TO')    
     screen.move(82,62)
-    screen.text('(K3) EVENTS')  
+    screen.text('(K3) EVENTS')
+
+  -- Chord patterns held down
+  -- --        elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
+  --       pattern_key_count = pattern_key_count + 1
+  --       pattern_keys[y] = 1
+  --       if pattern_key_count == 1 then
+  --         pattern_copy_source = y
+  --       elseif pattern_key_count > 1 then
+  --         print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
+  --         pattern_copy_performed = true
+          
+  -- tooltips for interacting with chord patterns      
+  elseif grid_view_name == 'Chord' and pattern_key_count > 0 then -- add a new interaction for this
+    screen.level(15)
+    screen.move(2,8)
+    screen.text("CHORD PATTERN '" .. pattern_name[pattern_copy_source] .. "'' COPIED")
+    screen.move(2,28)
+    screen.text('1. Tap a pattern to paste')
+    screen.move(2,38)
+    screen.text('2. Release to queue pattern')
+    screen.move(2,48)
+    screen.text('3. Tap again to force jump')
+    screen.level(4)
+    screen.move(1,54)
+    screen.line(128,54)
+    screen.stroke()    
   
   -- Standard priority (not momentary) menus---------------------------------  
   else
@@ -3200,7 +3238,7 @@ function redraw()
       screen.level(4)
       screen.move(2,8)
       if event_edit_active == false then
-        screen.text('Editing segment ' .. event_edit_pattern)
+        screen.text('EDITING SEGMENT ' .. event_edit_pattern)
         screen.move(2,28)
         screen.level(15)
         screen.text('Use Grid to select step (↑↓)')
@@ -3419,7 +3457,7 @@ function redraw()
           screen.text((arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
         end
       else
-        screen.text(arranger_seq_position .. '.' .. readout_chord_seq_position)
+        screen.text(arranger_seq_position .. '.' .. chord_seq_position)
         
       end      
       screen.fill()
