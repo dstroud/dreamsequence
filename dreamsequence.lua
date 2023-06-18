@@ -2999,7 +2999,9 @@ function gen_dash(source)
   print('gen_dash called by ' .. (source or ''))
   dash_patterns = {}
   -- dash_levels correspond to 3 arranger states:
-  -- 1. Arranger was disabl
+  -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
+  -- 2. Arranger is enabled so upcoming segments should be bright
+  -- 3. Arranger is disabled completely and should be dimmed  
   dash_levels = {}
   dash_events = {}
   dash_steps = 0
