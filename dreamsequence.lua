@@ -34,7 +34,9 @@ function init()
   init_generator()
   crow.ii.jf.mode(1)
   -- Turn off built-in Crow clock so it doesn't conflict with ours which only fires when transport is running.
-  params:set('clock_crow_out', 1)
+  params:set('clock_crow_out', 1) -- todo p0 store state and reset on script load
+  
+  clock.link.stop() -- or else transport won't start if external link clock is already running
   
   -- midi stuff
   midi_device = {} -- container for connected midi devices
@@ -461,6 +463,8 @@ function init()
 
     -- Reset arranger or pattern
     reset_external_clock() -- todo: check if this fires when syncing externally
+    -- print('pset read existing clock check: ' .. (sequence_clock_id or 'nil'))
+    -- this is needed if clock is already running or weirdness happens
     if sequence_clock_id ~= nil then
       print('PSET READ canceling sequence_clock_id ' .. (sequence_clock_id or 0))
       clock.cancel(sequence_clock_id)-- or 0)
@@ -481,6 +485,7 @@ function init()
     gen_dash('params.action_read')
     
     -- if transport_active, reset and continue playing so user can demo psets from the system menu
+    -- todo p2 when link clock is running we can pick up on the wrong beat. Pretty minor but worth fixing.
     if transport_active == true then
       clock.transport.start()
     end
@@ -1104,13 +1109,12 @@ function sequence_clock()
 
   while transport_active do
     if start == true and stop ~= true then
-      -- Send out MIDI start/continue messages
-        if clock_start_method == 'start' then
-          transport_multi_start()  
-        else
-          transport_multi_continue()
-        end
-      -- end
+    -- Send out MIDI start/continue messages
+      if clock_start_method == 'start' then
+        transport_multi_start()  
+      else
+        transport_multi_continue()
+      end
       clock_start_method = 'continue'
       start = false
     end
@@ -1277,19 +1281,12 @@ function clock.transport.start()
   start = true
   stop = false -- 2023-07-19 added so when arranger stops in 1-shot and then external clock stops, it doesn't get stuck
   transport_active = true
-  
-  -- -- Clock for note duration, note-off events
-  -- print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
-  -- clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
-  -- timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
-  
+
   -- Clock for chord/arp/arranger sequences
   sequence_clock_id = clock.run(sequence_clock)
-  -- print('sequence_clock id = ' .. sequence_clock_id)
-  
-  --Clock used to refresh screen 10x a second for the arranger countdown timer
+
+  --Clock used to refresh arranger countdown timer 10x a second
   countdown_timer:start()
-  
 end
 
 
@@ -1341,11 +1338,12 @@ end
 
 
 -- Used when resetting view K3 or when jumping to chord pattern immediately via g.key press
+-- Link can't be reset. Sending a stop then start will just result in stopping.
 function reset_external_clock()
   -- If we're sending MIDI clock out, send a stop msg
   -- Tell the transport to Start on the next sync of sequence_clock
   if transport_active then
-    transport_multi_stop()  
+    transport_multi_stop()
   end
   -- Tell sequence_clock to send a MIDI start/continue message after initial clock sync
   clock_start_method = 'start'
@@ -2623,7 +2621,6 @@ function key(n,z)
             print('Action = ' .. action or '' .. '(' .. action_var or ''  .. ')')
           end
           
-    
           -- Back to event overview
           event_edit_active = false
           
@@ -2644,13 +2641,25 @@ function key(n,z)
         
       elseif interaction == nil then
         -- Reset pattern/arp/arranger for standard K3 functionality-----------------
+        if params:string('clock_source') ~= 'link' then
           reset_external_clock()
-  
-        if params:get('arranger_enabled') == 1 then
-          reset_arrangement()
-        else
-          reset_pattern()       
-        end
+          if params:get('arranger_enabled') == 1 then
+            reset_arrangement()
+          else
+            reset_pattern()       
+          end
+        else 
+          -- don't let link reset while transport is active or it gets outta sync
+          if transport_active ~= true then
+            if params:get('arranger_enabled') == 1 then
+              reset_arrangement()
+            else
+              reset_pattern()       
+            end          
+          end
+      end
+        
+
           
       end
     end
