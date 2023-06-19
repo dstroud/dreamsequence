@@ -29,7 +29,7 @@ function init()
   -----------------------------
   -- UPDATE BEFORE RELEASE!
   -- saved with pset files to address compatibility checks in the future
-  version = 'v1.0.6'
+  version = 'v1.0.6' -- todo prerelease ALSO MAKE SURE TO UPDATE ABOVE!
   -----------------------------
   init_generator()
   crow.ii.jf.mode(1)
@@ -267,6 +267,7 @@ function init()
     }
   
   clock_start_method = 'start'
+  link_stop_source = nil
   global_clock_div = 48
   -- print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
   -- clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
@@ -499,7 +500,7 @@ function init()
   ---------------------------
 
 -- Optional: load most recent pset on init
--- params:default()
+params:default() -- todo prerelease disable
 params:bang()
 
 -- Some actions need to be added post-bang
@@ -510,7 +511,8 @@ countdown_timer.event = countdown -- call the 'countdown' function below,
 countdown_timer.time = .1 -- 1/10s
 countdown_timer.count = -1 -- for.evarrr
 
---thanks @dndrks for this little bit of magic to check crow version!
+-- thanks @dndrks for this little bit of magic to check crow version!
+-- todo prerelease
 norns.crow.events.version = function(...)
   crow_version = ...
 end
@@ -1121,20 +1123,26 @@ function sequence_clock()
       if params:string('clock_source') == 'internal' then
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
           print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
-          clock_step = clock_step - 1, 0 -- min?
+          clock_step = clock_step - 1, 0
           print('internal stop. setting clock_step to ' .. clock_step)
           transport_multi_stop()
-          -- print('STOP canceling sequence_clock_id ' .. (sequence_clock_id or 0))
-          -- clock.cancel(sequence_clock_id)-- or 0)
           transport_active = false
           stop = false
         end
-        
+      elseif link_stop_source == 'norns' then
+        if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
+          print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+          clock.link.stop()
+          clock_step = clock_step - 1, 0
+          print('internal stop. setting clock_step to ' .. clock_step)
+          transport_multi_stop()
+          transport_active = false
+          stop = false
+          link_stop_source = nil
+        end      
       else -- External clock_source. No quantization. Just resets pattern/arrangement
         transport_multi_stop()  
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
-        -- print('EXTERNAL canceling sequence_clock_id ' .. (sequence_clock_id or 0))
-        -- clock.cancel(sequence_clock_id)-- or 0)
         
         if arranger_active then
           reset_arrangement()
@@ -1146,7 +1154,9 @@ function sequence_clock()
         stop = false
         print('external clock just set stop to nil')
       end
-    end
+    end -- of stop handling
+    
+    
   
     -- Checking transport state again in case transport was just set to 'false' by Stop. I don't know if this is even possible TBH
     if transport_active then
@@ -1213,10 +1223,8 @@ function countdown()
   redraw()  
 end  
     
-    
--- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic
+-- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic.
 -- Unlike the sequence_clock, this continues to run after transport stops in order to turn off playing notes
--- todo p3: This should probably serve as the main clock and have sequence_clock sync to it?
 function timing_clock()
   while true do
     clock.sync(1/global_clock_div)
@@ -2492,14 +2500,23 @@ function key(n,z)
         gen_dash('K2 events editor closed') -- update events strip in dash after making changes in events editor
         grid_redraw()
         
-      -- Start/resume  
+      -- Start/resume todo p3: make a concat clock.xxxx.start/stop() string from clock_source callback. I guess. 
       elseif interaction == nil and params:string('clock_source') == 'internal' then
         if transport_active then
-          clock.transport.stop()
+          clock.transport.stop() -- todo move to sequence_clock for consistency with link logic?
           clock_start_method = 'continue'
           start = true
         else
           clock.transport.start()
+        end
+      elseif interaction == nil and params:string('clock_source') == 'link' then
+        if transport_active then
+          link_stop_source = 'norns'
+          stop = true -- replaces clock.link.stop() so we can fire that in sequence_clock
+          clock_start_method = 'continue'
+          start = true
+        else
+          clock.link.start()
         end
       end
       
