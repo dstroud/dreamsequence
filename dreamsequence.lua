@@ -263,7 +263,6 @@ function init()
     {{0,0},{1,0},{2,0},{3,0},{4,0}, {0,1},{1,1},{2,1},{3,1},{4,1}, {0,2},{1,2},{2,2},{3,2},{4,2}, {0,3},{1,3},{2,3},{3,3},{4,3},  {0,4},{1,4},{2,4},{3,4},{4,4}}
     }
   
-  -- timing_clock_active = true
   clock_start_method = 'start'
   global_clock_div = 48
 
@@ -455,10 +454,10 @@ function init()
 
     -- Reset arranger or pattern
     reset_external_clock() -- todo: check if this fires when syncing externally
-    -- if sequence_clock_id ~= nil then
-    --   print('PSET READ canceling sequence_clock_id ' .. (sequence_clock_id or 0))
-    --   clock.cancel(sequence_clock_id)-- or 0)
-    -- end
+    if sequence_clock_id ~= nil then
+      print('PSET READ canceling sequence_clock_id ' .. (sequence_clock_id or 0))
+      clock.cancel(sequence_clock_id)-- or 0)
+    end
     stop = false
     reset_clock() -- resets clock step and generates arranger_seq_padded
     arranger_queue = nil
@@ -494,7 +493,7 @@ function init()
   ---------------------------
 
 -- Optional: load most recent pset on init
-params:default()
+-- params:default()
 params:bang()
 
 -- Some actions need to be added post-bang
@@ -525,10 +524,7 @@ crow_version_clock = clock.run(
     end
   end
 )
-print('crow_version_clock = ' .. crow_version_clock)
 -- clock.cancel(crow_version_clock) -- todo research: not sure if it's even necessary to cancel all these clocks or if we just need to break the coroutines?
-
-sequence_clock_id = clock.run(sequence_clock)
 
 grid_redraw()
 redraw()
@@ -1094,33 +1090,38 @@ end
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
 
-  while true do
-  
-    clock.sync(1/global_clock_div)
+  -- -- Optional count-in for when syncing to external MIDI/Link
+  -- if params:string('clock_source') ~= 'internal' and params:get('count_in') > 0 then
+  --   clock.sync(params:get('count_in'))
+  -- end
 
-    -- ADVANCE CLOCK_STEP
-    -- todo: revisit wrap
-    -- clock_step = util.wrap(clock_step + 1,0, 1535) -- 192 tics per measure * 8 (max a step can be, 0-indexed.
-    clock_step = clock_step + 1 -- todo p0 investigate using a separate clock.sync for arranger, chord, arp, and crow clock out (if is even needed)
+  while transport_active do
     
-    process_note_history()
-
-
-    if transport_active then -- check if we need to stop
-      if start == true and stop ~= true then
-        print('starting')
-        -- Send out MIDI start/continue messages
-          if clock_start_method == 'start' then
-            transport_multi_start()  
-          else
-            transport_multi_continue()
-          end
-        clock_start_method = 'continue'
-        start = false
-      end
+    -- Moving syncing to beginning of while-do loop 2023-04-11. In testing, it seems that you can get better latency when syncing to an external MIDI source when syncing at the end of the loop but this is probably Bad for some reason.
+    clock.sync(1/global_clock_div)
+    
+    if start == true and stop ~= true then
+      -- Send out MIDI start/continue messages
+      -- transport_midi_update()
+      -- if params:get('clock_midi_out_1') ~= 1 then
+        if clock_start_method == 'start' then
+          -- transport_midi:start()
+          transport_multi_start()  
+        else
+          -- transport_midi:continue()
+          transport_multi_continue()
+        end
+      -- end
+      clock_start_method = 'continue'
+      start = false
     end
     
-
+    
+    -- ADVANCE CLOCK_STEP
+    -- Wrap not strictly needed and could actually be used to count arranger position? 
+    -- clock_step = util.wrap(clock_step + 1,0, 1535) -- 192 tics per measure * 8 (max a step can be, 0-indexed.
+    clock_step = clock_step + 1
+    
     -- STOP beat-quantized
     if stop == true then
       -- When internally clocked, stop is quantized to occur at the end of the chord step
@@ -1128,8 +1129,12 @@ function sequence_clock()
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
           print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           -- Reset the clock_step so sequence_clock resumes at the same position as MIDI beat clock
-          -- clock_step = clock_step - 1, 0 -- min? -- disabling seems to correct shift but now it shifts back and forth
+          -- clock_step = util.wrap(clock_step - 1, 0, 1535)
+          clock_step = clock_step - 1, 0 -- min?
+          -- print('clock_step reset to ' .. clock_step)
           transport_multi_stop()
+          print('STOP canceling sequence_clock_id ' .. (sequence_clock_id or 0))
+          clock.cancel(sequence_clock_id)-- or 0)
           transport_active = false
           stop = false
         end
@@ -1137,6 +1142,8 @@ function sequence_clock()
       else -- External clock_source. No quantization. Just resets pattern/arrangement
         transport_multi_stop()  
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+        print('EXTERNAL canceling sequence_clock_id ' .. (sequence_clock_id or 0))
+        clock.cancel(sequence_clock_id)-- or 0)
         
         if arranger_active then
           reset_arrangement()
@@ -1151,11 +1158,19 @@ function sequence_clock()
   
     -- Checking transport state again in case transport was just set to 'false' by Stop
     if transport_active then
+      -- if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
       if (clock_step + chord_preload_tics) % chord_div == 0 then
         get_next_chord()
       end
     
       if clock_step % chord_div == 0 then
+        -- if pset_queue ~= nil then
+        --   -- params:read(pset_queue)
+        --   -- manually fun pset read action
+        --   -- manual_params_read(pset_queue,false)
+        --   manual_params_read(pset_queue, false)
+        --   pset_queue = nil
+        -- end  
         advance_chord_seq()
         grid_dirty = true
         redraw() -- To update chord readout
@@ -1187,49 +1202,6 @@ function sequence_clock()
 end
 
 
--- Keep track of which notes are playing so we know when to turn them off and for optional deduping logic
-function process_note_history()
-  for i = #midi_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
-    midi_note_history[i][1] = midi_note_history[i][1] - 1
-    if midi_note_history[i][1] == 0 then
-      -- print('note_off')
-      midi_device[midi_note_history[i][5]]:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- port, note, vel, ch.
-      table.remove(midi_note_history, i)
-    end
-  end
-  
-  for i = #disting_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
-    disting_note_history[i][1] = disting_note_history[i][1] - 1
-    if disting_note_history[i][1] == 0 then
-      -- print('note_off')
-      crow.ii.disting.note_off(disting_note_history[i][2])
-      table.remove(disting_note_history, i)
-    end
-  end
-  
-  for i = #engine_note_history, 1, -1 do
-    engine_note_history[i][1] = engine_note_history[i][1] - 1
-    if engine_note_history[i][1] == 0 then
-      table.remove(engine_note_history, i)
-    end
-  end
-  
-  for i = #crow_note_history, 1, -1 do
-    crow_note_history[i][1] = crow_note_history[i][1] - 1
-    if crow_note_history[i][1] == 0 then
-      table.remove(crow_note_history, i)
-    end
-  end
-  
-  for i = #jf_note_history, 1, -1 do
-    jf_note_history[i][1] = jf_note_history[i][1] - 1
-    if jf_note_history[i][1] == 0 then
-      table.remove(jf_note_history, i)
-    end
-  end
-end  
-
-
 function calc_seconds_remaining()
   if arranger_active then
     percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
@@ -1245,15 +1217,75 @@ function calc_seconds_remaining()
 function countdown()
   calc_seconds_remaining()
   redraw()  
+end  
+    
+    
+-- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic
+-- Unlike the sequence_clock, this continues to run after transport stops in order to turn off playing notes
+-- todo p3: This should probably serve as the main clock and have sequence_clock sync to it?
+function timing_clock()
+  while true do
+    clock.sync(1/global_clock_div)
+
+    for i = #midi_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
+      midi_note_history[i][1] = midi_note_history[i][1] - 1
+      if midi_note_history[i][1] == 0 then
+        -- print('note_off')
+        midi_device[midi_note_history[i][5]]:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- port, note, vel, ch.
+        table.remove(midi_note_history, i)
+      end
+    end
+    
+    for i = #disting_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
+      disting_note_history[i][1] = disting_note_history[i][1] - 1
+      if disting_note_history[i][1] == 0 then
+        -- print('note_off')
+        crow.ii.disting.note_off(disting_note_history[i][2])
+        table.remove(disting_note_history, i)
+      end
+    end
+    
+    for i = #engine_note_history, 1, -1 do
+      engine_note_history[i][1] = engine_note_history[i][1] - 1
+      if engine_note_history[i][1] == 0 then
+        table.remove(engine_note_history, i)
+      end
+    end
+    
+    for i = #crow_note_history, 1, -1 do
+      crow_note_history[i][1] = crow_note_history[i][1] - 1
+      if crow_note_history[i][1] == 0 then
+        table.remove(crow_note_history, i)
+      end
+    end
+    
+    for i = #jf_note_history, 1, -1 do
+      jf_note_history[i][1] = jf_note_history[i][1] - 1
+      if jf_note_history[i][1] == 0 then
+        table.remove(jf_note_history, i)
+      end
+      
+    end
+  end
 end
     
     
 function clock.transport.start()
   print('Transport starting')
-  clock_step = -1
   start = true
   transport_active = true
+  
+  -- Clock for note duration, note-off events
+  print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
+  clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
+  timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
+  
+  -- Clock for chord/arp/arranger sequences
+  sequence_clock_id = clock.run(sequence_clock)
+  
+  --Clock used to refresh screen 10x a second for the arranger countdown timer
   countdown_timer:start()
+  
 end
 
 
@@ -2964,7 +2996,7 @@ end
 -- generates truncated flat tables at the chord step level for the arranger mini dashboard
 -- runs any time the arranger changes (generator, events, pattern changes, length changes, key pset load, arranger/pattern reset, event edits)
 function gen_dash(source)
-  -- print('gen_dash called by ' .. (source or ''))
+  print('gen_dash called by ' .. (source or ''))
   dash_patterns = {}
   -- dash_levels correspond to 3 arranger states:
   -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
