@@ -54,22 +54,22 @@ function init()
   -- params:set_action('clock_offset', function(val) offset = val end)
  
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
-    params:set_action('dedupe_threshold', function() dedupe_threshold() end)
+  params:set_action('dedupe_threshold', function() dedupe_threshold() end)
+  
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
-    params:set_action('chord_preload', function(x) chord_preload(x) end)     
+  params:set_action('chord_preload', function(x) chord_preload(x) end)     
+  
   params:add_number('crow_pullup','Crow Pullup',0, 1, 1,function(param) return t_f_string(param:get()) end)
-    params:set_action("crow_pullup",function() crow_pullup() end)
-  -- Not used currently but might re-implement at some point  
-  -- params:add_number('count_in', 'Count-in', 0, 8, 0)
-  -- params:add_number('clock_offset', 'Clock offset', -999, 999, 0)
+  params:set_action("crow_pullup",function() crow_pullup() end)
 
 
   --ARRANGER PARAMS
   params:add_group('arranger', 'ARRANGER', 2)
   params:add_number('arranger_enabled', 'Enabled', 0, 1, 0, function(param) return t_f_string(param:get()) end)
-    params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_active() end)
+  params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_active() end)
+  
   params:add_option('playback', 'Playback', {'Loop','One-shot'}, 1)
-    params:set_action('playback', function() grid_redraw(); arranger_ending() end)
+  params:set_action('playback', function() grid_redraw(); arranger_ending() end)
   -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
 
 
@@ -268,6 +268,9 @@ function init()
   
   clock_start_method = 'start'
   global_clock_div = 48
+  -- print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
+  -- clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
+  timing_clock_id = clock.run(timing_clock) --Start a new timing clock to handle note-off
 
   -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
@@ -527,7 +530,6 @@ crow_version_clock = clock.run(
     end
   end
 )
--- clock.cancel(crow_version_clock) -- todo research: not sure if it's even necessary to cancel all these clocks or if we just need to break the coroutines?
 
 grid_redraw()
 redraw()
@@ -1099,16 +1101,11 @@ function sequence_clock()
   end
 
   while transport_active do
-  
     if start == true and stop ~= true then
       -- Send out MIDI start/continue messages
-      -- transport_midi_update()
-      -- if params:get('clock_midi_out_1') ~= 1 then
         if clock_start_method == 'start' then
-          -- transport_midi:start()
           transport_multi_start()  
         else
-          -- transport_midi:continue()
           transport_multi_continue()
         end
       -- end
@@ -1118,7 +1115,6 @@ function sequence_clock()
     
     -- ADVANCE CLOCK_STEP
     clock_step = clock_step + 1
-    
     -- STOP beat-quantized
     if stop == true then
       -- When internally clocked, stop is quantized to occur at the end of the chord step. todo p1 also use this when running off norns link beat_count
@@ -1126,9 +1122,10 @@ function sequence_clock()
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
           print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           clock_step = clock_step - 1, 0 -- min?
+          print('internal stop. setting clock_step to ' .. clock_step)
           transport_multi_stop()
-          print('STOP canceling sequence_clock_id ' .. (sequence_clock_id or 0))
-          clock.cancel(sequence_clock_id)-- or 0)
+          -- print('STOP canceling sequence_clock_id ' .. (sequence_clock_id or 0))
+          -- clock.cancel(sequence_clock_id)-- or 0)
           transport_active = false
           stop = false
         end
@@ -1136,8 +1133,8 @@ function sequence_clock()
       else -- External clock_source. No quantization. Just resets pattern/arrangement
         transport_multi_stop()  
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
-        print('EXTERNAL canceling sequence_clock_id ' .. (sequence_clock_id or 0))
-        clock.cancel(sequence_clock_id)-- or 0)
+        -- print('EXTERNAL canceling sequence_clock_id ' .. (sequence_clock_id or 0))
+        -- clock.cancel(sequence_clock_id)-- or 0)
         
         if arranger_active then
           reset_arrangement()
@@ -1147,12 +1144,12 @@ function sequence_clock()
         
         transport_active = false
         stop = false
+        print('external clock just set stop to nil')
       end
     end
   
-    -- Checking transport state again in case transport was just set to 'false' by Stop
+    -- Checking transport state again in case transport was just set to 'false' by Stop. I don't know if this is even possible TBH
     if transport_active then
-      -- if util.wrap(clock_step + chord_preload_tics, 0, 1535) % chord_div == 0 then
       if (clock_step + chord_preload_tics) % chord_div == 0 then
         get_next_chord()
       end
@@ -1184,7 +1181,8 @@ function sequence_clock()
       crow.output[3].volts = 0    
       crow.output[3].slew = 0
       end
-
+    else
+      print('transport_active loop interrupted')
     end
     
     if grid_dirty == true then
@@ -1269,15 +1267,17 @@ end
 function clock.transport.start()
   print('Transport starting')
   start = true
+  stop = false -- 2023-07-19 added so when arranger stops in 1-shot and then external clock stops, it doesn't get stuck
   transport_active = true
   
-  -- Clock for note duration, note-off events
-  print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
-  clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
-  timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
+  -- -- Clock for note duration, note-off events
+  -- print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
+  -- clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
+  -- timing_clock_id = clock.run(timing_clock) --Start a new timing clock. Not sure about efficiency here.
   
   -- Clock for chord/arp/arranger sequences
   sequence_clock_id = clock.run(sequence_clock)
+  -- print('sequence_clock id = ' .. sequence_clock_id)
   
   --Clock used to refresh screen 10x a second for the arranger countdown timer
   countdown_timer:start()
@@ -3449,7 +3449,7 @@ function redraw()
           if params:string('playback') == "Loop"  then
             screen.text('LP.' .. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
           else
-            screen.text('ST.' .. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
+            screen.text('EN.' .. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
           end
         else
           screen.text((arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)) .. '.'.. math.min(chord_seq_position - chord_pattern_length[pattern], 0))
