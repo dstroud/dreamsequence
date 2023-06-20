@@ -53,10 +53,13 @@ function init()
     -- params:set_action('mode', function() update_chord_action() end)
 
   params:add_number('clock_offset', 'Clock Offset', -100, 100, 0) --todo prerelease reset
-  -- params:set_action('clock_offset', function() calc_clock_offset() end)
+  params:set_action('clock_offset', function() calc_clock_offset() end)
   calc_clock_offset()
-  prev_offset =  offset
- 
+  offset_chord = offset
+  offset_arp = offset
+  prev_offset_chord =  offset
+  prev_offset_arp = offset
+  
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
   params:set_action('dedupe_threshold', function() dedupe_threshold() end)
   
@@ -643,9 +646,19 @@ end
 -- called by offset param action and clock.tempo_change_handler() callback
 -- todo p2 see if this is more accurate than offset / 1000 * bpm / 60 (e.g. float bpm values when external sync?)
 function calc_clock_offset()
-  offset = params:get('clock_offset') / 1000 / clock.get_beat_sec() --todo p0 local if this is what we end up doing
-  return(offset)
-  -- offset = params:get('clock_offset') / 1000 * clock.get_tempo() / 60
+  offset = params:get('clock_offset') / 1000 / clock.get_beat_sec()
+  -- = params:get('clock_offset') / 1000 * clock.get_tempo() / 60
+  -- return(offset)
+end
+
+
+function calc_clock_offset_chord()
+  offset_chord = offset
+end
+
+
+function calc_clock_offset_arp()
+  offset_arp = offset
 end
 
 
@@ -982,7 +995,7 @@ end
 
 -- Callback function when system tempo changes
 function clock.tempo_change_handler()
-  -- calc_clock_offset()
+  calc_clock_offset()
   dedupe_threshold()
   -- To-do: think about other tempo-based things that are not generated dynamically
 end  
@@ -1279,45 +1292,37 @@ end
 
 
 function chord_clock()
+  -- local prev_offset_chord = 999 -- something needs to be reset here for resuming
   while transport_active do
-    calc_clock_offset()
-    if prev_offset >= offset then 
-      print(prev_offset .. ' ' .. offset ..' advancing')
+    calc_clock_offset_chord()
+    -- if offset increases (due to tempo change or changing the clock_offset param), it results in the clock scheduling the same tick twice (as best I can describe it). Like it schedules it and then schedules it again sooner, resulting in everything in this loop firing twice in an instant. So I just block it LOL.
+    if prev_offset_chord >= offset_chord then
+      -- print(prev_offset .. ' ' .. offset ..' advancing')
       advance_chord_seq()
-    else
-      print(prev_offset .. ' ' .. offset ..' blocking')
-    end
-      -- grid_dirty = true
-      grid_redraw() -- debug
+    -- else
+      -- print(prev_offset .. ' ' .. offset ..' blocking')
+    -- end
+      grid_redraw() -- todo       -- grid_dirty = true
       redraw() -- To update chord readout
-    
-    -- print(clock.get_tempo() .. 'bpm '     .. (chord_div / global_clock_div) .. '   ' .. prev_offset)  
-    clock.sync(chord_div / global_clock_div, offset)
-    
-    prev_offset = offset
-    
+    end
+    clock.sync(chord_div / global_clock_div, offset_chord)
+    prev_offset_chord = offset_chord
   end  
 end  
 
 
 function arp_clock()
+    -- local prev_offset_arp = 999
   while transport_active do
-    -- if offset >= prev_offset then
+      calc_clock_offset_arp()
       if params:string('arp_mode') == 'Loop' or play_arp then
-        -- print(os.time() .. ' advance_arp_seq() firing' )
-        -- prev_time = 
-        advance_arp_seq()
-        -- grid_dirty = true
-        grid_redraw() -- debug
-      -- end
+        if prev_offset_arp >= offset_arp then
+          advance_arp_seq()
+          grid_redraw() -- todo           -- grid_dirty = true
+      end
     end
-      -- if (arp_div / global_clock_div) < prev_offset then
-        -- print(clock.get_tempo() .. '   ' .. params:get('clock_tempo') .. '    '     .. (arp_div / global_clock_div) .. '   ' .. prev_offset)
-      -- end
-    -- calc_clock_offset()
-    
-    clock.sync(arp_div / global_clock_div, offset)--, offset)
-    -- prev_offset = offset
+    clock.sync(arp_div / global_clock_div, offset_arp)
+    prev_offset_arp = offset_arp
   end
 end  
 
