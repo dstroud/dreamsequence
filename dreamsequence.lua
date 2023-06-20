@@ -640,6 +640,7 @@ end
 -- takes offset (milliseconds) input and converts to a beat-based value suitable for clock.sync offset
 -- called by offset param action and clock.tempo_change_handler() callback
 -- todo p2 see if this is more accurate than offset / 1000 * bpm / 60 (e.g. float bpm values when external sync?)
+-- todo p0 not sure this works with weird chord divisions. Something is up.
 function calc_clock_offset()
   offset = params:get('clock_offset') / 1000 * clock.get_beat_sec() * 4  
 end
@@ -1318,7 +1319,7 @@ end
 -- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic. Runs indefinitely in order to turn off playing notes after transport stops.
 function timing_clock()
   while true do
-    clock.sync(1/global_clock_div)
+    clock.sync(1/global_clock_div, offset)
 
     for i = #midi_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       midi_note_history[i][1] = midi_note_history[i][1] - 1
@@ -1370,7 +1371,7 @@ function clock.transport.start()
   transport_active = true
 
   -- Clock for chord/arp sequences and crow pulses out
-  sequence_clock_id = clock.run(link_stop_source)
+  sequence_clock_id = clock.run(sequence_clock)
   print('starting sequence_clock_id ' .. sequence_clock_id)
 
   --Clock used to refresh arranger countdown timer 10x a second
