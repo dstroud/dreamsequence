@@ -53,7 +53,9 @@ function init()
     -- params:set_action('mode', function() update_chord_action() end)
 
   params:add_number('clock_offset', 'Clock Offset', -100, 100, 0) --todo prerelease reset
-  params:set_action('clock_offset', function() calc_clock_offset() end)
+  -- params:set_action('clock_offset', function() calc_clock_offset() end)
+  calc_clock_offset()
+  prev_offset =  offset
  
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
   params:set_action('dedupe_threshold', function() dedupe_threshold() end)
@@ -640,9 +642,10 @@ end
 -- takes offset (milliseconds) input and converts to a beat-based value suitable for clock.sync offset
 -- called by offset param action and clock.tempo_change_handler() callback
 -- todo p2 see if this is more accurate than offset / 1000 * bpm / 60 (e.g. float bpm values when external sync?)
--- todo p0 not sure this works with weird chord divisions. Something is up.
 function calc_clock_offset()
-  offset = params:get('clock_offset') / 1000 * clock.get_beat_sec() * 4  
+  offset = params:get('clock_offset') / 1000 / clock.get_beat_sec() --todo p0 local if this is what we end up doing
+  return(offset)
+  -- offset = params:get('clock_offset') / 1000 * clock.get_tempo() / 60
 end
 
 
@@ -979,7 +982,7 @@ end
 
 -- Callback function when system tempo changes
 function clock.tempo_change_handler()
-  calc_clock_offset()
+  -- calc_clock_offset()
   dedupe_threshold()
   -- To-do: think about other tempo-based things that are not generated dynamically
 end  
@@ -1114,10 +1117,10 @@ function sequence_clock()
 
   -- INITIAL SYNC DEPENDING ON CLOCK SOURCE
   if params:string('clock_source') == 'internal' then
-    clock.sync(chord_div / global_clock_div, offset) -- now needs to sync at chord div
+    clock.sync(chord_div / global_clock_div)--, offset) -- now needs to sync at chord div
   elseif params:string('clock_source') == 'link' then
     -- clock.sync(params:get('link_quantum'), offset) -- not sure how this works with odd chord divs
-    clock.sync(chord_div / global_clock_div, offset) -- now needs to sync at chord div
+    clock.sync(chord_div / global_clock_div)--, offset) -- now needs to sync at chord div
   end
 
   chord_clock_id = clock.run(chord_clock)
@@ -1277,24 +1280,45 @@ end
 
 function chord_clock()
   while transport_active do
-    advance_chord_seq()
-    -- grid_dirty = true
-    grid_redraw() -- debug
-    redraw() -- To update chord readout
+    calc_clock_offset()
+    if prev_offset >= offset then 
+      print(prev_offset .. ' ' .. offset ..' advancing')
+      advance_chord_seq()
+    else
+      print(prev_offset .. ' ' .. offset ..' blocking')
+    end
+      -- grid_dirty = true
+      grid_redraw() -- debug
+      redraw() -- To update chord readout
+    
+    -- print(clock.get_tempo() .. 'bpm '     .. (chord_div / global_clock_div) .. '   ' .. prev_offset)  
     clock.sync(chord_div / global_clock_div, offset)
+    
+    prev_offset = offset
+    
   end  
 end  
 
 
 function arp_clock()
   while transport_active do
+    -- if offset >= prev_offset then
       if params:string('arp_mode') == 'Loop' or play_arp then
+        -- print(os.time() .. ' advance_arp_seq() firing' )
+        -- prev_time = 
         advance_arp_seq()
         -- grid_dirty = true
         grid_redraw() -- debug
-      end
-    clock.sync(arp_div / global_clock_div, offset)
-  end  
+      -- end
+    end
+      -- if (arp_div / global_clock_div) < prev_offset then
+        -- print(clock.get_tempo() .. '   ' .. params:get('clock_tempo') .. '    '     .. (arp_div / global_clock_div) .. '   ' .. prev_offset)
+      -- end
+    -- calc_clock_offset()
+    
+    clock.sync(arp_div / global_clock_div, offset)--, offset)
+    -- prev_offset = offset
+  end
 end  
 
 
@@ -1319,7 +1343,7 @@ end
 -- This clock is used to keep track of which notes are playing so we know when to turn them off and for optional deduping logic. Runs indefinitely in order to turn off playing notes after transport stops.
 function timing_clock()
   while true do
-    clock.sync(1/global_clock_div, offset)
+    clock.sync(1/global_clock_div)--, offset)
 
     for i = #midi_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       midi_note_history[i][1] = midi_note_history[i][1] - 1
