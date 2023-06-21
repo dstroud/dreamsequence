@@ -10,7 +10,7 @@ events_lookup = {
   {	category= 'Global', 	event_type= 'param', 	id= 'transpose', 	name= 'Key', 	value_type= 'inc, set', 	formatter= 'transpose_string', 			},
   {	category= 'Global', 	event_type= 'param', 	id= 'clock_tempo', 	name= 'Tempo', 	value_type= 'inc, set', 				},
   {	category= 'Global', 	event_type= 'param', 	id= 'crow_clock_index', 	name= 'Crow clock', 	value_type= 'inc, set', 	formatter= 'crow_clock_string', 	action= 'set_crow_clock', 		},
-  									
+                    
   {	category= 'Chord', 	event_type= 'function', 	id= 'transpose_chord_pattern', 	name= 'Transpose pattern', 	value_type= 'set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_dest', 	name= 'Destination', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'set', 	formatter= 'chord_type', 			},
@@ -27,9 +27,10 @@ events_lookup = {
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_midi_out_port', 	name= 'MIDI out port', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
+  {	category= 'Chord', 	event_type= 'param', 	id= 'chord_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'inc, set', 	formatter= 'neg_to_off', 			},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_jf_amp', 	name= 'Just Friends amp', 	value_type= 'inc, set', 				},
   {	category= 'Chord', 	event_type= 'param', 	id= 'chord_disting_velocity', 	name= 'Disting velocity', 	value_type= 'inc, set', 				},
-  									
+                    
   {	category= 'Arp', 	event_type= 'function', 	id= 'shuffle_arp', 	name= 'Shuffle Arp', 	value_type= 'trigger', 				},
   {	category= 'Arp', 	event_type= 'function', 	id= 'rotate_arp', 	name= 'Rotate Arp', 	value_type= 'set', 				},
   {	category= 'Arp', 	event_type= 'function', 	id= 'transpose_arp_pattern', 	name= 'Transpose pattern', 	value_type= 'set', 				},
@@ -47,11 +48,12 @@ events_lookup = {
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_midi_out_port', 	name= 'MIDI out port', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
+  {	category= 'Arp', 	event_type= 'param', 	id= 'arp_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'inc, set', 	formatter= 'neg_to_off', 			},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_tr_env', 	name= 'Crow output', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_ad_skew', 	name= 'Crow AD skew', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_jf_amp', 	name= 'Just Friends amp', 	value_type= 'inc, set', 				},
   {	category= 'Arp', 	event_type= 'param', 	id= 'arp_disting_velocity', 	name= 'Disting velocity', 	value_type= 'inc, set', 				},
-  									
+                    
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_dest', 	name= 'Destination', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_chord_type', 	name= 'Chord type', 	value_type= 'set', 	formatter= 'chord_type', 			},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_octave', 	name= 'Octave', 	value_type= 'inc, set', 				},
@@ -66,11 +68,12 @@ events_lookup = {
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'do_midi_velocity_passthru', 	name= 'Pass velocity', 	value_type= 'set', 	formatter= 't_f_string', 	action= 'update_menus', 		},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
+  {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'inc, set', 	formatter= 'neg_to_off', 			},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_tr_env', 	name= 'Crow output', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_ad_skew', 	name= 'Crow AD skew', 	value_type= 'inc, set', 				},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_jf_amp', 	name= 'Just Friends amp', 	value_type= 'inc, set', 				},
   {	category= 'MIDI harmonizer', 	event_type= 'param', 	id= 'midi_disting_velocity', 	name= 'Disting velocity', 	value_type= 'inc, set', 				},
-  									
+                    
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_dest', 	name= 'Destination', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_chord_type', 	name= 'Chord type', 	value_type= 'set', 	formatter= 'chord_type', 			},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_octave', 	name= 'Octave', 	value_type= 'inc, set', 				},
@@ -84,8 +87,9 @@ events_lookup = {
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_midi_out_port', 	name= 'MIDI out port', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_midi_ch', 	name= 'MIDI channel', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_midi_velocity', 	name= 'MIDI velocity', 	value_type= 'inc, set', 				},
+  {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'inc, set', 	formatter= 'neg_to_off', 			},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_tr_env', 	name= 'Crow output', 	value_type= 'set', 		action= 'update_menus', 		},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_ad_skew', 	name= 'Crow AD skew', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_jf_amp', 	name= 'Just Friends amp', 	value_type= 'inc, set', 				},
   {	category= 'CV harmonizer', 	event_type= 'param', 	id= 'crow_disting_velocity', 	name= 'Disting velocity', 	value_type= 'inc, set', 				},
-}									
+  }

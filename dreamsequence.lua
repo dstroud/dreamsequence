@@ -93,7 +93,7 @@ function init()
   
   
   --CHORD PARAMS
-  params:add_group('chord', 'CHORD', 22)  
+  params:add_group('chord', 'CHORD', 23)  
   params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
@@ -124,6 +124,7 @@ function init()
   
   params:add_separator ('chord_midi', 'MIDI')
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
+  params:add_number('chord_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
   params:add_number('chord_midi_out_port', 'MIDI out',1,#midi.vports,1)
     -- params:set_action('chord_midi_out_port', function(value) chord_midi_out = midi_device[value] end)    
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
@@ -136,7 +137,7 @@ function init()
 
 
   --ARP PARAMS
-  params:add_group('arp', 'ARP', 24)  
+  params:add_group('arp', 'ARP', 25)  
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
     params:set_action('arp_div_index',function() set_div('arp') end)
@@ -159,6 +160,7 @@ function init()
   params:add_number('arp_midi_out_port', 'MIDI out',1,#midi.vports,1)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
+  params:add_number('arp_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
   
   params:add_separator ('arp_jf', 'Just Friends')
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -173,7 +175,7 @@ function init()
   
   
   --MIDI PARAMS
-  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 23)  
+  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 24)  
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
     
@@ -205,6 +207,7 @@ function init()
   params:add_number('do_midi_velocity_passthru', 'Pass velocity', 0, 1, 0, function(param) return t_f_string(param:get()) end)
     params:set_action("do_midi_velocity_passthru",function() update_menus() end)  
   params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
+  params:add_number('midi_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
   
   params:add_separator ('Just Friends')
   params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -219,7 +222,7 @@ function init()
 
   
   --CV/CROW PARAMS
-  params:add_group('cv_harmonizer', 'CV HARMONIZER', 23)  
+  params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)  
   -- Crow clock uses hybrid notation/PPQN
   params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
     params:set_action('crow_clock_index',function() set_crow_clock() end)
@@ -242,6 +245,7 @@ function init()
   params:add_number('crow_midi_out_port', 'MIDI out',1,#midi.vports,1)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
+  params:add_number('crow_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
   
   params:add_separator ('cv_harmonizer_jf', 'Just Friends')
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -530,8 +534,10 @@ crow_version_clock = clock.run(
       if crow_version == 'v3.0.1' then
         print('Crow v.3.0.1 detected')
       elseif crow_major_version > 3 then 
+        -- init_message = 'Crow version mismatch'
         print('---- Crow ' .. crow_version .. ' detected. PLEASE DOWNGRADE TO CROW v3.0.1 TO USE WITH DREAMSEQUENCE----')
       else
+        -- init_message = 'Crow version mismatch'
         print('---- Crow ' .. crow_version .. ' detected. PLEASE UPGRADE TO CROW v3.0.1 TO USE WITH DREAMSEQUENCE----')
       end
     end
@@ -568,7 +574,7 @@ function update_menus()
   elseif params:string('chord_dest') == 'Engine' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
   elseif params:string('chord_dest') == 'ii-JF' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_dest') == 'Disting' then
@@ -581,7 +587,7 @@ function update_menus()
   elseif params:string('arp_dest') == 'Engine' then
     menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
       menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
@@ -601,9 +607,9 @@ function update_menus()
     menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index','midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru'}
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index','midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_cc_1_val'}
     else
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity'}
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
@@ -623,7 +629,7 @@ function update_menus()
   elseif params:string('crow_dest') == 'Engine' then
     menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity'}
+    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
       menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
@@ -910,6 +916,11 @@ end
 
 function t_f_bool(x)
   return(x == 1 and true or false)
+end
+
+
+function neg_to_off(x)
+  return(x < 0 and 'Off' or x)  
 end
 
 
@@ -1543,9 +1554,15 @@ function play_chord(destination, channel)
       to_engine('chord', note)
     end
   elseif destination == 'MIDI' then
+      local channel = params:get('chord_midi_ch')
+      local port = params:get('chord_midi_out_port')
+      local cc_1 = params:get('chord_midi_cc_1_val')
+      if cc_1 ~= 0 then
+        midi_device[port]:cc(1, cc_1, channel)
+      end
     for i = 1, params:get('chord_type') do
       local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_midi(note, params:get('chord_midi_velocity'), params:get('chord_midi_ch'), chord_duration, params:get('chord_midi_out_port'))
+      to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
     end
   elseif destination == 'Crow' then
     for i = 1, params:get('chord_type') do
@@ -1654,7 +1671,13 @@ function advance_arp_seq()
     if destination == 'Engine' then
       to_engine('arp', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('arp_midi_velocity'), params:get('arp_midi_ch'), arp_duration, params:get('arp_midi_out_port'))
+      local channel = params:get('arp_midi_ch')
+      local port = params:get('arp_midi_out_port')
+      local cc_1 = params:get('arp_midi_cc_1_val')
+      if cc_1 ~= 0 then
+        midi_device[port]:cc(1, cc_1, channel)
+      end
+      to_midi(note, params:get('arp_midi_velocity'), channel, arp_duration, port)
     elseif destination == 'Crow' then
       to_crow('arp',note)
     elseif destination == 'ii-JF' then
@@ -1689,7 +1712,13 @@ function sample_crow(volts)
     if destination == 'Engine' then
       to_engine('crow', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('crow_midi_velocity'), params:get('crow_midi_ch'), crow_duration, params:get('crow_midi_out_port'))
+      local channel = params:get('crow_midi_ch')
+      local port = params:get('crow_midi_out_port')
+      local cc_1 = params:get('crow_midi_cc_1_val')
+      if cc_1 ~= 0 then
+        midi_device[port]:cc(1, cc_1, channel)
+      end      
+      to_midi(note, params:get('crow_midi_velocity'), channel, crow_duration, port)
     elseif destination == 'Crow' then
       to_crow('crow', note)
     elseif destination =='ii-JF' then
@@ -1713,7 +1742,13 @@ midi_event = function(data)
     if destination == 'Engine' then
       to_engine('midi', note)
     elseif destination == 'MIDI' then
-      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), params:get('midi_midi_ch'), midi_duration, params:get('midi_midi_out_port'))
+      local channel = params:get('midi_midi_ch')
+      local port = params:get('midi_midi_out_port')
+      local cc_1 = params:get('midi_midi_cc_1_val')
+      if cc_1 ~= 0 then
+        midi_device[port]:cc(1, cc_1, channel)
+      end      
+      to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), channel, midi_duration, port)
     elseif destination == 'Crow' then
       to_crow('midi', note)
     elseif destination =='ii-JF' then
@@ -3099,12 +3134,23 @@ function gen_dash(source)
 end
 
 
+  -- todo p2: this can be improved quite a bit by just having these custom screens be generated at the key/g.key level. Should be a fun refactor.
 function redraw()
   screen.clear()
   local dash_x = 94
-  -- todo p2: this can be improved quite a bit by just having these custom screens be generated at the key/g.key level. Should be a fun refactor.
+
+  -- if init_message ~= nil then
+  --   print('should show screen stuff here')
+  --   -- crow_version = 'v.4.0.2' --prerelease remove!
+  --   screen.level(15)
+  --   screen.move(2,18)
+  --   screen.text('Crow ' .. crow_version .. ' detected')
+  --   screen.move(2,28)
+  --   screen.text('Only v3.0.1 works for now :(')
+  --   screen.move(2,38)
+  --   screen.text('Manual install or unplug pls!')
+
   -- Screens that pop up when g.keys are being held down take priority--------
-  
   -- POP-up g.key tip always takes priority
   if view_key_count > 0 then
     -- screen.level(7)
