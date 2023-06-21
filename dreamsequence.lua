@@ -364,26 +364,25 @@ function init()
   keys = {}
   key_count = 0
   -- global_clock_div = 48
-  chord_seq = {{},{},{},{}} 
+  chord_seq = {{},{},{},{}}
+  arp_seq = {{},{},{},{}}
   for p = 1,4 do
     for i = 1,8 do
-      chord_seq[p][i] = {x = 0} -- raw value
-      chord_seq[p][i]["c"] = 0  -- chord wrapped 1-7   
-      chord_seq[p][i]["o"] = 0  -- octave
+      chord_seq[p][i] = 0
+      arp_seq[p][i] = 0
     end
   end
   chord_seq_position = 0
-  chord = {}
-  -- chord = musicutil.generate_chord_scale_degree(chord_seq[pattern][1].o * 12, params:get('mode'), chord_seq[pattern][1].c, true)
+  chord_raw = {}
   current_chord_o = 0
   current_chord_c = 1
   next_chord_o = 0
   next_chord_c = 1  
-  arp_seq = {{0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0},
-            } -- sub table for multiple arp patterns
+  -- arp_seq = {{0,0,0,0,0,0,0,0},
+  --           {0,0,0,0,0,0,0,0},
+  --           {0,0,0,0,0,0,0,0},
+  --           {0,0,0,0,0,0,0,0},
+  --           } -- sub table for multiple arp patterns
   arp_pattern_length = {8,8,8,8}
   arp_pattern = 1
   arp_seq_position = 0
@@ -396,7 +395,7 @@ function init()
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   get_next_chord()
-  chord = next_chord
+  chord_raw = next_chord
   -- pset_queue = nil
   -- pset_data_cache = {}
   -- pset_load_source = 'load_system'
@@ -483,7 +482,7 @@ function init()
     arranger_seq_position = 0
     pattern = arranger_seq_padded[1]
     get_next_chord()
-    chord = next_chord
+    chord_raw = next_chord
     chord_no = 0 -- wipe chord readout
     generate_chord_names()
     gen_dash('params.action_read')
@@ -509,7 +508,7 @@ function init()
   ---------------------------
 
 -- Optional: load most recent pset on init
-params:default() -- todo prerelease disable
+-- params:default() -- todo prerelease disable. Set preference for autoloading!
 params:bang()
 
 -- Some actions need to be added post-bang
@@ -960,9 +959,7 @@ end
 
 function clear_chord_pattern()
   for i = 1, 8 do
-    chord_seq[pattern][i].x = 0
-    chord_seq[pattern][i].c = 0
-    chord_seq[pattern][i].o = 0
+    chord_seq[pattern][i] = 0
   end
 end
 
@@ -1312,7 +1309,7 @@ function reset_pattern() -- To-do: Also have the chord readout updated (move fro
   chord_seq_position = 0
   reset_clock()
   get_next_chord()
-  chord = next_chord
+  chord_raw = next_chord
   gen_dash('reset_pattern')
   grid_redraw()
   redraw()
@@ -1333,7 +1330,7 @@ function reset_arrangement() -- To-do: Also have the chord readout updated (move
   if params:string('arranger_enabled') == 'True' then arranger_active = true end
   reset_clock()
   get_next_chord()
-  chord = next_chord
+  chord_raw = next_chord
   gen_dash('reset_arrangement')
   grid_redraw()
   redraw()
@@ -1417,7 +1414,7 @@ function advance_chord_seq()
     update_chord()
 
     -- Play the chord
-    if chord_seq[pattern][chord_seq_position].c > 0 then play_chord(params:string('chord_dest'), params:get('chord_midi_ch')) end
+    if chord_seq[pattern][chord_seq_position] > 0 then play_chord(params:string('chord_dest'), params:get('chord_midi_ch')) end
     
     if chord_key_count == 0 then
       chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)
@@ -1498,9 +1495,10 @@ end
 function update_chord()
 -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
 -- Mode is always updated in case no chord has been set but user has changed Mode param.
-  current_chord_o = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].o or current_chord_o
-  current_chord_c = chord_seq[pattern][chord_seq_position].c > 0 and chord_seq[pattern][chord_seq_position].c or current_chord_c
-  chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+-- todo p3 efficiency test on this vs if/then
+  current_chord_o = chord_seq[pattern][chord_seq_position] > 0 and (chord_seq[pattern][chord_seq_position] > 7 and 1 or 0) or current_chord_o
+  current_chord_c = chord_seq[pattern][chord_seq_position] > 0 and util.wrap(chord_seq[pattern][chord_seq_position], 1, 7) or current_chord_c
+  chord_raw = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
   -- chord transformations
   invert_chord()
   spread_chord()  
@@ -1508,28 +1506,27 @@ end
 
 -- Makes a copy of the base chord table with inversion applied
 function invert_chord()
-  chord_inverted = {}
+  chord_transformed = {}
   for i = 1,params:get('chord_type') do
-    chord_inverted[i] = chord[i]
+    chord_transformed[i] = chord_raw[i]
   end  
 
   if params:get('chord_inversion') ~= 0 then
     for i = 1,params:get('chord_inversion') do
-      local index = util.wrap(i, 1, #chord_inverted) --params:get('chord_type'))
-      chord_inverted[index] = chord_inverted[index] + 12
+      local index = util.wrap(i, 1, #chord_transformed) --params:get('chord_type'))
+      chord_transformed[index] = chord_transformed[index] + 12
     end
     -- Re-sort them so we can apply additional transformations later
-    table.sort(chord_inverted)
+    table.sort(chord_transformed)
   end
 end  
 
 
 -- Applies note spread to chord (in octaves)
 function spread_chord()
-  -- chord_inverted = deepcopy(chord)
   if params:get('chord_spread') ~= 0 then
-    for i = 1,#chord_inverted do
-      chord_inverted[i] = chord_inverted[i] + round((params:get('chord_spread') / (params:get('chord_type') - 1) * (i - 1))) * 12
+    for i = 1,#chord_transformed do
+      chord_transformed[i] = chord_transformed[i] + round((params:get('chord_spread') / (params:get('chord_type') - 1) * (i - 1))) * 12
     end
   end
 end
@@ -1537,7 +1534,7 @@ end
 
 -- This triggers when mode param changes and allows arp and harmonizers to pick up the new mode immediately. Doesn't affect the chords and doesn't need chord transformations since the chord advancement will overwrite
 function update_chord_action()
-  chord = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  chord_raw = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
   next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
 end
 
@@ -1546,7 +1543,7 @@ function play_chord(destination, channel)
   local destination = params:string('chord_dest')
   if destination == 'Engine' then
     for i = 1, params:get('chord_type') do
-      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_engine('chord', note)
     end
   elseif destination == 'MIDI' then
@@ -1557,22 +1554,22 @@ function play_chord(destination, channel)
         midi_device[port]:cc(1, cc_1, channel)
       end
     for i = 1, params:get('chord_type') do
-      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
     end
   elseif destination == 'Crow' then
     for i = 1, params:get('chord_type') do
-      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_crow('chord',note)
     end
   elseif destination =='ii-JF' then
     for i = 1, params:get('chord_type') do
-      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_jf('chord',note, params:get('chord_jf_amp')/10)
     end
   elseif destination == 'Disting' then
     for i = 1, params:get('chord_type') do
-      local note = chord_inverted[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_disting(note, params:get('chord_disting_velocity'), chord_duration)
     end    
   end
@@ -1627,8 +1624,9 @@ function get_next_chord()
 
     -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
     -- Mode is always updated in case no chord has been set but user has changed Mode param.
-      next_chord_o = chord_seq[pre_pattern][pre_chord_seq_position].c > 0 and chord_seq[pre_pattern][pre_chord_seq_position].o or next_chord_o
-      next_chord_c = chord_seq[pre_pattern][pre_chord_seq_position].c > 0 and chord_seq[pre_pattern][pre_chord_seq_position].c or next_chord_c
+    -- todo p3 efficiency test vs if/then
+      next_chord_o = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and (chord_seq[pre_pattern][pre_chord_seq_position] > 7 and 1 or 0) or next_chord_o
+      next_chord_c = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and util.wrap(chord_seq[pre_pattern][pre_chord_seq_position], 1, 7) or next_chord_c
       next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
     
   end
@@ -1648,7 +1646,7 @@ end
 function quantize_note(note_num, source)
   local chord_length = params:get(source..'_chord_type') -- Move upstream?
   local source_octave = params:get(source..'_octave') -- Move upstream?
-  local quantized_note = chord[util.wrap(note_num, 1, chord_length)]
+  local quantized_note = chord_raw[util.wrap(note_num, 1, chord_length)]
   local quantized_octave = math.floor((note_num - 1) / chord_length)
   return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
 end
@@ -2130,9 +2128,9 @@ function grid_redraw()
         g:led(i, chord_seq_position, 3)
       end
       for i = 1,8 do
-        g:led(15, i, chord_pattern_length[pattern] < i and 4 or 15)           --set pattern_length LEDs
-        if chord_seq[pattern][i].x > 0 then                             -- muted steps
-          g:led(chord_seq[pattern][i].x, i, 15)                         -- set LEDs for chord sequence
+        g:led(15, i, chord_pattern_length[pattern] < i and 4 or 15)     --set pattern_length LEDs
+        if chord_seq[pattern][i] > 0 then                               -- muted steps
+          g:led(chord_seq[pattern][i], i, 15)                         -- set LEDs for chord sequence
         end
       end
       
@@ -2280,21 +2278,17 @@ function g.key(x,y,z)
       end
       if transport_active == false then -- Update chord for when play starts
         get_next_chord()
-        chord = next_chord
+        chord_raw = next_chord
       end
       
     --CHORD KEYS
     elseif grid_view_name == 'Chord' then
       if x < 15 then
         chord_key_count = chord_key_count + 1
-        if x == chord_seq[pattern][y].x then
-          chord_seq[pattern][y].x = 0
-          chord_seq[pattern][y].c = 0
-          chord_seq[pattern][y].o = 0
+        if x == chord_seq[pattern][y] then
+          chord_seq[pattern][y] = 0
         else
-          chord_seq[pattern][y].x = x --raw key x coordinate
-          chord_seq[pattern][y].c = util.wrap(x, 1, 7) --chord 1-7 (no octave). Should move this to a function since it's called a few places.
-          chord_seq[pattern][y].o = math.floor(x / 8) --octave
+          chord_seq[pattern][y] = x
         end
         chord_no = util.wrap(x,1,7) + (params:get('chord_type') == 4 and 7 or 0) -- or 0
         generate_chord_names()
@@ -2314,16 +2308,14 @@ function g.key(x,y,z)
           pattern_copy_performed = true
           -- To-do: deepcopy
           for i = 1,8 do
-            chord_seq[y][i].x = chord_seq[pattern_copy_source][i].x
-            chord_seq[y][i].c = chord_seq[pattern_copy_source][i].c
-            chord_seq[y][i].o = chord_seq[pattern_copy_source][i].o
+            chord_seq[y][i] = chord_seq[pattern_copy_source][i]
           end
           chord_pattern_length[y] = chord_pattern_length[pattern_copy_source]
         end
       end
       if transport_active == false then -- Pre-load chord for when play starts
         get_next_chord()
-        chord = next_chord
+        chord_raw = next_chord
       end
       
     -- ARP KEYS
@@ -2714,14 +2706,10 @@ function rotate_pattern(view, direction)
     local length = chord_pattern_length[pattern]
     local temp_chord_seq = {}
     for i = 1, length do
-      temp_chord_seq[i] = {x = chord_seq[pattern][i].x} -- I still don't get why this has to be formatted differently
-      temp_chord_seq[i]['c'] = chord_seq[pattern][i].c 
-      temp_chord_seq[i]['o'] = chord_seq[pattern][i].o
+      temp_chord_seq[i] = chord_seq[pattern][i]
     end
     for i = 1, length do
-      chord_seq[pattern][i]['x'] = temp_chord_seq[util.wrap(i - direction,1,length)].x
-      chord_seq[pattern][i]['c'] = temp_chord_seq[util.wrap(i - direction,1,length)].c
-      chord_seq[pattern][i]['o'] = temp_chord_seq[util.wrap(i - direction,1,length)].o
+      chord_seq[pattern][i] = temp_chord_seq[util.wrap(i - direction,1,length)]
     end
   elseif view == 'Arp' then
     local length = arp_pattern_length[arp_pattern]
@@ -2813,10 +2801,8 @@ end
 function transpose_pattern(view, direction)
   if view == 'Chord' then
     for y = 1,8 do
-      if chord_seq[pattern][y]['x'] ~= 0 then
-        chord_seq[pattern][y]['x'] = util.wrap(chord_seq[pattern][y]['x'] + direction, 1, 14)
-        chord_seq[pattern][y].c = util.wrap(chord_seq[pattern][y]['x'], 1, 7) --chord 1-7 (no octave)
-        chord_seq[pattern][y].o = math.floor(chord_seq[pattern][y]['x'] / 8) --octave
+      if chord_seq[pattern][y] ~= 0 then
+        chord_seq[pattern][y] = util.wrap(chord_seq[pattern][y] + direction, 1, 14)
       end
     end
   elseif view == 'Arp' then
@@ -3139,8 +3125,6 @@ function redraw()
   local dash_x = 94
 
   if init_message ~= nil then
-    print('should show screen stuff here')
-    -- crow_version = 'v.4.0.2' --prerelease remove!
     screen.level(15)
     screen.move(2,8)
     screen.text('WARNING!')    
@@ -3149,18 +3133,16 @@ function redraw()
     screen.move(2,28)
     screen.text('Your version is ' .. crow_version .. '.')
     screen.move(2,38)
-    screen.text('If freezing occurs, try')
-    screen.move(2,48)
+    screen.text('If Norns locks up, try')
+    screen.move(2,48) 
     screen.text('unplugging Crow inputs 1-2.')
-    
-      screen.level(4)
-      screen.move(1,54)
-      screen.line(128,54)
-      screen.stroke()
-      screen.level(3)      
-      screen.move(128,62)
-      screen.text_right('(K3) OK')          
-
+    screen.level(4)
+    screen.move(1,54)
+    screen.line(128,54)
+    screen.stroke()
+    screen.level(3)      
+    screen.move(128,62)
+    screen.text_right('(K3) OK')          
     
   -- Screens that pop up when g.keys are being held down take priority--------
   -- POP-up g.key tip always takes priority

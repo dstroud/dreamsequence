@@ -68,6 +68,7 @@ function chord_generator_lite()
   chord_generator('run')
   print('Chord algo: ' .. chord_algos['name'][chord_algo])
   grid_redraw()
+  -- gen_dash('chord_generator_lite')
   redraw()
 end
 
@@ -127,7 +128,7 @@ function chord_generator(mode)
           if prev_chord_type == 'dim' or prev_chord_type == 'aug' then
             progression = {}
             progression_valid = false
-            print('reroll')
+            -- print('reroll')
           else
             progression_valid = true
           end
@@ -139,9 +140,7 @@ function chord_generator(mode)
     octave_split_up()
     for i = 1, chord_pattern_length[pattern] do
       local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor((x) / 8) --octave
+      chord_seq[pattern][i] = x
     end  
   end)
 
@@ -189,7 +188,7 @@ function chord_generator(mode)
     for i = 1,#progression do
       local this_type = mode_chord_types[util.wrap(progression[i], 1, 7)]
       if (this_type == 'aug') or (this_type == 'dim') then
-        print('reroll')
+        -- print('reroll')
         reroll = true
       end
     end
@@ -200,9 +199,7 @@ function chord_generator(mode)
     chord_pattern_length[pattern] = 4
     for i = 1, chord_pattern_length[pattern] do
       local x = progression[i]
-      chord_seq[pattern][i].x = x --raw key x coordinate
-      chord_seq[pattern][i].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][i].o = math.floor(x / 8) --octave
+      chord_seq[pattern][i] = x
     end  
     
   end)
@@ -226,40 +223,31 @@ function chord_generator(mode)
     progression[1] = progression[1] + ((progression[2] - progression[1] > 3) and 7 or 0)
   
     local x = progression[1]
-    chord_seq[pattern][1].x = x --raw key x coordinate
-    chord_seq[pattern][1].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-    chord_seq[pattern][1].o = math.floor(x / 8) --octave
+    chord_seq[pattern][1] = x
     local x = progression[2]
-    chord_seq[pattern][5].x = x --raw key x coordinate
-    chord_seq[pattern][5].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-    chord_seq[pattern][5].o = math.floor(x / 8) --octave
+    chord_seq[pattern][5] = x
     
     -- Chance of adding a transition chord at end of loop
     if math.random() >.7 then
       local position = 8
       local x = (math.max(progression[1], progression[3]) -  math.min(progression[1], progression[3])) < (math.max(progression[1], progression[3] + 7) -  math.min(progression[1], progression[3] + 7)) and 0 or 7
       local x = x + progression[3] 
-      chord_seq[pattern][position].x = x --raw key x coordinate
-      chord_seq[pattern][position].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][position].o = math.floor(x / 8) --octave
+      chord_seq[pattern][position] = x
     end
     
     -- Use diminished passing chord if possible
     if (progression[1] < 14) and mode_chord_types[util.wrap(progression[1], 1, 7) + 1] == 'dim' then --math.random() >.5 then
       local position = 8
       local x = progression[1] + 1
-      chord_seq[pattern][position].x = x --raw key x coordinate
-      chord_seq[pattern][position].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][position].o = math.floor(x / 8) --octave
+      chord_seq[pattern][position] = x
     end      
 
     -- Use augmented passing chord if possible
     if (progression[1] >1) and mode_chord_types[util.wrap(progression[1], 1, 7) - 1] == 'aug' then
       local position = 8
       local x = progression[1] - 1
-      chord_seq[pattern][position].x = x --raw key x coordinate
-      chord_seq[pattern][position].c = util.wrap(x, 1, 7) --chord 1-7 (no octave)
-      chord_seq[pattern][position].o = math.floor(x / 8) --octave
+      chord_seq[pattern][position] = x
+
     end  
     
   end)
@@ -374,7 +362,7 @@ function arp_generator(mode)
     
     -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
-    -- print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
+
     local peak = math.random(2, arp_pattern_length[arp_pattern] - 1)
     for i = 1, peak do
       arp_seq[1][i] = arp_min - 1 + i
@@ -402,7 +390,7 @@ function arp_generator(mode)
     
     -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
-    -- print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
+
     local peak = math.random(2, arp_pattern_length[arp_pattern] - 1)
     for i = 1, peak do
       arp_seq[1][i] = arp_max - 1 - i
@@ -525,8 +513,6 @@ function arp_generator(mode)
     -- -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     -- params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
     
-    -- print(params:get('clock_tempo') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
-    
     for i = 1, arp_pattern_length[arp_pattern] do
       arp_seq[1][i] = arp_min - 1 + i
     end
@@ -611,7 +597,6 @@ function arp_generator(mode)
   -- arp_generator index 1 is reserved for Randomize, otherwise fire the selected algo.
     local arp_algo = params:get('arp_generator') == 1 and math.random(2,#arp_algos['name']) or params:get('arp_generator')
     print('Arp algo: ' .. arp_algos['name'][arp_algo])
-    -- print(params:get('clock_tempo') .. ' ' .. params:get('arp_div_index') .. ' ' .. divisions_string(params:get('arp_div_index')) .. ' ' .. divisions_string(params:get('arp_duration_index')))
     load(arp_algos['func'][arp_algo])
   end
 end
