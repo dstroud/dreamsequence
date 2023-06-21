@@ -531,15 +531,11 @@ crow_version_clock = clock.run(
     clock.sleep(0.005) -- a small hold for usb round-trip
     if crow_version ~= nil then
       local crow_major_version = find_number(crow_version)
-      if crow_version == 'v3.0.1' then
-        print('Crow v.3.0.1 detected')
-      elseif crow_major_version > 3 then 
-        -- init_message = 'Crow version mismatch'
-        print('---- Crow ' .. crow_version .. ' detected. PLEASE DOWNGRADE TO CROW v3.0.1 TO USE WITH DREAMSEQUENCE----')
-      else
-        -- init_message = 'Crow version mismatch'
-        print('---- Crow ' .. crow_version .. ' detected. PLEASE UPGRADE TO CROW v3.0.1 TO USE WITH DREAMSEQUENCE----')
+      if crow_version ~= 'v3.0.1' then
+        init_message = 'Crow version warning'
+        redraw()
       end
+      print('Crow version ' .. crow_version)
     end
   end
 )
@@ -2560,7 +2556,10 @@ function key(n,z)
     elseif n == 3 then
       -- if keys[1] == 1 then
       
-      if view_key_count > 0 then -- Grid view key held down
+      if init_message ~= nil then
+        init_message = nil
+      
+      elseif view_key_count > 0 then -- Grid view key held down
         if screen_view_name == 'Chord+arp' then
         
           -- When Chord+Arp Grid View keys are held down, K3 runs Generator and resets pattern+arp
@@ -3056,7 +3055,7 @@ end
 -- generates truncated flat tables at the chord step level for the arranger mini dashboard
 -- runs any time the arranger changes (generator, events, pattern changes, length changes, key pset load, arranger/pattern reset, event edits)
 function gen_dash(source)
-  print('gen_dash called by ' .. (source or ''))
+  -- print('gen_dash called by ' .. (source or ''))
   dash_patterns = {}
   -- dash_levels correspond to 3 arranger states:
   -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
@@ -3139,20 +3138,33 @@ function redraw()
   screen.clear()
   local dash_x = 94
 
-  -- if init_message ~= nil then
-  --   print('should show screen stuff here')
-  --   -- crow_version = 'v.4.0.2' --prerelease remove!
-  --   screen.level(15)
-  --   screen.move(2,18)
-  --   screen.text('Crow ' .. crow_version .. ' detected')
-  --   screen.move(2,28)
-  --   screen.text('Only v3.0.1 works for now :(')
-  --   screen.move(2,38)
-  --   screen.text('Manual install or unplug pls!')
+  if init_message ~= nil then
+    print('should show screen stuff here')
+    -- crow_version = 'v.4.0.2' --prerelease remove!
+    screen.level(15)
+    screen.move(2,8)
+    screen.text('WARNING!')    
+    screen.move(2,18)
+    screen.text('Crow v.3.0.1 is recommended.')
+    screen.move(2,28)
+    screen.text('Your version is ' .. crow_version .. '.')
+    screen.move(2,38)
+    screen.text('If freezing occurs, try')
+    screen.move(2,48)
+    screen.text('unplugging Crow inputs 1-2.')
+    
+      screen.level(4)
+      screen.move(1,54)
+      screen.line(128,54)
+      screen.stroke()
+      screen.level(3)      
+      screen.move(128,62)
+      screen.text_right('(K3) OK')          
 
+    
   -- Screens that pop up when g.keys are being held down take priority--------
   -- POP-up g.key tip always takes priority
-  if view_key_count > 0 then
+  elseif view_key_count > 0 then
     -- screen.level(7)
     -- screen.move(64,32)
     -- screen.font_size(16)
