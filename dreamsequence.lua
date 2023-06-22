@@ -92,12 +92,19 @@ function init()
   params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI harmonizer', 'CV harmonizer'}, 1)
   params:set_action('event_category',function() update_menus() end)
   params:hide(params.lookup['event_category'])
+ 
+  params:add_option('event_sub_category', 'Sub-Category', {'Crow aux', 'Gen', 'Song', 'Pattern', 'Voice', 'Engine', 'MIDI', 'JF', 'Crow', 'Disting'}, 1) --todo p1 generate these dynamically becuase you know they're gonna break
+  
+  params:set_action('event_category',function() update_menus() end)
+  params:hide(params.lookup['event_category'])
   
   params:add_option('event_name', 'Event', events_lookup_names, 1) -- Default value overwritten later in Init
   params:set_action('event_name',function() update_menus() end)
   params:hide(params.lookup['event_name'])
+  
   params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
   params:hide(params.lookup['event_value_type'])
+  
   params:add_number('event_value', 'Value', -999, 999, 0)
   params:hide(params.lookup['event_value'])
   
@@ -337,7 +344,7 @@ function init()
   arranger_seq_position = 0
   arranger_seq_length = 1
   arranger_grid_offset = 0 -- offset allows us to scroll the arranger grid view beyond 16 segments
-  generate_arranger_seq_padded()
+  gen_arranger_seq_padded()
   d_cuml = 0
   interaction = nil
   events = {}
@@ -354,9 +361,20 @@ function init()
   event_categories = {} -- to-do: make local after debug
   for i = 1, #events_lookup do
     event_categories[i] = events_lookup[i].category
-  end  
+  end
+  set_event_category_min_max()
+  
+  event_sub_categories = {} -- to-do: make local after debug
+  for i = 1, #events_lookup do
+    event_sub_categories[i] = events_lookup[i].sub_category
+  end
+  
+  -- todo p0 rewrite to use sub_category
   set_event_category_min_max()
   params:set('event_name', event_category_min_index)  -- Overwrites initial value
+  
+  
+  
   event_edit_pattern = 0
   event_edit_step = 0
   event_edit_lane = 0
@@ -561,11 +579,11 @@ function update_menus()
   local event_index = params:get('event_name')
   local value_type = events_lookup[event_index].value_type
   if value_type == 'inc, set' then 
-    events_menus =  {'event_category', 'event_name', 'event_value_type', 'event_value'}
+    events_menus =  {'event_category', 'event_sub_category', 'event_name', 'event_value_type', 'event_value'}
   elseif value_type == 'set' then 
-    events_menus =  {'event_category', 'event_name', 'event_value'}
+    events_menus =  {'event_category', 'event_sub_category', 'event_name', 'event_value'}
   elseif value_type == 'trigger' then 
-    events_menus =  {'event_category', 'event_name'}
+    events_menus =  {'event_category', 'event_sub_category', 'event_name'}
   end
 
   -- GLOBAL MENU 
@@ -990,9 +1008,9 @@ function clock.tempo_change_handler()
 end  
 
 
--- Pads out arranger where it has 0 segments
+-- Pads out arranger where it has 0 val segments
 -- Called when selecting/deselecting Arranger segments, changing Arranger lenth via key or enc (insert/delete), switching patterns manually
-function generate_arranger_seq_padded()
+function gen_arranger_seq_padded()
   arranger_seq_padded = {}
   
   -- First identify the first and last populated segments
@@ -1000,13 +1018,28 @@ function generate_arranger_seq_padded()
   last_populated_segment = 0
   patt = nil
 
-  -- To-do: this seems like a super crappy way to find the lowest and highest keys in arranger_seq?
-  for k, v in pairs(arranger_seq) do
-    if arranger_seq[k] > 0 then
-      if first_populated_segment == 0 then first_populated_segment = k end
-      last_populated_segment = math.max(last_populated_segment,k)
+  -- -- To-do: profile this vs the 2x pass and break
+  -- for k, v in pairs(arranger_seq) do -- no longer need to do in pairs because there are no nils
+  --   if arranger_seq[k] > 0 then
+  --     if first_populated_segment == 0 then first_populated_segment = k end
+  --     last_populated_segment = math.max(last_populated_segment,k)
+  --   end
+  -- end
+
+  for i = 1, max_arranger_seq_length do
+    if arranger_seq[i] > 0 then
+      first_populated_segment = i
+      break
     end
-  end
+  end  
+
+  for i = max_arranger_seq_length, 1, -1 do
+    if arranger_seq[i] > 0 then
+      last_populated_segment = i
+      -- print('last_populated_segment = ' .. last_populated_segment)
+      break
+    end
+  end    
 
   arranger_seq_length = math.max(last_populated_segment,1)
   
@@ -1023,7 +1056,7 @@ function generate_arranger_seq_padded()
       arranger_seq_padded[i] = (patt or pattern)
     end
   end
-  gen_dash('generate_arranger_seq_padded')
+  gen_dash('gen_arranger_seq_padded')
 end
 
 
@@ -1350,7 +1383,7 @@ end
 function reset_clock()
   clock_step = -1
   -- Immediately update this so if Arranger is zeroed we can use the current-set pattern (even if paused)
-  generate_arranger_seq_padded()
+  gen_arranger_seq_padded()
 end
 
 
@@ -1460,9 +1493,7 @@ function do_events()
         -- To-do: Cheesy check if each automation event lane has something. This sucks.
         if events[arranger_seq_position][chord_seq_position][i] ~= nil  then
           local event_type = events[arranger_seq_position][chord_seq_position][i].event_type
-          -- local event_name = events_lookup[events[arranger_seq_position][chord_seq_position][i].event_index].id
-          local event_name = events[arranger_seq_position][chord_seq_position][i].id -- changed to use string id rather than index
-          
+          local event_name = events[arranger_seq_position][chord_seq_position][i].id
           local value = events[arranger_seq_position][chord_seq_position][i].event_value or ''
           local value_type_index = events[arranger_seq_position][chord_seq_position][i].event_value_type
           local value_type = params.params[params.lookup['event_value_type']]['options'][value_type_index] or ''
@@ -2289,7 +2320,7 @@ function g.key(x,y,z)
         else
           arranger_seq[x_offset] = y
         end  
-        generate_arranger_seq_padded()
+        gen_arranger_seq_padded()
         
       end
       if transport_active == false then -- Update chord for when play starts
@@ -2443,7 +2474,7 @@ function g.key(x,y,z)
               events[event_edit_pattern] = {{},{},{},{},{},{},{},{}}
               table.remove(events, max_arranger_seq_length + 1)
             end
-            generate_arranger_seq_padded()
+            gen_arranger_seq_padded()
             d_cuml = 0
   
           elseif d_cuml < 0 then
@@ -2454,7 +2485,7 @@ function g.key(x,y,z)
               table.insert(events, {})
               events[max_arranger_seq_length] = {{},{},{},{},{},{},{},{}}
             end
-            generate_arranger_seq_padded()
+            gen_arranger_seq_padded()
             d_cuml = 0
           end
         interaction = nil
@@ -2851,12 +2882,14 @@ end
 
 function set_event_category_min_max()
   -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
-  -- Also should be called when K3 opens events menu and when recalling a populated event slot          
+  -- Also called when K3 opens events menu and when recalling a populated event slot          
   event_category_min_index = tab.key(event_categories, params:string('event_category'))
-  event_category_max_index = 0
-  for i = 1, #event_categories do
-    event_category_max_index = event_categories[i] == params:string('event_category') and i or event_category_max_index
-  end 
+  for i = #event_categories, 1, -1 do
+    if event_categories[i] == params:string('event_category') then
+      event_category_max_index = i
+      break
+    end
+  end
 end
 -- END OF EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
 
@@ -2880,7 +2913,7 @@ function enc(n,d)
         grid_redraw()            
       end
    
-    elseif screen_view_name == 'Events' then
+    elseif screen_view_name == 'Events' and event_saved == false then
       -- Scroll through the Events menus (name, type, val)
       events_index = util.clamp(events_index + d, 1, #events_menus)
       selected_events_menu = events_menus[events_index]
@@ -2900,7 +2933,7 @@ function enc(n,d)
     end
       
   -- Change event value
-  elseif screen_view_name == 'Events' then
+  elseif screen_view_name == 'Events' and event_saved == false then
 
     if selected_events_menu == 'event_category' then
       params:delta(selected_events_menu, d)
@@ -2910,6 +2943,16 @@ function enc(n,d)
       event_name = events_lookup[params:get('event_name')].id
       set_event_range()
       init_event_value()
+      
+    elseif selected_events_menu == 'event_sub_category' then
+      local prev_event_sub_category = event_sub_category --todo p0 create this var somewhere
+      params:set(selected_events_menu, util.clamp(params:get(selected_events_menu) + d, event_category_min_index, event_category_max_index))
+      event_sub_category = events_lookup[params:get('event_sub_category')].id
+      -- We don't want values to be reset if user hits the start/end of the event_name range and keeps turning the encoder. 
+      if event_sub_category ~= prev_event_sub_category then
+        set_event_range()
+        init_event_value()  
+      end  
 
     elseif selected_events_menu == 'event_name' then
       local prev_event_name = event_name
@@ -3365,6 +3408,48 @@ function redraw()
         screen.move(126,8)
         screen.text_right('EVENT ' .. event_edit_lane .. '/16') 
   
+        -- -- Scrolling events menu
+        -- local menu_offset = scroll_offset(events_index,#events_menus, 5, 10)
+        -- line = 1
+        -- for i = 1,#events_menus do
+        --   screen.move(2, line * 10 + 8 - menu_offset)
+        --   screen.level(events_index == i and 15 or 3)
+
+        --   -- Switch between number and formatted value for Incremental and Set, respectively
+        --   event_val_string = params:string(events_menus[i])
+        --   if events_menus[i] == 'event_value' then
+        --     if not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then
+        --       if events_lookup[params:get('event_name')].formatter ~= nil then
+        --         event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
+        --       elseif events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
+        --         local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
+        --         event_val_string = options[params:get(events_menus[i])]                
+        --       end
+        --     end  
+        --   end
+          
+        --   -- Draw menu and <> indicators for scroll range
+        --   -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
+        --   local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
+        --   if events_index == i then
+        --     local selected_events_menu = events_menus[i]
+        --     local range =
+        --       (selected_events_menu == 'event_category' or selected_events_menu == 'event_value_type') and params:get_range(selected_events_menu)
+        --       or selected_events_menu == 'event_name' and {event_category_min_index, event_category_max_index}
+        --       or event_range
+        --     local menu_value_suf = params:get(selected_events_menu) == range[1] and '>' or ''
+        --     local menu_value_pre = params:get(selected_events_menu) == range[2] and '<' or ' '
+        --     local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+        --     screen.text(events_menu_txt)
+        --   else
+        --     screen.text(first_to_upper(param_formatter(param_id_to_name(events_menus[i]))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
+        --   end
+        
+        --   line = line + 1
+        -- end
+
+
+
         -- Scrolling events menu
         local menu_offset = scroll_offset(events_index,#events_menus, 5, 10)
         line = 1
@@ -3404,6 +3489,78 @@ function redraw()
         
           line = line + 1
         end
+        
+        
+        -- -- Static events menu
+        -- for i = 1,#events_menus do
+
+        --   -- line 1
+        --   if events_menus[i] == 'event_category' then
+        --     screen.move(2, 18)
+        --   elseif events_menus[i] == 'event_sub_category' then
+        --     screen.move(6 + previous_events_menu_width,18)
+            
+        --   -- line 2
+        --   elseif events_menus[i] == 'event_name' then
+        --     screen.move(2, 28)
+
+        --   -- line 3
+        --   elseif events_menus[i] == 'event_value_type' then
+        --     screen.move(2,38)
+        --     line = 3
+            
+        --   -- line 4
+        --   elseif events_menus[i] == 'event_value' then
+        --     screen.move(6 + previous_events_menu_width, 38)    
+            
+        --   else
+        --     screen.move(2, (line)* 10 + 8)
+        --     -- line = line + 1
+        --   end
+          
+        --   screen.level(events_index == i and 15 or 3)
+
+        --   -- Switch between number and formatted value for Incremental and Set, respectively
+        --   event_val_string = params:string(events_menus[i])
+        --   if events_menus[i] == 'event_value' then
+        --     if not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then
+        --       if events_lookup[params:get('event_name')].formatter ~= nil then
+        --         event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
+        --       elseif events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
+        --         local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
+        --         event_val_string = options[params:get(events_menus[i])]                
+        --       end
+        --     end  
+        --   end
+
+        --   -- Draw menu and <> indicators for scroll range
+        --   -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
+        --   local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
+        --   if events_index == i then
+        --     local selected_events_menu = events_menus[i]
+        --     local range =
+        --       (selected_events_menu == 'event_category' or selected_events_menu == 'event_value_type') and params:get_range(selected_events_menu)
+        --       or selected_events_menu == 'event_name' and {event_category_min_index, event_category_max_index}
+        --       or event_range
+        --     local menu_value_suf = params:get(selected_events_menu) == range[1] and '>' or ''
+        --     local menu_value_pre = params:get(selected_events_menu) == range[2] and '<' or ' '
+        
+        --     -- local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+        --     -- screen.text(events_menu_txt)
+
+        --     local events_menu_txt = menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+        --     screen.text(events_menu_txt)
+            
+        --     previous_events_menu_width = screen.text_extents(events_menu_txt)
+        
+        --   else
+        --     screen.text(string.sub(event_val_string, 1, events_menu_trunc))
+        
+        --   end
+        
+        --   -- line = line + 1
+        -- end
+        
         
         screen.level(4)
         screen.move(1,54)
