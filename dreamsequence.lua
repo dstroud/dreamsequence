@@ -43,6 +43,19 @@ function init()
   midi_device_names = {} -- container for their names
   refresh_midi_devices()
   
+  -- build some events tables needed for params/menus
+  local events_lookup_names = {} -- to-do: make local after debug
+  local events_lookup_ids = {} -- local
+  for i = 1, #events_lookup do
+    events_lookup_names[i] = events_lookup[i].name
+    events_lookup_ids[i] = events_lookup[i].id
+  end
+  events_lookup_index = {}
+  events_lookup_index = tab.invert(events_lookup_ids)
+  
+  --------------------
+  --PARAMS
+  --------------------
   params:add_separator ('DREAMSEQUENCE')
 
   --GLOBAL PARAMS
@@ -77,19 +90,16 @@ function init()
 
   -- EVENT PARAMS
   params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI harmonizer', 'CV harmonizer'}, 1)
-    params:set_action('event_category',function() update_menus() end)
-    params:hide(params.lookup['event_category'])
-  event_display_names = {} -- to-do: make local after debug
-  for i = 1, #events_lookup do
-    event_display_names[i] = events_lookup[i].name
-  end
-  params:add_option('event_name', 'Event', event_display_names, 1) -- Default value will be overwritten later in Init
-    params:set_action('event_name',function() update_menus() end)
-    params:hide(params.lookup['event_name'])
+  params:set_action('event_category',function() update_menus() end)
+  params:hide(params.lookup['event_category'])
+  
+  params:add_option('event_name', 'Event', events_lookup_names, 1) -- Default value overwritten later in Init
+  params:set_action('event_name',function() update_menus() end)
+  params:hide(params.lookup['event_name'])
   params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
-    params:hide(params.lookup['event_value_type'])
+  params:hide(params.lookup['event_value_type'])
   params:add_number('event_value', 'Value', -999, 999, 0)
-    params:hide(params.lookup['event_value'])
+  params:hide(params.lookup['event_value'])
   
   
   --CHORD PARAMS
@@ -171,7 +181,7 @@ function init()
   params:add_separator ('arp_crow', 'Crow')
   params:add_option("arp_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("arp_tr_env",function() update_menus() end)
-  params:add_number('arp_ar_skew','AD env. skew',0, 100, 0)
+  params:add_number('arp_ad_skew','AD env. skew',0, 100, 0)
   
   
   --MIDI PARAMS
@@ -218,7 +228,7 @@ function init()
   params:add_separator ('midi_harmonizer_crow','Crow')
   params:add_option("midi_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("midi_tr_env",function() update_menus() end)
-  params:add_number('midi_ar_skew','AD env. skew',0, 100, 0)
+  params:add_number('midi_ad_skew','AD env. skew',0, 100, 0)
 
   
   --CV/CROW PARAMS
@@ -256,7 +266,7 @@ function init()
   params:add_separator ('cv_harmonizer_crow', 'Crow')
   params:add_option("crow_tr_env", "Output", {'Trigger','AD env.'},1)
     params:set_action("crow_tr_env",function() update_menus() end)
-  params:add_number('crow_ar_skew','AD env. skew',0, 100, 0)
+  params:add_number('crow_ad_skew','AD env. skew',0, 100, 0)
   
   
   glyphs = {
@@ -587,7 +597,7 @@ function update_menus()
     if params:string('arp_tr_env') == 'Trigger' then
       menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
     else -- AD envelope
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ar_skew',}
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
     menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
@@ -610,7 +620,7 @@ function update_menus()
     if params:string('midi_tr_env') == 'Trigger' then
       menus[4] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env'}
     else -- AD envelope
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ar_skew'}
+      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
     end
   elseif params:string('midi_dest') == 'ii-JF' then
     menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
@@ -629,7 +639,7 @@ function update_menus()
     if params:string('crow_tr_env') == 'Trigger' then
       menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
     else -- AD envelope
-      menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ar_skew', }
+      menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
     end
   elseif params:string('crow_dest') == 'ii-JF' then
     menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
@@ -1450,7 +1460,9 @@ function do_events()
         -- To-do: Cheesy check if each automation event lane has something. This sucks.
         if events[arranger_seq_position][chord_seq_position][i] ~= nil  then
           local event_type = events[arranger_seq_position][chord_seq_position][i].event_type
-          local event_name = events_lookup[events[arranger_seq_position][chord_seq_position][i].event_index].id
+          -- local event_name = events_lookup[events[arranger_seq_position][chord_seq_position][i].event_index].id
+          local event_name = events[arranger_seq_position][chord_seq_position][i].id -- changed to use string id rather than index
+          
           local value = events[arranger_seq_position][chord_seq_position][i].event_value or ''
           local value_type_index = events[arranger_seq_position][chord_seq_position][i].event_value_type
           local value_type = params.params[params.lookup['event_value_type']]['options'][value_type_index] or ''
@@ -1849,8 +1861,8 @@ function to_crow(source, note)
     if params:get(source..'_tr_env') == 1 then  -- Trigger
       crow.output[2].action = 'pulse(.001,10,1)' -- (time,level,polarity)
     else -- envelope
-      local crow_attack = duration_sec(_G[source .. '_duration']) * params:get(source..'_ar_skew') / 100
-      local crow_release = duration_sec(_G[source .. '_duration']) * (100 - params:get(source..'_ar_skew')) / 100
+      local crow_attack = duration_sec(_G[source .. '_duration']) * params:get(source..'_ad_skew') / 100
+      local crow_release = duration_sec(_G[source .. '_duration']) * (100 - params:get(source..'_ad_skew')) / 100
       crow.output[2].action = 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)'  -- (attack,release,shape) SHAPE is bugged?
     end
     crow.output[2]()
@@ -2158,17 +2170,21 @@ function g.key(x,y,z)
     if screen_view_name == 'Events' then
       -- Setting of events past the pattern length is permitted
       event_key_count = event_key_count + 1
+      
         -- First touched event is the one we edit, effectively resetting on key_count = 0
         if event_key_count == 1 then
           event_edit_step = y
           event_edit_lane = x
           event_saved = false
+          
           -- If the event lane is populated, Load the Event vars back to the displayed param
           if events[event_edit_pattern][y][x] ~= nil then
             local event_category_options = params.params[params.lookup['event_category']].options
             params:set('event_category', tab.key(event_category_options, events[event_edit_pattern][y][x].category))
             set_event_category_min_max()
-            params:set('event_name', events[event_edit_pattern][y][x].event_index)
+            
+            -- No longer storing events_lookup index in events table since this will break with saves. So we do a reverse lookup on id to get the index #
+            params:set('event_name', events_lookup_index[events[event_edit_pattern][y][x].id])
             if events[event_edit_pattern][y][x].event_value ~= nil then
               params:set('event_value', events[event_edit_pattern][y][x].event_value)
               if events[event_edit_pattern][y][x].event_value_type ~= nil then
@@ -2603,7 +2619,6 @@ function key(n,z)
         if event_edit_active then
           
           local event_index = params:get('event_name')
-          local event_id = events_lookup[event_index].id
           local event_type = events_lookup[event_index].event_type
           local event_value = params:get('event_value')
           local value_type = events_lookup[event_index].value_type
@@ -2625,21 +2640,40 @@ function key(n,z)
 
           -- Wipe existing events, write the event vars to events
           if value_type == 'trigger' then
-            events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index}
+            events[event_edit_pattern][event_edit_step][event_edit_lane] = 
+              {
+                category = events_lookup[event_index].category, 
+                id = events_lookup[event_index].id, 
+                event_type = event_type, 
+              }
+
             
             print('Saving Trigger event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')
-            print('category = ' .. events_lookup[event_index].category .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index)
+            print('category = ' .. events_lookup[event_index].category .. ', id = ' .. events_lookup[event_index].id .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index)
             
             
           elseif value_type == 'set' then
-            events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value}
+            events[event_edit_pattern][event_edit_step][event_edit_lane] = 
+              {
+                category = events_lookup[event_index].category, 
+                id = events_lookup[event_index].id, 
+                event_type = event_type, 
+                event_value = event_value
+              }
             
-         print('Saving Set event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')            print('category = ' .. events_lookup[event_index].category .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index .. ', event_value = ' .. event_value)
+         print('Saving Set event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')            print('category = ' .. events_lookup[event_index].category .. ', id = ' .. events_lookup[event_index].id .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index .. ', event_value = ' .. event_value)
   
           elseif value_type == 'inc, set' then
-            events[event_edit_pattern][event_edit_step][event_edit_lane] = {category = events_lookup[event_index].category, event_type = event_type, event_index = event_index, event_value = event_value, event_value_type = params:get('event_value_type')}
+            events[event_edit_pattern][event_edit_step][event_edit_lane] = 
+              {
+                category = events_lookup[event_index].category, 
+                id = events_lookup[event_index].id, 
+                event_type = event_type, 
+                event_value = event_value, 
+                event_value_type = params:get('event_value_type')
+              }
             
-         print('Saving Inc/Set event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')              print('category = ' .. events_lookup[event_index].category .. ', event_type = ' .. event_type .. ', event_index = ' .. event_index .. ', event_value = ' .. event_value .. ' event_value_type = ' .. params:get('event_value_type'))
+         print('Saving Inc/Set event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')              print('category = ' .. events_lookup[event_index].category .. ', id = ' .. events_lookup[event_index].id.. ', event_type = ' .. event_type .. ', event_index = ' .. event_index .. ', event_value = ' .. event_value .. ' event_value_type = ' .. params:get('event_value_type'))
           end
           
           -- Extra fields are added if action is assigned to param/function
