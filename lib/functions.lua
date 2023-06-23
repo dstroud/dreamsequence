@@ -36,3 +36,24 @@ function gen_event_tables()
   
   end
   
+  
+  function spaces_to_underscores(str)
+    local replacedStr = string.gsub(str, " ", "_")
+    return replacedStr
+  end
+  
+  
+  -- text_extents sucks so I gotta make some adjustments
+  -- spaces should count as 3 and </> count as 3
+  function text_width(str)
+    local extents = screen.text_extents(str) -- raw count that ain't great
+    
+    local symbols = "<>"
+    local pattern = "[" .. symbols:gsub("[<>]", "%%%0") .. "]" -- character class to identify < and >
+    local extents = extents - (select(2, string.gsub(str, pattern, ""))) -- subtract 1 for each < and >
+  
+    local count = select(2, string.gsub(str, pattern, ""))
+    local extents = extents + (string.len(string.gsub(str, "[^%s]", "")) * 3) -- spaces count as 3 pixels
+    
+    return extents
+  end
