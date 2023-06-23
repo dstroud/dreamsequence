@@ -43,16 +43,53 @@ function init()
   midi_device_names = {} -- container for their names
   refresh_midi_devices()
   
-  -- build some events tables needed for params/menus
-  local events_lookup_names = {} -- to-do: make local after debug
-  local events_lookup_ids = {} -- local
+  
+  -- Events tables needed for params/menus
+  --todo p3 generate from events_lookup
+  event_category_ids = {'event_global', 'event_chord', 'event_arp', 'event_midi_harmonizer', 'event_cv_harmonizer'}
+  local events_lookup_names = {}
+  local events_lookup_ids = {}
   for i = 1, #events_lookup do
     events_lookup_names[i] = events_lookup[i].name
     events_lookup_ids[i] = events_lookup[i].id
   end
-  events_lookup_index = {}
   events_lookup_index = tab.invert(events_lookup_ids)
   
+  
+  -- Used to derive the min and max indices for the selected event category (Global, Chord, Arp, etc...)
+  event_categories = {} -- todo: make local after debug
+  for i = 1, #events_lookup do
+    event_categories[i] = events_lookup[i].category
+  end
+  
+
+  -- Generate sub_categories lookup tables with unique, ordered event sub_categories for each category
+  -- These will be used to generate a parameter for each event category containing the sub_categories
+  event_sub_categories = {}
+  for _, entry in ipairs(events_lookup) do
+    local category = entry.category
+    local sub_category = entry.sub_category
+
+    if not event_sub_categories[category] then
+      event_sub_categories[category] = {}  -- Create a table for each category
+    end
+
+    -- Check if the sub_category already exists in the table
+    local exists = false
+    for _, value in ipairs(event_sub_categories[category]) do
+      if value == sub_category then
+        exists = true
+        break
+      end
+    end
+
+    -- Add the sub_category to the table if it doesn't exist
+    if not exists then
+      table.insert(event_sub_categories[category], sub_category)
+    end
+  end
+  
+
   --------------------
   --PARAMS
   --------------------
@@ -85,18 +122,32 @@ function init()
   
   params:add_option('playback', 'Playback', {'Loop','One-shot'}, 1)
   params:set_action('playback', function() grid_redraw(); arranger_ending() end)
-  -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- To-do
-
+  -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- todo
 
   -- EVENT PARAMS
   params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI harmonizer', 'CV harmonizer'}, 1)
   params:set_action('event_category',function() update_menus() end)
   params:hide(params.lookup['event_category'])
- 
-  params:add_option('event_sub_category', 'Sub-Category', {'Crow aux', 'Gen', 'Song', 'Pattern', 'Voice', 'Engine', 'MIDI', 'JF', 'Crow', 'Disting'}, 1) --todo p1 generate these dynamically becuase you know they're gonna break
+
+  params:add_option('event_global', 'event_global', event_sub_categories['Global'], 1)
+  params:set_action('event_global',function() update_menus() end)
+  params:hide(params.lookup['event_global'])
   
-  params:set_action('event_category',function() update_menus() end)
-  params:hide(params.lookup['event_category'])
+  params:add_option('event_chord', 'event_chord', event_sub_categories['Chord'], 1)
+  params:set_action('event_chord',function() update_menus() end)
+  params:hide(params.lookup['event_chord'])  
+  
+  params:add_option('event_arp', 'event_arp', event_sub_categories['Arp'], 1)
+  params:set_action('event_arp',function() update_menus() end)
+  params:hide(params.lookup['event_arp'])  
+  
+  params:add_option('event_cv_harmonizer', 'event_cv_harmonizer', event_sub_categories['CV harmonizer'], 1)
+  params:set_action('event_cv_harmonizer',function() update_menus() end)
+  params:hide(params.lookup['event_cv_harmonizer'])  
+
+  params:add_option('event_midi_harmonizer', 'event_midi_harmonizer', event_sub_categories['MIDI harmonizer'], 1)
+  params:set_action('event_midi_harmonizer',function() update_menus() end)
+  params:hide(params.lookup['event_midi_harmonizer'])  
   
   params:add_option('event_name', 'Event', events_lookup_names, 1) -- Default value overwritten later in Init
   params:set_action('event_name',function() update_menus() end)
@@ -105,7 +156,7 @@ function init()
   params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
   params:hide(params.lookup['event_value_type'])
   
-  params:add_number('event_value', 'Value', -999, 999, 0)
+  params:add_number('event_value', 'Value', -9999, 9999, 0)
   params:hide(params.lookup['event_value'])
   
   
@@ -356,24 +407,8 @@ function init()
   end
   events_index = 1
   selected_events_menu = 'event_category'
-  
-  -- Used to derive the min and max indices for the selected event category (Global, Chord, Arp, etc...)
-  event_categories = {} -- to-do: make local after debug
-  for i = 1, #events_lookup do
-    event_categories[i] = events_lookup[i].category
-  end
-  set_event_category_min_max()
-  
-  event_sub_categories = {} -- to-do: make local after debug
-  for i = 1, #events_lookup do
-    event_sub_categories[i] = events_lookup[i].sub_category
-  end
-  
-  -- todo p0 rewrite to use sub_category
   set_event_category_min_max()
   params:set('event_name', event_category_min_index)  -- Overwrites initial value
-  
-  
   
   event_edit_pattern = 0
   event_edit_step = 0
@@ -480,7 +515,16 @@ function init()
     params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
     
     -- reset event-related params so the event editor opens to the default view
-    params:set('event_category', 1)    
+    params:set('event_category', 1)  
+    params:set('event_global', 1)
+    params:set('event_chord', 1)
+    params:set('event_arp', 1)
+    params:set('event_cv_harmonizer', 1)
+    params:set('event_midi_harmonizer', 1)
+  
+    --todo p1 untested but probably fine
+    events_menus[2] = event_category_ids[params:get('event_category')]
+    
     params:set('event_name', 1)
     params:set('event_value_type', 1)
     params:set('event_value', 0)
@@ -572,18 +616,22 @@ redraw()
 end
 
 
--- UPDATE_MENUS. To-do: Probably can be optimized by only calculating the current view+page
+-- UPDATE_MENUS. todo: Probably can be optimized by only calculating the current view+page
 function update_menus()
+
+
+
+
 
   -- EVENTS MENU
   local event_index = params:get('event_name')
   local value_type = events_lookup[event_index].value_type
   if value_type == 'inc, set' then 
-    events_menus =  {'event_category', 'event_sub_category', 'event_name', 'event_value_type', 'event_value'}
+    events_menus =  {'event_category', event_category_ids[params:get('event_category')], 'event_name', 'event_value_type', 'event_value'}
   elseif value_type == 'set' then 
-    events_menus =  {'event_category', 'event_sub_category', 'event_name', 'event_value'}
+    events_menus =  {'event_category', event_category_ids[params:get('event_category')], 'event_name', 'event_value'}
   elseif value_type == 'trigger' then 
-    events_menus =  {'event_category', 'event_sub_category', 'event_name'}
+    events_menus =  {'event_category', event_category_ids[params:get('event_category')], 'event_name'}
   end
 
   -- GLOBAL MENU 
@@ -1004,7 +1052,7 @@ end
 -- Callback function when system tempo changes
 function clock.tempo_change_handler()  
   dedupe_threshold()
-  -- To-do: think about other tempo-based things that are not generated dynamically
+  -- todo: think about other tempo-based things that are not generated dynamically
 end  
 
 
@@ -1018,7 +1066,7 @@ function gen_arranger_seq_padded()
   last_populated_segment = 0
   patt = nil
 
-  -- -- To-do: profile this vs the 2x pass and break
+  -- -- todo: profile this vs the 2x pass and break
   -- for k, v in pairs(arranger_seq) do -- no longer need to do in pairs because there are no nils
   --   if arranger_seq[k] > 0 then
   --     if first_populated_segment == 0 then first_populated_segment = k end
@@ -1346,7 +1394,7 @@ end
 
 
 -- Does not set start = true since this can be called by clock.transport.stop() when pausing
-function reset_pattern() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
+function reset_pattern() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
@@ -1360,7 +1408,7 @@ end
 
 
 -- Does not set start = true since this can be called by clock.transport.stop() when pausing
-function reset_arrangement() -- To-do: Also have the chord readout updated (move from advance_chord_seq to a function)
+function reset_arrangement() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
   arranger_queue = nil
   arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
   pattern_queue = false
@@ -1490,7 +1538,7 @@ function do_events()
   if events[arranger_seq_position] ~= nil and arranger_seq_position ~= 0 and chord_seq_position ~= 0 then
     if events[arranger_seq_position][chord_seq_position].populated or 0 > 0 then
       for i = 1,16 do
-        -- To-do: Cheesy check if each automation event lane has something. This sucks.
+        -- todo: Cheesy check if each automation event lane has something. This sucks.
         if events[arranger_seq_position][chord_seq_position][i] ~= nil  then
           local event_type = events[arranger_seq_position][chord_seq_position][i].event_type
           local event_name = events[arranger_seq_position][chord_seq_position][i].id
@@ -1528,7 +1576,7 @@ end
 function generate_chord_names()
   if chord_no > 0 then
     chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
-    --To-do: More thoughtful display of either sharps or flats depending on specific chord and key. I need someone that is not a musical hack (me) to explain how this works.
+    --todo: More thoughtful display of either sharps or flats depending on specific chord and key. I need someone that is not a musical hack (me) to explain how this works.
     chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
     chord_name_modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- transpose root?
   end
@@ -1662,7 +1710,7 @@ function get_next_chord()
       pre_chord_seq_position = util.wrap(pre_chord_seq_position + 1, 1, chord_pattern_length[pre_pattern])
     end
     
-    -- Arranger automation step. To-do: examine impact of running some events here rather than in advance_chord_seq
+    -- Arranger automation step. todo: examine impact of running some events here rather than in advance_chord_seq
     -- Could be important for anything that changes patterns but might also be weird for grid redraw
 
     -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
@@ -1885,7 +1933,7 @@ function to_crow(source, note)
   end
 
   --Play the note
-  -- To-do: revisit after Crow 4.x bugs are worked out
+  -- todo: revisit after Crow 4.x bugs are worked out
   if crow_play_note == true then
     crow.output[1].volts = (note) / 12
     crow.output[2].volts = 0  -- Needed or skew 100 AD gets weird
@@ -1908,7 +1956,7 @@ end
 
 
 --WIP for estimating JF's envelope time using regression analysis. Doesn't update on call though because of an issue with crow.ii.jf.event?
--- To-do: revisit after Crow 4.x bugs are worked out
+-- todo: revisit after Crow 4.x bugs are worked out
 -- crow.ii.jf.event = function( e, value )
 --   if e.name == 'time' then
 --     jf_time_v = value
@@ -2222,8 +2270,10 @@ function g.key(x,y,z)
                 params:set('event_value_type', events[event_edit_pattern][y][x].event_value_type)
               end
             end
+            -- todo p0 need to restore event_sub_category?
             event_name = events_lookup[params:get('event_name')].id
           else
+            -- todo p0 need to restore event_sub_category?
             event_name = events_lookup[params:get('event_name')].id
             set_event_range()
             init_event_value()
@@ -2240,7 +2290,7 @@ function g.key(x,y,z)
           -- Then copy
           events[event_edit_pattern][y][x] = deepcopy(events[event_edit_pattern][event_edit_step][event_edit_lane])
           
-          -- Adjust populated events count at the step level. To-do: also set at the segment level once implemented
+          -- Adjust populated events count at the step level. todo: also set at the segment level once implemented
           if og_event_populated and not copied_event_populated then
             events[event_edit_pattern][y].populated = events[event_edit_pattern][y].populated - 1
             
@@ -2353,7 +2403,7 @@ function g.key(x,y,z)
         elseif pattern_key_count > 1 then
           print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
           pattern_copy_performed = true
-          -- To-do: deepcopy
+          -- todo: deepcopy
           for i = 1,8 do
             chord_seq[y][i] = chord_seq[pattern_copy_source][i]
           end
@@ -2883,14 +2933,24 @@ end
 function set_event_category_min_max()
   -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
   -- Also called when K3 opens events menu and when recalling a populated event slot          
-  event_category_min_index = tab.key(event_categories, params:string('event_category'))
+  local event_category = params:string('event_category')
+  event_category_min_index = tab.key(event_categories, event_category)
   for i = #event_categories, 1, -1 do
-    if event_categories[i] == params:string('event_category') then
+    if event_categories[i] == event_category then
       event_category_max_index = i
       break
     end
   end
+  
+  -- swaps out the events_sub_category with whatever the active category is
+  -- todo p1 this is a stupid place for this and can be simplified. Just have it generated from events_lookup with the 'event_ prefix
+  events_menus[2] = event_category_ids[params:get('event_category')]
+  -- print('events_menus[2] = ' .. events_menus[2])
+
 end
+
+  
+  
 -- END OF EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
 
           
@@ -2937,7 +2997,10 @@ function enc(n,d)
 
     if selected_events_menu == 'event_category' then
       params:delta(selected_events_menu, d)
+      
+      -- move this to param action?
       set_event_category_min_max()
+      
       -- Change event_name to first item in the selected Category and event_value to the current value (Set) or 0 (Increment)
       params:set('event_name', event_category_min_index)
       event_name = events_lookup[params:get('event_name')].id
@@ -2945,14 +3008,13 @@ function enc(n,d)
       init_event_value()
       
     elseif selected_events_menu == 'event_sub_category' then
-      local prev_event_sub_category = event_sub_category --todo p0 create this var somewhere
-      params:set(selected_events_menu, util.clamp(params:get(selected_events_menu) + d, event_category_min_index, event_category_max_index))
-      event_sub_category = events_lookup[params:get('event_sub_category')].id
+      -- local prev_event_sub_category = event_sub_category --todo p0 not sure we need this with the individual sub_category params
+      params:delta(events_menus[2], d)
       -- We don't want values to be reset if user hits the start/end of the event_name range and keeps turning the encoder. 
-      if event_sub_category ~= prev_event_sub_category then
-        set_event_range()
-        init_event_value()  
-      end  
+      -- if event_sub_category ~= prev_event_sub_category then
+      --   set_event_range()
+      --   init_event_value()  
+      -- end  
 
     elseif selected_events_menu == 'event_name' then
       local prev_event_name = event_name
@@ -3314,7 +3376,7 @@ function redraw()
     screen.level(15)
     screen.move(2,8)
     screen.text('ARRANGER SEGMENT ' .. event_edit_pattern)
-    -- To-do: might be cool to add a scrollable (K2) list of events in this segment here
+    -- todo: might be cool to add a scrollable (K2) list of events in this segment here
     screen.move(2,38)
     screen.text('ENC 3: Shift segments ←→')
     screen.level(4)
@@ -3328,7 +3390,7 @@ function redraw()
     screen.level(15)
     screen.move(2,8)
     screen.text('ARRANGER SEGMENT ' .. event_edit_pattern)
-    -- To-do: might be cool to add a scrollable (K2) list of events in this segment here
+    -- todo: might be cool to add a scrollable (K2) list of events in this segment here
     screen.move(2,28)
     screen.text('Tap to paste events')
     screen.move(2,38)
@@ -3454,6 +3516,7 @@ function redraw()
         local menu_offset = scroll_offset(events_index,#events_menus, 5, 10)
         line = 1
         for i = 1,#events_menus do
+          
           screen.move(2, line * 10 + 8 - menu_offset)
           screen.level(events_index == i and 15 or 3)
 
@@ -3464,7 +3527,7 @@ function redraw()
               if events_lookup[params:get('event_name')].formatter ~= nil then
                 event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
               elseif events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
-                local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
+                local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
                 event_val_string = options[params:get(events_menus[i])]                
               end
             end  
@@ -3592,7 +3655,7 @@ function redraw()
       screen.rect(dash_x,0,34,11)
       screen.fill()
 
-      -- STATE determination. To-do: move this out of redraw
+      -- STATE determination. todo: move this out of redraw
       if arranger_seq_position == 0 and chord_seq_position == 0 then
         state = 5 --stopped/reset
       else
@@ -3620,7 +3683,7 @@ function redraw()
       screen.level(15)
       if chord_no > 0 then
         screen.move(dash_x + 17,y_offset + 16)
-        screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name. To-do: param to switch between this and chord_degree ?
+        screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name. todo: param to switch between this and chord_degree ?
       end
       
       
