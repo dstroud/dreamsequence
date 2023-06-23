@@ -44,17 +44,18 @@ function init()
   refresh_midi_devices()
   
   
-  -- Events tables needed for params/menus
+  -- Used to populate the event_sub_category tables used as args for params/menus
   --todo p3 generate from events_lookup
-  event_category_ids = {'event_global', 'event_chord', 'event_arp', 'event_midi_harmonizer', 'event_cv_harmonizer'}
+  event_sub_category_param = {'event_global', 'event_chord', 'event_arp', 'event_midi_harmonizer', 'event_cv_harmonizer'}
   local events_lookup_names = {}
   local events_lookup_ids = {}
   for i = 1, #events_lookup do
     events_lookup_names[i] = events_lookup[i].name
     events_lookup_ids[i] = events_lookup[i].id
   end
-  events_lookup_index = tab.invert(events_lookup_ids)
   
+  -- big list of event_id, index
+  events_lookup_index = tab.invert(events_lookup_ids)
   
   -- Used to derive the min and max indices for the selected event category (Global, Chord, Arp, etc...)
   event_categories = {} -- todo: make local after debug
@@ -62,32 +63,15 @@ function init()
     event_categories[i] = events_lookup[i].category
   end
   
-
-  -- Generate sub_categories lookup tables with unique, ordered event sub_categories for each category
-  -- These will be used to generate a parameter for each event category containing the sub_categories
-  event_sub_categories = {}
-  for _, entry in ipairs(events_lookup) do
-    local category = entry.category
-    local sub_category = entry.sub_category
-
-    if not event_sub_categories[category] then
-      event_sub_categories[category] = {}  -- Create a table for each category
-    end
-
-    -- Check if the sub_category already exists in the table
-    local exists = false
-    for _, value in ipairs(event_sub_categories[category]) do
-      if value == sub_category then
-        exists = true
-        break
-      end
-    end
-
-    -- Add the sub_category to the table if it doesn't exist
-    if not exists then
-      table.insert(event_sub_categories[category], sub_category)
-    end
-  end
+  -- Generate sub_categories lookup tables
+  gen_event_tables()
+  
+  -- Unique, ordered event sub_categories for each category
+  -- Used to generate a parameter for each event category containing the sub_categories
+  -- event_sub_categories
+  
+  -- key = conctat category_sub_category with first_index and last_index values
+  -- event_indices
   
 
   --------------------
@@ -407,7 +391,7 @@ function init()
   end
   events_index = 1
   selected_events_menu = 'event_category'
-  set_event_category_min_max()
+  set_selected_event_indices()
   params:set('event_name', event_category_min_index)  -- Overwrites initial value
   
   event_edit_pattern = 0
@@ -522,15 +506,15 @@ function init()
     params:set('event_cv_harmonizer', 1)
     params:set('event_midi_harmonizer', 1)
   
-    --todo p1 untested but probably fine
-    events_menus[2] = event_category_ids[params:get('event_category')]
+    --todo p0 redo!
+    -- events_menus[2] = event_sub_category_param[params:get('event_category')]
     
     params:set('event_name', 1)
     params:set('event_value_type', 1)
     params:set('event_value', 0)
     selected_events_menu = 'event_category'
     events_index = 1
-    set_event_category_min_max()
+    set_selected_event_indices()
     params:set('event_name', event_category_min_index)
     event_name = events_lookup[params:get('event_name')].id
     set_event_range()
@@ -627,11 +611,11 @@ function update_menus()
   local event_index = params:get('event_name')
   local value_type = events_lookup[event_index].value_type
   if value_type == 'inc, set' then 
-    events_menus =  {'event_category', event_category_ids[params:get('event_category')], 'event_name', 'event_value_type', 'event_value'}
+    events_menus =  {'event_category', 'event_sub_category', 'event_name', 'event_value_type', 'event_value'}
   elseif value_type == 'set' then 
-    events_menus =  {'event_category', event_category_ids[params:get('event_category')], 'event_name', 'event_value'}
+    events_menus =  {'event_category', 'event_sub_category', 'event_name', 'event_value'}
   elseif value_type == 'trigger' then 
-    events_menus =  {'event_category', event_category_ids[params:get('event_category')], 'event_name'}
+    events_menus =  {'event_category', 'event_sub_category', 'event_name'}
   end
 
   -- GLOBAL MENU 
@@ -2260,7 +2244,7 @@ function g.key(x,y,z)
           if events[event_edit_pattern][y][x] ~= nil then
             local event_category_options = params.params[params.lookup['event_category']].options
             params:set('event_category', tab.key(event_category_options, events[event_edit_pattern][y][x].category))
-            set_event_category_min_max()
+            set_selected_event_indices()
             
             -- No longer storing events_lookup index in events table since this will break with saves. So we do a reverse lookup on id to get the index #
             params:set('event_name', events_lookup_index[events[event_edit_pattern][y][x].id])
@@ -2930,23 +2914,19 @@ function transpose_pattern(view, direction)
 end   
 
 
-function set_event_category_min_max()
-  -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...)
-  -- Also called when K3 opens events menu and when recalling a populated event slot          
+-- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...) + sub_category
+-- Also called when K3 opens events menu and when recalling a populated event slot
+function set_selected_event_indices()
   local event_category = params:string('event_category')
-  event_category_min_index = tab.key(event_categories, event_category)
-  for i = #event_categories, 1, -1 do
-    if event_categories[i] == event_category then
-      event_category_max_index = i
-      break
-    end
-  end
-  
-  -- swaps out the events_sub_category with whatever the active category is
-  -- todo p1 this is a stupid place for this and can be simplified. Just have it generated from events_lookup with the 'event_ prefix
-  events_menus[2] = event_category_ids[params:get('event_category')]
-  -- print('events_menus[2] = ' .. events_menus[2])
 
+  -- Also swaps out the events_sub_category with whatever the active category is so this can be used for enc and redraw functions
+  -- lookup is done on an "id" that doesn't exist in the og lookup table yet
+  selected_event_sub_category_param = event_sub_category_param[params:get('event_category')]
+  local event_sub_category = params:string(selected_event_sub_category_param)
+
+
+  event_category_min_index = event_indices[event_category .. '_' .. event_sub_category].first_index
+  event_category_max_index = event_indices[event_category .. '_' .. event_sub_category].last_index
 end
 
   
@@ -2997,11 +2977,9 @@ function enc(n,d)
 
     if selected_events_menu == 'event_category' then
       params:delta(selected_events_menu, d)
+      set_selected_event_indices()
       
-      -- move this to param action?
-      set_event_category_min_max()
-      
-      -- Change event_name to first item in the selected Category and event_value to the current value (Set) or 0 (Increment)
+      -- Set event_name to first index in the selected category+sub_category and event_value to the current value (Set) or 0 (Increment)
       params:set('event_name', event_category_min_index)
       event_name = events_lookup[params:get('event_name')].id
       set_event_range()
@@ -3009,7 +2987,15 @@ function enc(n,d)
       
     elseif selected_events_menu == 'event_sub_category' then
       -- local prev_event_sub_category = event_sub_category --todo p0 not sure we need this with the individual sub_category params
-      params:delta(events_menus[2], d)
+      params:delta(selected_event_sub_category_param, d)
+      set_selected_event_indices()
+      
+      -- Set event_name to first index in the selected category+sub_category and event_value to the current value (Set) or 0 (Increment)
+      params:set('event_name', event_category_min_index)
+      event_name = events_lookup[params:get('event_name')].id
+      set_event_range()
+      init_event_value()      
+      
       -- We don't want values to be reset if user hits the start/end of the event_name range and keeps turning the encoder. 
       -- if event_sub_category ~= prev_event_sub_category then
       --   set_event_range()
@@ -3521,14 +3507,46 @@ function redraw()
           screen.level(events_index == i and 15 or 3)
 
           -- Switch between number and formatted value for Incremental and Set, respectively
-          event_val_string = params:string(events_menus[i])
-          if events_menus[i] == 'event_value' then
+          -- print('events_menus[i] = ' .. events_menus[i])
+          
+          -- i == 2 will be 'event_sub_category' 
+          selected_menu = events_menus[i] -- todo p0 make local 
+          
+          -- i == 2 will be 'event_global', 'event_chord', etc... (used for parameters)
+          selected_param = (selected_menu == 'event_sub_category')  -- todo p0 make local
+            and selected_event_sub_category_param 
+            or selected_menu
+          
+
+          print('selected_param = ' .. (selected_param or 'nil'))
+          event_val_string = params:string(selected_param)
+          
+          print('event_val_string = ' .. event_val_string)
+          
+          -- event_val_string = event_val_string == 'event_sub_category' and selected_event_sub_category_param or event_val_string
+          
+          -- use event_value to determine which items we build the menu with
+          if selected_menu == 'event_value' then
+            
+            -- inc, trigger
             if not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then
+              
+              -- no formatter needed
               if events_lookup[params:get('event_name')].formatter ~= nil then
                 event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
-              elseif events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
+                
+              print('param before formatting = ' .. event_val_string)
+                
+              -- params with a formatter
+              elseif events_lookup[params:get('event_name')].event_type == 'param' 
+                
+              -- params:t gets the param type! I *think* type 2 are add_options params
+              and params:t(events_lookup[params:get('event_name')].id) == 2 then
+                
+                -- not sure how this is a local and still gets passed out of this if/then. TEST
                 local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
-                event_val_string = options[params:get(events_menus[i])]                
+                event_val_string = options[params:get(selected_param)]
+                print('add_options style param = ' .. event_val_string)
               end
             end  
           end
@@ -3537,94 +3555,24 @@ function redraw()
           -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
           local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
           if events_index == i then
-            local selected_events_menu = events_menus[i]
+            -- local selected_events_menu = events_menus[i] -- now selected_menu
             local range =
-              (selected_events_menu == 'event_category' or selected_events_menu == 'event_value_type') and params:get_range(selected_events_menu)
-              or selected_events_menu == 'event_name' and {event_category_min_index, event_category_max_index}
+              (selected_menu == 'event_category' or selected_menu == 'event_value_type') and params:get_range(selected_param)
+              or selected_menu == 'event_name' and {event_category_min_index, event_category_max_index}
               or event_range
-            local menu_value_suf = params:get(selected_events_menu) == range[1] and '>' or ''
-            local menu_value_pre = params:get(selected_events_menu) == range[2] and '<' or ' '
-            local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+            local menu_value_suf = params:get(selected_param) == range[1] and '>' or ''
+            local menu_value_pre = params:get(selected_param) == range[2] and '<' or ' '
+            local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(selected_param))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
             screen.text(events_menu_txt)
           else
-            screen.text(first_to_upper(param_formatter(param_id_to_name(events_menus[i]))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
+            -- print('events_menus[i] = ' .. events_menus[i])
+            screen.text(first_to_upper(param_formatter(param_id_to_name(selected_param))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
           end
         
           line = line + 1
         end
         
-        
-        -- -- Static events menu
-        -- for i = 1,#events_menus do
-
-        --   -- line 1
-        --   if events_menus[i] == 'event_category' then
-        --     screen.move(2, 18)
-        --   elseif events_menus[i] == 'event_sub_category' then
-        --     screen.move(6 + previous_events_menu_width,18)
-            
-        --   -- line 2
-        --   elseif events_menus[i] == 'event_name' then
-        --     screen.move(2, 28)
-
-        --   -- line 3
-        --   elseif events_menus[i] == 'event_value_type' then
-        --     screen.move(2,38)
-        --     line = 3
-            
-        --   -- line 4
-        --   elseif events_menus[i] == 'event_value' then
-        --     screen.move(6 + previous_events_menu_width, 38)    
-            
-        --   else
-        --     screen.move(2, (line)* 10 + 8)
-        --     -- line = line + 1
-        --   end
-          
-        --   screen.level(events_index == i and 15 or 3)
-
-        --   -- Switch between number and formatted value for Incremental and Set, respectively
-        --   event_val_string = params:string(events_menus[i])
-        --   if events_menus[i] == 'event_value' then
-        --     if not (events_lookup[params:get('event_name')].value_type == 'inc, set' and params:string('event_value_type') == 'Increment') then
-        --       if events_lookup[params:get('event_name')].formatter ~= nil then
-        --         event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
-        --       elseif events_lookup[params:get('event_name')].event_type == 'param' and params:t(events_lookup[params:get('event_name')].id) == 2 then
-        --         local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options -- Make Local.
-        --         event_val_string = options[params:get(events_menus[i])]                
-        --       end
-        --     end  
-        --   end
-
-        --   -- Draw menu and <> indicators for scroll range
-        --   -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
-        --   local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
-        --   if events_index == i then
-        --     local selected_events_menu = events_menus[i]
-        --     local range =
-        --       (selected_events_menu == 'event_category' or selected_events_menu == 'event_value_type') and params:get_range(selected_events_menu)
-        --       or selected_events_menu == 'event_name' and {event_category_min_index, event_category_max_index}
-        --       or event_range
-        --     local menu_value_suf = params:get(selected_events_menu) == range[1] and '>' or ''
-        --     local menu_value_pre = params:get(selected_events_menu) == range[2] and '<' or ' '
-        
-        --     -- local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(events_menus[i]))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
-        --     -- screen.text(events_menu_txt)
-
-        --     local events_menu_txt = menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
-        --     screen.text(events_menu_txt)
-            
-        --     previous_events_menu_width = screen.text_extents(events_menu_txt)
-        
-        --   else
-        --     screen.text(string.sub(event_val_string, 1, events_menu_trunc))
-        
-        --   end
-        
-        --   -- line = line + 1
-        -- end
-        
-        
+      
         screen.level(4)
         screen.move(1,54)
         screen.line(128,54)
