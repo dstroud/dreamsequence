@@ -151,6 +151,14 @@ function gen_event_tables()
   
   
   --- UTILITY FUNCTIONS
+  
+  -- converts the string value of an 'add_options' param into a value index # suitable for params:set
+  -- args: param id and string value         eg 'event_category', 'Arp' == 3
+  function param_option_to_index(param, str)
+    return(tab.key(params.params[params.lookup[param]].options, str))
+  end
+  
+  
   function spaces_to_underscores(str)
     local replacedStr = string.gsub(str, " ", "_")
     return replacedStr
