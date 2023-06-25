@@ -28,9 +28,10 @@ norns.version.required = 230526
 function init()
   -----------------------------
   -- UPDATE BEFORE RELEASE!
-  -- saved with pset files to address compatibility checks in the future
+  -- saved with pset files to suss out issues in the future
   version = 'v1.0.6' -- todo prerelease ALSO MAKE SURE TO UPDATE ABOVE!
   -----------------------------
+
   init_generator()
   crow.ii.jf.mode(1)
   -- Turn off built-in Crow clock so it doesn't conflict with ours which only fires when transport is running.
@@ -44,9 +45,13 @@ function init()
   refresh_midi_devices()
   
   
-  -- Used to populate the event_subcategory tables used as args for params/menus
+  -- Used to populate the tables used as args for params/menus
   --todo p3 generate from events_lookup
-  event_subcategory_param = {'event_global', 'event_chord', 'event_arp', 'event_midi_harmonizer', 'event_cv_harmonizer'}
+  event_subcategory_param = {'event_sub_global', 'event_sub_chord', 'event_sub_arp', 'event_sub_midi', 'event_sub_cv'}
+
+  -- set the starting value of event_value_type_param
+  event_value_type_param = events_lookup[1].value_type
+  
   local events_lookup_names = {}
   local events_lookup_ids = {}
   for i = 1, #events_lookup do
@@ -80,7 +85,7 @@ function init()
   params:add_separator ('DREAMSEQUENCE')
 
   --GLOBAL PARAMS
-  params:add_group('global', 'GLOBAL', 5)
+  params:add_group('global', 'GLOBAL', 6)
   params:add_number("transpose","Key",-12, 12, 0, function(param) return transpose_string(param:get()) end)
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end)
     -- moving action to post-bang
@@ -97,6 +102,8 @@ function init()
   
   params:add_number('crow_pullup','Crow Pullup',0, 1, 1,function(param) return t_f_string(param:get()) end)
   params:set_action("crow_pullup",function() crow_pullup() end)
+  
+  params:add_option('chord_readout', 'Chords as', {'Name', 'Degree'}, 1)
 
 
   --ARRANGER PARAMS
@@ -114,32 +121,45 @@ function init()
   params:hide(params.lookup['event_category'])
 
   -- Subcategory menus switch between the next 5 params behind the scenes
-  params:add_option('event_global', 'Subcategory', event_subcategories['Global'], 1)
-  params:set_action('event_global',function() update_menus() end)
-  params:hide(params.lookup['event_global'])
+  params:add_option('event_sub_global', 'Subcategory', event_subcategories['Global'], 1)
+  params:set_action('event_sub_global',function() update_menus() end)
+  params:hide(params.lookup['event_sub_global'])
   
-  params:add_option('event_chord', 'Subcategory', event_subcategories['Chord'], 1)
-  params:set_action('event_chord',function() update_menus() end)
-  params:hide(params.lookup['event_chord'])  
+  params:add_option('event_sub_chord', 'Subcategory', event_subcategories['Chord'], 1)
+  params:set_action('event_sub_chord',function() update_menus() end)
+  params:hide(params.lookup['event_sub_chord'])  
   
-  params:add_option('event_arp', 'Subcategory', event_subcategories['Arp'], 1)
-  params:set_action('event_arp',function() update_menus() end)
-  params:hide(params.lookup['event_arp'])  
+  params:add_option('event_sub_arp', 'Subcategory', event_subcategories['Arp'], 1)
+  params:set_action('event_sub_arp',function() update_menus() end)
+  params:hide(params.lookup['event_sub_arp'])  
   
-  params:add_option('event_cv_harmonizer', 'Subcategory', event_subcategories['CV harmonizer'], 1)
-  params:set_action('event_cv_harmonizer',function() update_menus() end)
-  params:hide(params.lookup['event_cv_harmonizer'])  
+  params:add_option('event_sub_cv', 'Subcategory', event_subcategories['CV harmonizer'], 1)
+  params:set_action('event_sub_cv',function() update_menus() end)
+  params:hide(params.lookup['event_sub_cv'])  
 
-  params:add_option('event_midi_harmonizer', 'Subcategory', event_subcategories['MIDI harmonizer'], 1)
-  params:set_action('event_midi_harmonizer',function() update_menus() end)
-  params:hide(params.lookup['event_midi_harmonizer'])  
+  params:add_option('event_sub_midi', 'Subcategory', event_subcategories['MIDI harmonizer'], 1)
+  params:set_action('event_sub_midi',function() update_menus() end)
+  params:hide(params.lookup['event_sub_midi'])  
   
   params:add_option('event_name', 'Event', events_lookup_names, 1) -- Default value overwritten later in Init
-  params:set_action('event_name',function() update_menus() end)
+  params:set_action('event_name',function(val) set_selected_event_value_type(val); update_menus() end)
   params:hide(params.lookup['event_name'])
   
-  params:add_option('event_value_type', 'Type', {'Set','Increment'}, 1)
-  params:hide(params.lookup['event_value_type'])
+  -- Different value type params will be loaded depending on the Event
+
+
+  -- called whenever event_name changes to point to the correct param
+  -- function set_selected_event_value_type(event_index)
+  --   -- local value_type = events_lookup[event_index].value_type
+  --   -- if value_type == 'set' then
+  --     event_value_type_param = 'event_value_type_' .. events_lookup[event_index].value_type
+  -- end
+
+  params:add_option('event_value_type_set', 'Type', {'Set','Random'}, 1)
+  params:hide(params.lookup['event_value_type_set'])
+  
+  params:add_option('event_value_type_increment', 'Type', {'Set', 'Increment', 'Wander', 'Random'}, 1)
+  params:hide(params.lookup['event_value_type_increment'])
   
   params:add_number('event_value', 'Value', -9999, 9999, 0)
   params:hide(params.lookup['event_value'])
@@ -314,20 +334,12 @@ function init()
     params:set_action("crow_tr_env",function() update_menus() end)
   params:add_number('crow_ad_skew','AD env. skew',0, 100, 0)
   
+  -----------------------------
+  -- Init stuff
+  -----------------------------
   
-  glyphs = {
-    --loop glyph    
-    {{1,0},{2,0},{3,0},{0,1},{0,2},{4,2},{4,3},{1,4},{2,4},{3,4}},
-    --one-shot glyph  
-    {{2,0},{3,1},{0,2},{1,2},{4,2},{3,3},{2,4}},
-    -- pause
-    {{0,0},{1,0},{3,0},{4,0}, {0,1},{1,1},{3,1},{4,1}, {0,2},{1,2},{3,2},{4,2}, {0,3},{1,3},{3,3},{4,3},  {0,4},{1,4},{3,4},{4,4}},
-    -- play
-    {{0,0},{1,0}, {0,1},{1,1},{2,1}, {0,2},{1,2},{2,2},{3,2}, {0,3},{1,3},{2,3}, {0,4},{1,4}},
-    -- reset/stopped
-    {{0,0},{1,0},{2,0},{3,0},{4,0}, {0,1},{1,1},{2,1},{3,1},{4,1}, {0,2},{1,2},{2,2},{3,2},{4,2}, {0,3},{1,3},{2,3},{3,3},{4,3},  {0,4},{1,4},{2,4},{3,4},{4,4}}
-    }
-  
+  start = false
+  transport_state = 'stopped'
   clock_start_method = 'start'
   link_stop_source = nil
   global_clock_div = 48
@@ -356,7 +368,7 @@ function init()
   grid_views = {'Arranger','Chord','Arp'}
   grid_view_keys = {}
   grid_view_name = grid_views[2]
-  -- fast_blinky = 0
+  fast_blinky = 1
   pages = {'GLOBAL>', 'CHORD', 'ARP', 'MIDI HARMONIZER', '<CV HARMONIZER'}
   page_index = 1
   page_name = pages[page_index]
@@ -505,11 +517,11 @@ function init()
     
     -- reset event-related params so the event editor opens to the default view
     params:set('event_category', 1)  
-    params:set('event_global', 1)
-    params:set('event_chord', 1)
-    params:set('event_arp', 1)
-    params:set('event_cv_harmonizer', 1)
-    params:set('event_midi_harmonizer', 1)
+    params:set('event_sub_global', 1)
+    params:set('event_sub_chord', 1)
+    params:set('event_sub_arp', 1)
+    params:set('event_sub_cv', 1)
+    params:set('event_sub_midi', 1)
     params:set('event_name', 1)
     params:set('event_value_type', 1)
     params:set('event_value', 0)
@@ -541,7 +553,7 @@ function init()
     get_next_chord()
     chord_raw = next_chord
     chord_no = 0 -- wipe chord readout
-    generate_chord_names()
+    gen_chord_readout()
     gen_dash('params.action_read')
     
     -- if transport_active, reset and continue playing so user can demo psets from the system menu
@@ -617,8 +629,7 @@ function update_menus()
 
   -- GLOBAL MENU 
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
-      --'clock_midi_out', --'clock_midi_out' option removed for Norns update with multi-clock. TBD if we should replicate all ports here (this could get cluttered)
-      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator'}
+      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator', 'chord_readout'}
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
@@ -1178,6 +1189,28 @@ end
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
 
+  -- if arranger_seq_position == 0 and chord_seq_position == 0 then
+  --   if start == true then
+  --     transport_state = 'starting'
+  --   else
+  --     transport_state = 'stopped'
+  --   end
+  -- elseif transport_active == true then
+  --   if stop ~= true then  -- account for nils
+  --     transport_state = 'playing'
+  --   else
+  --     transport_state = 'pausing'
+  --   end
+  -- else
+  --   if start == true then
+  --     transport_state = 'starting'
+  --   else
+  --     transport_state = 'paused'
+  --   end
+  -- end
+  
+  transport_state = 'starting'
+  print(transport_state)
 
   -- INITIAL SYNC DEPENDING ON CLOCK SOURCE
   if params:string('clock_source') == 'internal' then
@@ -1185,11 +1218,16 @@ function sequence_clock()
   elseif params:string('clock_source') == 'link' then
     clock.sync(params:get('link_quantum'))--, offset / 1000 * clock.get_beat_sec()) -- todo p0: generate from param action all this will be generated by param action prob?
   end
+  
+  transport_state = 'playing'
+  print(transport_state)
+  
+  while transport_active do
 
 
   -- SEND MIDI CLOCK START/CONTINUE MESSAGES
-  while transport_active do
     if start == true and stop ~= true then
+      transport_active = true
     -- Send out MIDI start/continue messages
       if clock_start_method == 'start' then
         transport_multi_start()  
@@ -1199,7 +1237,7 @@ function sequence_clock()
       clock_start_method = 'continue'
       start = false
     end
-
+    
     
     -- ADVANCE CLOCK_STEP
     clock_step = clock_step + 1
@@ -1208,6 +1246,8 @@ function sequence_clock()
     -- STOP LOGIC DEPENDING ON CLOCK SOURCE
     -- Immediate or instant stop
     if stop == true then
+        transport_state = 'pausing'
+        print(transport_state)
       -- When internally clocked, stop is quantized to occur at the end of the chord step. todo p1 also use this when running off norns link beat_count
       if params:string('clock_source') == 'internal' then
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
@@ -1216,6 +1256,8 @@ function sequence_clock()
           print('internal stop. setting clock_step to ' .. clock_step)
           transport_multi_stop()
           transport_active = false
+          transport_state = 'paused'
+          print(transport_state)
           stop = false
         end
       elseif link_stop_source == 'norns' then
@@ -1226,20 +1268,28 @@ function sequence_clock()
           print('internal stop. setting clock_step to ' .. clock_step)
           transport_multi_stop()
           transport_active = false
+          transport_state = 'paused'
+          print(transport_state)
           stop = false
+          start = false
           link_stop_source = nil
         end      
-      else -- External clock_source. No quantization. Just resets pattern/arrangement
-        transport_multi_stop()  
+      
+      -- External clock_source. No quantization. Just resets pattern/arrangement
+      -- todo p2 look at options for a start/continue mode for external sources that support this
+      else
+        transport_multi_stop()
         print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
         
         if arranger_active then
-          reset_arrangement()
+          print(transport_state)
         else
           reset_pattern()
         end
         
         transport_active = false
+        reset_arrangement()
+        transport_state = 'stopped'
         stop = false
         print('external clock just set stop to nil')
       end
@@ -1304,7 +1354,7 @@ function calc_seconds_remaining()
 -- Also used to set blinkies
 function countdown()
   calc_seconds_remaining()
-  -- fast_blinky = fast_blinky ~ 1
+  fast_blinky = fast_blinky ~ 1
   -- grid_redraw()
   redraw()  
 end  
@@ -1363,6 +1413,7 @@ function clock.transport.start()
   start = true
   stop = false -- 2023-07-19 added so when arranger stops in 1-shot and then external clock stops, it doesn't get stuck
   transport_active = true
+  print ('transport set to active in transport.start')
 
   -- Clock for chord/arp/arranger sequences
   sequence_clock_id = clock.run(sequence_clock)
@@ -1379,6 +1430,8 @@ end
 
 -- Does not set start = true since this can be called by clock.transport.stop() when pausing
 function reset_pattern() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
+  transport_state = 'stopped'
+  print(transport_state)
   pattern_queue = false
   arp_seq_position = 0
   chord_seq_position = 0
@@ -1395,20 +1448,10 @@ end
 function reset_arrangement() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
   arranger_queue = nil
   arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
-  pattern_queue = false
-  arp_seq_position = 0
-  chord_seq_position = 0
   arranger_seq_position = 0
-  
   if arranger_seq[1] > 0 then pattern = arranger_seq[1] end
-
   if params:string('arranger_enabled') == 'True' then arranger_active = true end
-  reset_clock()
-  get_next_chord()
-  chord_raw = next_chord
-  gen_dash('reset_arrangement')
-  grid_redraw()
-  redraw()
+  reset_pattern()
 end
 
 
@@ -1493,7 +1536,7 @@ function advance_chord_seq()
     
     if chord_key_count == 0 then
       chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)
-      generate_chord_names()
+      gen_chord_readout()
     end
 
   end
@@ -1559,12 +1602,13 @@ function do_events()
 end
 
 
-function generate_chord_names()
+-- todo: More thoughtful display of either sharps or flats depending on mode and key
+function gen_chord_readout()
   if chord_no > 0 then
-    chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
-    --todo: More thoughtful display of either sharps or flats depending on specific chord and key. I need someone that is not a musical hack (me) to explain how this works.
-    chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
-    chord_name_modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- transpose root?
+    local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
+    local chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
+    local modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- transpose root?
+    chord_readout = params:string('chord_readout') == 'Degree' and chord_degree or chord_name .. modifier
   end
 end  
 
@@ -2270,7 +2314,6 @@ function g.key(x,y,z)
             local selected_event_subcategory_param = selected_event_subcategory
 
             -- look up string ids for 'add_options' type params, return index, and set the params with this
-            -- back into category from id in case category names change
             params:set('event_category', param_option_to_index('event_category', selected_event_category))
             
             -- set the subcategory_param based on the category 
@@ -2289,9 +2332,14 @@ function g.key(x,y,z)
             params:set('event_name', selected_event_index)
             if selected_event_value ~= nil then
               params:set('event_value', selected_event_value)
-              if selected_event_value_type ~= nil then -- nil means trigger. other types always have a val
-                params:set('event_value_type', param_option_to_index('event_value_type', selected_event_value_type))
-
+              if selected_event_value_type ~= nil then
+                if selected_event_value_type == 'Set' then
+                  event_value_type_param = 'event_value_type_set'
+                elseif selected_event_value_type == 'Increment' then
+                  event_value_type_param = 'event_value_type_increment'
+                -- else it's trigger in which case we just leave the current event_value_type and ignore it
+                end
+                params:set(event_value_type_param, param_option_to_index(event_value_type_param, selected_event_value_type))
               end
             end
             params:set('event_probability', events_path.probability)
@@ -2414,7 +2462,7 @@ function g.key(x,y,z)
           chord_seq[pattern][y] = x
         end
         chord_no = util.wrap(x,1,7) + (params:get('chord_type') == 4 and 7 or 0) -- or 0
-        generate_chord_names()
+        gen_chord_readout()
         
       -- set chord_pattern_length  
       elseif x == 15 then
@@ -2528,7 +2576,7 @@ function g.key(x,y,z)
         if chord_key_count == 0 then
           -- This reverts the chord readout to the currently loaded chord but it is kinda confusing when paused so now it just wipes and refreshes at the next chord step.
           -- chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)          
-          -- generate_chord_names()
+          -- gen_chord_readout()
           chord_no = 0
         end
       end
@@ -2647,7 +2695,8 @@ function key(n,z)
         gen_dash('K2 events editor closed') -- update events strip in dash after making changes in events editor
         grid_redraw()
         
-      -- Start/resume todo p3: make a concat clock.xxxx.start/stop() string from clock_source callback. I guess. 
+      -- Start/resume todo p3: make a concat clock.xxxx.start/stop() string from clock_source callback. I guess.
+      -- Todo p1 need to have a way of canceling a pending pause once transport controls are reworked
       elseif interaction == nil and params:string('clock_source') == 'internal' then
         if transport_active then
           clock.transport.stop() -- todo move to sequence_clock for consistency with link logic?
@@ -2662,8 +2711,12 @@ function key(n,z)
           stop = true -- replaces clock.link.stop() so we can fire that in sequence_clock
           clock_start_method = 'continue'
           start = true
+          -- captures a play that was canceled but this might not be the best place for this
+          transport_state = 'pausing'
+          print(transport_state)
         else
-          clock.link.start()
+          -- disabling until issue with internal link start clobbering clocks is addressed
+          -- clock.link.start()
         end
       end
       
@@ -2850,6 +2903,7 @@ function key(n,z)
         else 
           -- don't let link reset while transport is active or it gets outta sync
           if transport_active ~= true then
+
             if params:get('arranger_enabled') == 1 then
               reset_arrangement()
             else
@@ -3022,17 +3076,31 @@ function enc(n,d)
 end
 
 
+-- run when entering a blank event, in which case we load up some values from the previously touched event to make editing quicker
+-- todo p1 think about how we want to handle wander and random types
 function init_event_value()
   if events_lookup[params:get('event_name')].event_type == 'param' then
-    if (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Set') 
-    or events_lookup[params:get('event_name')].value_type == 'set' then
+    
+    -- if (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Set') 
+    -- or events_lookup[params:get('event_name')].value_type == 'set' then
+    --   params:set('event_value', params:get(event_name))
+    -- else
+    --   params:set('event_value', 0)
+    -- end
+    
+    if (events_lookup[params:get('event_name')].value_type ~= 'trigger')
+    and (events_lookup[params:get('event_name')].value_type == 'set') then
       params:set('event_value', params:get(event_name))
     else
       params:set('event_value', 0)
     end
-  else
+
+    params:set('event_value', 0)
+
+  else -- non-params
     params:set('event_value', 0)
   end
+  -- always reset... todo: might want to carry this over as well but probably not since it can be off-screen
   params:set('event_probability', 100)
 end
   
@@ -3052,17 +3120,33 @@ function deepcopy(orig)
     return copy
 end
 
+
 function set_event_range()
   -- Determine if event range should be clamped
   if events_lookup[params:get('event_name')].event_type == 'param' then
+    
     -- Unrestrict range if it's a param of the 'increment' type and is set to 'Increment'
-    if events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Increment' then
-      event_range = {-999,999}
-    else -- 'Set', 'Trigger', etc...
-      event_range = params:get_range(params.lookup[event_name]) or {-999,999}
+    -- print('param value_type = ' .. (event_value_type_param or 'nil'))
+    
+    -- -- this breaks now because 'trigger' can be passed which has no value_type
+    -- if events_lookup[params:get('event_name')].value_type == 'increment'
+    -- and params:string(event_value_type_param) == 'Increment' then
+    --   event_range = {-9999,9999}
+    -- else -- 'Set', 'Trigger', etc...
+    --   event_range = params:get_range(params.lookup[event_name]) or {-9999, 9999}
+    -- end
+    
+    if events_lookup[params:get('event_name')].value_type ~= 'trigger' then
+      if params:string(event_value_type_param) == 'Increment' then
+        event_range = {-9999,9999}
+      else -- 'Set'
+        event_range = params:get_range(params.lookup[event_name]) or {-9999, 9999}
+      end
     end
+    
+    
   else -- function. May have hardcoded ranges in events_lookup at some point
-    event_range = {-999,999}
+    event_range = {-9999,9999}
   end
 end  
 
@@ -3125,7 +3209,7 @@ end
 -- generates truncated flat tables at the chord step level for the arranger mini dashboard
 -- runs any time the arranger changes (generator, events, pattern changes, length changes, key pset load, arranger/pattern reset, event edits)
 function gen_dash(source)
-  -- print('gen_dash called by ' .. (source or ''))
+  -- print('gen_dash called by ' .. (source or '?'))
   dash_patterns = {}
   -- dash_levels correspond to 3 arranger states:
   -- 1. Arranger was disabled then re-enabled mid-segment so current segment should be dimmed
@@ -3419,38 +3503,103 @@ function redraw()
           -- i == 2 will be 'event_subcategory' 
           local selected_events_menu = events_menus[i] -- todo p0 make local 
           
-          -- i == 2 will be 'event_global', 'event_chord', etc... (used for parameters)
-          local selected_param = (selected_events_menu == 'event_subcategory')  -- todo p0 make local
-            and selected_event_subcategory_param 
+          -- i == 2 will be 'event_sub_global', 'event_sub_chord', etc... (used for parameters)
+
+          -- print('event_value_type_param = ' .. event_value_type_param)
+
+          local selected_param = (selected_events_menu == 'event_subcategory'
+            and selected_event_subcategory_param)
+            
+            or (selected_events_menu == 'event_value_type'
+            and event_value_type_param)
+            
             or selected_events_menu
+            
           local get_selected_param = params:get(selected_param)
           event_val_string = params:string(selected_param)
 
-          -- use event_value to determine which items we build the menu with
+
+
+          -- -- use event_value to determine which items we build the menu with
+          -- if selected_events_menu == 'event_value' then
+            
+          --   -- inc, trigger
+          --   if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Increment') then
+              
+          --     -- no formatter needed
+          --     if events_lookup[params:get('event_name')].formatter ~= nil then
+          --       event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
+                
+
+          --     -- params with a formatter
+          --     elseif events_lookup[params:get('event_name')].event_type == 'param' 
+                
+          --     -- params:t gets the param type! I *think* type 2 are add_options params
+          --     and params:t(events_lookup[params:get('event_name')].id) == 2 then
+                
+          --       -- Uses event index to look up all the options for that param
+          --       local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
+                
+          --       event_val_string = options[get_selected_param]
+                
+          --     end
+          --   end  
+          -- end
+
+          -- print('lookup type = ' .. events_lookup[params:get('event_name')].value_type)
+            -- use event_value to determine which items we build the menu with
           if selected_events_menu == 'event_value' then
             
             -- inc, trigger
-            if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Increment') then
+            -- if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Increment') then
+            if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string(event_value_type_param) == 'Increment') then
+
+
               
               -- no formatter needed
               if events_lookup[params:get('event_name')].formatter ~= nil then
+                -- print('a')
                 event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                 
 
               -- params with a formatter
-              elseif events_lookup[params:get('event_name')].event_type == 'param' 
+              elseif events_lookup[params:get('event_name')].event_type == 'param'
                 
-              -- params:t gets the param type! I *think* type 2 are add_options params
-              and params:t(events_lookup[params:get('event_name')].id) == 2 then
-                
+              -- params:t gets the param type! I *think* type 2 are add_options params but pretty sure was is an existing bug here...
+              -- and params:t(events_lookup[params:get('event_name')].id) == 2 then
+              -- print('event_name = ' .. event_name)
+              and params:t('event_name') == 2 then
+              print('options param event')
+              
+                print('event_name = ' .. event_name)
                 -- Uses event index to look up all the options for that param
-                local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
+                -- nill with event_name = 'midi_dest'
+                -- local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
                 
-                event_val_string = options[get_selected_param]
+                -- param_option_to_index(event_name, params:get('event_value'))
+                -- local options = params.params[params.lookup[events_lookup[event_name].id]].options
                 
+                -- params.lookup['midi_dest'] -- 136
+                -- event_val_string =param_option_to_index('midi_dest', params:string('midi_dest'))
+                
+                -- event_val_string = param_option_to_index('midi_dest', params:get('midi_dest'))
+
+                local options = params.params[params.lookup['midi_dest']].options
+                tab.print(options)
+                
+                print('selected_events_menu = ' .. selected_events_menu)
+
+                -- from 1.0.5                
+                -- event_val_string = options[params:get(automator_events_menus[i])]                
+                event_val_string = options[params:get(selected_events_menu)]
+                
+                print('event_val_string = ' .. event_val_string)
+
               end
             end  
           end
+  
+  
           
           -- Draw menu and <> indicators for scroll range
           -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
@@ -3470,6 +3619,8 @@ function redraw()
             local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(selected_param))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
             screen.text(events_menu_txt)
           else
+            -- print('param_id_to_name(selected_param) = ' .. param_id_to_name(selected_param))
+            -- print('event_val_string = ' .. event_val_string)
             screen.text(first_to_upper(param_formatter(param_id_to_name(selected_param))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
           end
         
@@ -3493,7 +3644,7 @@ function redraw()
         --   -- i == 2 will be 'event_subcategory' 
         --   local selected_events_menu = events_menus[i] -- todo p0 make local 
           
-        --   -- i == 2 will be 'event_global', 'event_chord', etc... (used for parameters)
+        --   -- i == 2 will be 'event_sub_global', 'event_sub_chord', etc... (used for parameters)
         --   local selected_param = (selected_events_menu == 'event_subcategory')  -- todo p0 make local
         --     and selected_event_subcategory_param 
         --     or selected_events_menu
@@ -3627,25 +3778,22 @@ function redraw()
       screen.rect(dash_x,0,34,11)
       screen.fill()
 
-      -- STATE determination. todo: move this out of redraw
-      if arranger_seq_position == 0 and chord_seq_position == 0 then
-        state = 5 --stopped/reset
-      else
-        state = transport_active == true and stop ~= true and 4 or 3 --play or pause
-      end
-      
       -- Draw transport status glyph
-      screen.level(0)
+      screen.level(((transport_state == 'starting' or transport_state == 'pausing') and fast_blinky or 0) * 2)
       local x_offset = dash_x + 26
       local y_offset = 3
-      for i = 1, #glyphs[state] do
-        screen.pixel(glyphs[state][i][1] + x_offset, glyphs[state][i][2] + y_offset)
+
+      -- simplify intermediate states for the glyph selection
+      local transport_state = transport_state == 'starting' and 'playing' or transport_state == 'pausing' and 'paused' or transport_state
+      for i = 1, #glyphs_str[transport_state] do
+        screen.pixel(glyphs_str[transport_state][i][1] + x_offset, glyphs_str[transport_state][i][2] + y_offset)
       end
       screen.fill()
     
       --------------------------------------------    
       -- Pattern position readout
       --------------------------------------------      
+      screen.level(0)
       screen.move(dash_x + 3, y_offset + 5)
       screen.text(pattern_name[pattern] .. '.' .. chord_seq_position)
       
@@ -3655,7 +3803,7 @@ function redraw()
       screen.level(15)
       if chord_no > 0 then
         screen.move(dash_x + 17,y_offset + 16)
-        screen.text_center((chord_name or '')..(chord_name_modifier or '')) -- Chord name. todo: param to switch between this and chord_degree ?
+        screen.text_center(chord_readout)
       end
       
       

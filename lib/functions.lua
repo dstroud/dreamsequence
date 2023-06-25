@@ -1,3 +1,9 @@
+--------------------------------------------
+-- GLOBAL VAR FUNCTIONS SETTING FUNCTIONS --
+--------------------------------------------
+
+
+
 -- EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
 
 -- init functions
@@ -145,6 +151,16 @@ function gen_event_tables()
     event_category_min_index = event_indices[event_category .. '_' .. event_subcategory].first_index
     event_category_max_index = event_indices[event_category .. '_' .. event_subcategory].last_index
   end
+  
+  
+  -- called whenever event_name changes to point to the correct param
+  function set_selected_event_value_type(event_index)
+    local value_type = events_lookup[event_index].value_type
+    if value_type ~= 'trigger' then
+      event_value_type_param = 'event_value_type_' .. value_type
+    end
+  end
+          
   
   -- END OF EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
   
