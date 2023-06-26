@@ -49,8 +49,6 @@ function init()
   --todo p3 generate from events_lookup
   event_subcategory_param = {'event_sub_global', 'event_sub_chord', 'event_sub_arp', 'event_sub_midi', 'event_sub_cv'}
 
-  -- set the starting value of event_value_type_param
-  event_value_type_param = events_lookup[1].value_type
   
   local events_lookup_names = {}
   local events_lookup_ids = {}
@@ -141,25 +139,24 @@ function init()
   params:set_action('event_sub_midi',function() update_menus() end)
   params:hide(params.lookup['event_sub_midi'])  
   
+  function update_event_operation_options()
+    swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
+    print('printing from update_event_operation_options:')
+    print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
+  end
+  
   params:add_option('event_name', 'Event', events_lookup_names, 1) -- Default value overwritten later in Init
-  params:set_action('event_name',function(val) set_selected_event_value_type(val); update_menus() end)
+  -- todo consider an action  to update .options for value_type
+  params:set_action('event_name',function() update_event_operation_options(); update_menus() end)
   params:hide(params.lookup['event_name'])
   
-  -- Different value type params will be loaded depending on the Event
 
-
-  -- called whenever event_name changes to point to the correct param
-  -- function set_selected_event_value_type(event_index)
-  --   -- local value_type = events_lookup[event_index].value_type
-  --   -- if value_type == 'set' then
-  --     event_value_type_param = 'event_value_type_' .. events_lookup[event_index].value_type
-  -- end
-
-  params:add_option('event_value_type_set', 'Type', {'Set','Random'}, 1)
-  params:hide(params.lookup['event_value_type_set'])
-  
-  params:add_option('event_value_type_increment', 'Type', {'Set', 'Increment', 'Wander', 'Random'}, 1)
-  params:hide(params.lookup['event_value_type_increment'])
+  -- used to dynamically change the .options for 'event_operation' param
+  event_operation_options_continuous = {'Set', 'Increment', 'Wander', 'Random'}
+  event_operation_options_discreet = {'Set', 'Random'}
+  event_operation_options_trigger = {'Trigger'} 
+  params:add_option('event_operation', 'Operation', _G['event_operation_options_' .. events_lookup[1].value_type], 1)
+  params:hide(params.lookup['event_operation'])
   
   params:add_number('event_value', 'Value', -9999, 9999, 0)
   params:hide(params.lookup['event_value'])
@@ -523,7 +520,7 @@ function init()
     params:set('event_sub_cv', 1)
     params:set('event_sub_midi', 1)
     params:set('event_name', 1)
-    params:set('event_value_type', 1)
+    params:set('event_operation', 1)
     params:set('event_value', 0)
     selected_events_menu = 'event_category'
     events_index = 1
@@ -617,16 +614,22 @@ end
 function update_menus()
 
   -- EVENTS MENU
-  local event_index = params:get('event_name')
-  local value_type = events_lookup[event_index].value_type
-  if value_type == 'increment' then 
-    events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_value_type', 'event_value', 'event_probability'}
-  elseif value_type == 'set' then 
-    events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_value', 'event_probability'}
-  elseif value_type == 'trigger' then 
+  local event_index = params:get('event_name')                
+  local value_type = events_lookup[event_index].value_type    --'trigger'
+  
+  --todo p1 this feels fragile. Think about what might happen if events_lookup changes or if an update occurs with various operations
+  local operation = params:string('event_operation')          --'Trigger' pulled from events_lookup index 1
+  
+  if value_type == 'trigger' then
     events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_probability'}
+  elseif operation == 'Random' then
+    events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_probability'} 
+  else
+    events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_value', 'event_probability'}    
   end
-
+  
+  
+  
   -- GLOBAL MENU 
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator', 'chord_readout'}
@@ -1578,14 +1581,14 @@ function do_events()
           local event_type = event_path.event_type
           local event_name = event_path.id
           local value = event_path.event_value or ''
-          -- local value_type_index = event_path.value_type_id
-          -- local value_type = params.params[params.lookup['event_value_type']]['options'][value_type_index] or ''
-          local value_type = event_path.value_type_id
+          local operation = event_path.operation
           local action = event_path.action or nil
           local action_var = event_path.action_var or nil
           
+          -- 2023-06-25 changing value_types to lowercase
           if event_type == 'param' then
-            params:set(event_name, (value + (value_type == 'Increment' and params:get(event_name) or 0)))
+            -- pretty sure I got this right but do test becase 'increment' got set to 'continuous' in the Great Find and Replace Wars
+            params:set(event_name, (value + (operation == 'increment' and params:get(event_name) or 0)))
           else -- functions
             _G[event_name](value)
           end
@@ -2305,12 +2308,12 @@ function g.key(x,y,z)
             events_index = 1
             selected_events_menu = events_menus[events_index]
 
-            local selected_event_id = events_path.id
-            local selected_event_index = events_lookup_index[selected_event_id]
-            local selected_event_value = events_path.event_value
-            local selected_event_value_type = events_path.value_type_id
-            local selected_event_category = event_categories[selected_event_index]
-            local selected_event_subcategory = events_lookup[selected_event_index].subcategory
+            local id = events_path.id
+            local index = events_lookup_index[id]
+            local value = events_path.value
+            local operation = events_path.operation
+            local selected_event_category = event_categories[index]
+            local selected_event_subcategory = events_lookup[index].subcategory
             local selected_event_subcategory_param = selected_event_subcategory
 
             -- look up string ids for 'add_options' type params, return index, and set the params with this
@@ -2323,25 +2326,26 @@ function g.key(x,y,z)
             -- subcategory needs an extra step since it is technically a number of params that we alias to
             params:set(selected_event_subcategory_param, param_option_to_index(selected_event_subcategory_param, selected_event_subcategory))
             
-            -- will need to do the same as above with event_value_type once this field is dynamic (some event types have different options)
-
+            
             -- This sets the index ranges needed to set events and values
             set_selected_event_indices()
             
             -- Look up event id to get the index #
-            params:set('event_name', selected_event_index)
-            if selected_event_value ~= nil then
-              params:set('event_value', selected_event_value)
-              if selected_event_value_type ~= nil then
-                if selected_event_value_type == 'Set' then
-                  event_value_type_param = 'event_value_type_set'
-                elseif selected_event_value_type == 'Increment' then
-                  event_value_type_param = 'event_value_type_increment'
-                -- else it's trigger in which case we just leave the current event_value_type and ignore it
-                end
-                params:set(event_value_type_param, param_option_to_index(event_value_type_param, selected_event_value_type))
+            params:set('event_name', index)
+            
+            if value ~= nil then
+              params:set('event_value', value)
+              
+              if operation ~= nil then
+                -- swap out the param's options for whatever event we're loading
+                swap_param_options('event_operation', _G['event_operation_options_' .. value_type])
+                
+                params:set('event_operation', param_option_to_index('event_operation', operation))
               end
+              
             end
+            
+            
             params:set('event_probability', events_path.probability)
             
             event_name = events_lookup[params:get('event_name')].id   -- todo not sure what this is for
@@ -2779,16 +2783,18 @@ function key(n,z)
         if event_edit_active then
           
           local event_index = params:get('event_name')
-          local event_type = events_lookup[event_index].event_type
-          local event_value = params:get('event_value')
           
-          -- designated trigger, set, increment
+          -- function or param
+          local event_type = events_lookup[event_index].event_type
+          local value = params:get('event_value')
+          
+          -- trigger, discreet, continuous
           local value_type = events_lookup[event_index].value_type
           
-          -- which option has actually been selected eg set, increment, random, wander
-          local value_type_id = params:string('event_value_type') -- changed to id which will need to be looked up and turned into an id
+          -- Set, Increment, Wander, Random
+          local operation = params:string('event_operation') -- changed to id which will need to be looked up and turned into an id
           local action = events_lookup[event_index].action
-          local action_var = events_lookup[event_index].action_var
+          local action_var_1 = events_lookup[event_index].action_var
           
           local probability = params:get('event_probability') -- todo p2 convert to float
           
@@ -2809,68 +2815,46 @@ function key(n,z)
           if value_type == 'trigger' then
             events[event_edit_pattern][event_edit_step][event_edit_lane] = 
               {
-                -- category = events_lookup[event_index].category, 
                 id = events_lookup[event_index].id, 
                 event_type = event_type,
                 value_type = value_type,
                 probability = probability
               }
 
-            print('Saving Trigger event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')
+            print('Saving to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')
             print('>> id = ' .. events_lookup[event_index].id)
             print('>> event_type = ' .. event_type)
             print('>> value_type = ' .. value_type)
-            print('>> event_probability = ' .. probability)
+            print('>> probability = ' .. probability)
             
-            
-          elseif value_type == 'set' then
+          else
             events[event_edit_pattern][event_edit_step][event_edit_lane] = 
               {
-                -- category = events_lookup[event_index].category, 
-                id = events_lookup[event_index].id, 
-                event_type = event_type,
-                value_type = value_type,
-                value_type_id = 'Set', -- hardcoding for now but once we have the ability to select 'Random' for set types this should use value_type_id
-                event_value = event_value,
-                probability = probability
-              }
-            
-            print('Saving Set event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')            
-            print('>> id = ' .. events_lookup[event_index].id)
-            print('>> event_type = ' .. event_type)
-            print('>> value_type = ' .. value_type)
-            print('>> event_value = ' .. event_value)
-            print('>> event_probability = ' .. probability)
-  
-  
-          elseif value_type == 'increment' then
-            events[event_edit_pattern][event_edit_step][event_edit_lane] = 
-              {
-                -- category = events_lookup[event_index].category, 
                 id = events_lookup[event_index].id, 
                 event_type = event_type, 
                 value_type = value_type,
-                event_value = event_value, 
-                value_type_id = value_type_id,
+                operation = operation,
+                value = event_value, 
                 probability = probability
               }
             
-            print('Saving Inc/Set event to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')              
+            print('Saving to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')              
               print('>> id = ' .. events_lookup[event_index].id)
               print('>> event_type = ' .. event_type)
               print('>> value_type = ' .. value_type)
-              print('>> value_type_id = ' .. value_type_id)
-              print('>> event_value = ' .. event_value)
-              print('>> event_probability = ' .. probability)
+              print('>> operation = ' .. operation)
+              print('>> value = ' .. value)
+              print('>> probability = ' .. probability)
           
           end
           
           -- Extra fields are added if action is assigned to param/function
           if action ~= nil then
             events[event_edit_pattern][event_edit_step][event_edit_lane].action = action
-            events[event_edit_pattern][event_edit_step][event_edit_lane].action_var = action_var
+            events[event_edit_pattern][event_edit_step][event_edit_lane].action_var_1 = action_var_1
             
-            print('>> action = ' .. action or '' .. '(' .. action_var or ''  .. ')')
+            print('>> action = ' .. action)
+            print('>> action_var_1 = ' .. (action_var_1 or 'nil'))
           end
           
           -- Back to event overview
@@ -2997,28 +2981,22 @@ function enc(n,d)
       params:delta(selected_events_menu, d)
       set_selected_event_indices()
       
-      -- Set event_name to first index in the selected category+subcategory and event_value to the current value (Set) or 0 (Increment)
+      -- Set event_name to first index in the selected category+subcategory and event_value to the current value (discreet) or 0 (continuous)
       params:set('event_name', event_category_min_index)
       event_name = events_lookup[params:get('event_name')].id
       set_event_range()
       init_event_value()
       
     elseif selected_events_menu == 'event_subcategory' then
-      -- local prev_event_subcategory = event_subcategory --todo p0 not sure we need this with the individual subcategory params
       params:delta(selected_event_subcategory_param, d)
       set_selected_event_indices()
       
-      -- Set event_name to first index in the selected category+subcategory and event_value to the current value (Set) or 0 (Increment)
+      -- Set event_name to first index in the selected category+subcategory and event_value to the current value (discreet) or 0 (continuous)
       params:set('event_name', event_category_min_index)
       event_name = events_lookup[params:get('event_name')].id
       set_event_range()
       init_event_value()      
       
-      -- We don't want values to be reset if user hits the start/end of the event_name range and keeps turning the encoder. 
-      -- if event_subcategory ~= prev_event_subcategory then
-      --   set_event_range()
-      --   init_event_value()  
-      -- end  
 
     elseif selected_events_menu == 'event_name' then
       local prev_event_name = event_name
@@ -3030,22 +3008,41 @@ function enc(n,d)
         init_event_value()  
       end
     
-    elseif selected_events_menu == 'event_value_type' then
-      local prev_event_value_str = params:string('event_value_type')
+    elseif selected_events_menu == 'event_operation' then
+      local prev_operation = params:string('event_operation')
       params:delta(selected_events_menu, d)
       set_event_range()
-      if params:string('event_value_type') == 'Increment' and prev_event_value_str ~= 'Increment' then
+
+
+      -------------------------
+      -- todo p0!      
+      --------------------------
+      -- Selecting a new operation type will pick up the current value (set in menus) as a starting point
+      -- p0 I think this should be moved into a function that is also called when changing category/subcategory bumps us to a new operation type. Maybe as a param action on 'event_operation' so it's only called when necessary!
+      -- needs to be skipped on function. Errors with arp shuffle for example
+      -- logic needed for switching between new operations as well
+      
+      -- if events_lookup[params:get('event_name')].event_type == 'param' then
+      --   .....
+      
+      if params:string('event_operation') == 'Increment' and prev_operation ~= 'Increment' then
         params:set('event_value', 0)
-      elseif params:string('event_value_type') == 'Set' and prev_event_value_str ~= 'Set' then
+      elseif params:string('event_operation') == 'Set' and prev_operation ~= 'Set' then
         params:set('event_value', params:get(event_name))
       end
       
+
       -- Clamp the current event_value in case it's out-of-bounds
       params:set('event_value',util.clamp(params:get('event_value'), event_range[1], event_range[2]))
-    
+      
+      -- need to update menu so we can remove Value for 'Random' operation selection
+      -- todo p1 test whether this can also be an issue when changing category/subcategory
+      update_menus()
+      
     elseif selected_events_menu == 'event_value' then
       set_event_range()
       params:set('event_value',util.clamp(util.clamp(params:get('event_value'), event_range[1], event_range[2]) + d, event_range[1], event_range[2]))
+      
       
     -- All other Events menus get the usual delta
     else
@@ -3077,32 +3074,27 @@ end
 
 
 -- run when entering a blank event, in which case we load up some values from the previously touched event to make editing quicker
--- todo p1 think about how we want to handle wander and random types
 function init_event_value()
   if events_lookup[params:get('event_name')].event_type == 'param' then
     
-    -- if (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Set') 
-    -- or events_lookup[params:get('event_name')].value_type == 'set' then
-    --   params:set('event_value', params:get(event_name))
-    -- else
-    --   params:set('event_value', 0)
-    -- end
+    local prev_operation = params:string('event_operation')
     
-    if (events_lookup[params:get('event_name')].value_type ~= 'trigger')
-    and (events_lookup[params:get('event_name')].value_type == 'set') then
+    if prev_operation == 'Set' then
       params:set('event_value', params:get(event_name))
-    else
+    elseif prev_operation == 'Wander' then
+      params:set('event_value', 1)
+    elseif prev_operation == 'Increment' then
       params:set('event_value', 0)
+    -- else ignore 'Trigger' and 'Random'
     end
 
-    params:set('event_value', 0)
-
-  else -- non-params
+  else -- functions
     params:set('event_value', 0)
   end
-  -- always reset... todo: might want to carry this over as well but probably not since it can be off-screen
+  -- always reset... todo: might want to carry this over as well but probably not since it can be off-screen ATM
   params:set('event_probability', 100)
 end
+
   
           
 function deepcopy(orig)
@@ -3120,30 +3112,20 @@ function deepcopy(orig)
     return copy
 end
 
-
+-- todo p1 review this
 function set_event_range()
   -- Determine if event range should be clamped
   if events_lookup[params:get('event_name')].event_type == 'param' then
     
-    -- Unrestrict range if it's a param of the 'increment' type and is set to 'Increment'
-    -- print('param value_type = ' .. (event_value_type_param or 'nil'))
     
-    -- -- this breaks now because 'trigger' can be passed which has no value_type
-    -- if events_lookup[params:get('event_name')].value_type == 'increment'
-    -- and params:string(event_value_type_param) == 'Increment' then
-    --   event_range = {-9999,9999}
-    -- else -- 'Set', 'Trigger', etc...
-    --   event_range = params:get_range(params.lookup[event_name]) or {-9999, 9999}
-    -- end
-    
-    if events_lookup[params:get('event_name')].value_type ~= 'trigger' then
-      if params:string(event_value_type_param) == 'Increment' then
-        event_range = {-9999,9999}
-      else -- 'Set'
-        event_range = params:get_range(params.lookup[event_name]) or {-9999, 9999}
-      end
-    end
-    
+    -- v3 adapting to handle new values for trigger but getting rid of the dynamic param thing
+        if events_lookup[params:get('event_name')].value_type ~= 'trigger' then
+          if params:string('event_operation') == 'Increment' then
+            event_range = {-9999,9999}
+          else -- discreet'
+            event_range = params:get_range(params.lookup[event_name]) or {-9999, 9999}
+          end
+        end
     
   else -- function. May have hardcoded ranges in events_lookup at some point
     event_range = {-9999,9999}
@@ -3490,7 +3472,8 @@ function redraw()
         screen.text_right('(K3) DONE')
       else
    
-        -- Scrolling events menu
+
+-- Scrolling events menu
         local menu_offset = scroll_offset(events_index, #events_menus, 4, 10)
         line = 1
         for i = 1,#events_menus do
@@ -3498,109 +3481,48 @@ function redraw()
           screen.move(2, line * 10 + 8 - menu_offset)
           screen.level(events_index == i and 15 or 3)
 
-          -- Switch between number and formatted value for Incremental and Set, respectively
- 
-          -- i == 2 will be 'event_subcategory' 
-          local selected_events_menu = events_menus[i] -- todo p0 make local 
-          
-          -- i == 2 will be 'event_sub_global', 'event_sub_chord', etc... (used for parameters)
-
-          -- print('event_value_type_param = ' .. event_value_type_param)
-
-          local selected_param = (selected_events_menu == 'event_subcategory'
-            and selected_event_subcategory_param)
-            
-            or (selected_events_menu == 'event_value_type'
-            and event_value_type_param)
-            
+          local selected_events_menu = events_menus[i]
+          local selected_param = (selected_events_menu == 'event_subcategory')  -- todo p0 make local
+            and selected_event_subcategory_param 
             or selected_events_menu
-            
           local get_selected_param = params:get(selected_param)
           event_val_string = params:string(selected_param)
 
 
-
-          -- -- use event_value to determine which items we build the menu with
-          -- if selected_events_menu == 'event_value' then
-            
-          --   -- inc, trigger
-          --   if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Increment') then
-              
-          --     -- no formatter needed
-          --     if events_lookup[params:get('event_name')].formatter ~= nil then
-          --       event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
-                
-
-          --     -- params with a formatter
-          --     elseif events_lookup[params:get('event_name')].event_type == 'param' 
-                
-          --     -- params:t gets the param type! I *think* type 2 are add_options params
-          --     and params:t(events_lookup[params:get('event_name')].id) == 2 then
-                
-          --       -- Uses event index to look up all the options for that param
-          --       local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
-                
-          --       event_val_string = options[get_selected_param]
-                
-          --     end
-          --   end  
-          -- end
-
-          -- print('lookup type = ' .. events_lookup[params:get('event_name')].value_type)
-            -- use event_value to determine which items we build the menu with
+         -- use event_value to format values
+         -- values are already set on var event_val_string so if no conditions are met they pass through raw
+         -- >> 'Set' operation should do .options lookup where possible
+         -- >> functions are raw
+         -- >> inc, random, wander are raw
+         -- >> todo p1: think about using formatter on increment and wander. Like how do we handle percentages and large frequencies?
+         -- might need an events_lookup[params:get('event_name')].event_type == param check
           if selected_events_menu == 'event_value' then
+            operation = params:string('event_operation')
             
-            -- inc, trigger
-            -- if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Increment') then
-            if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string(event_value_type_param) == 'Increment') then
-
-
+            if operation == 'Set' then
               
-              -- no formatter needed
+              -- params with a formatter
               if events_lookup[params:get('event_name')].formatter ~= nil then
-                -- print('a')
+                -- print('value set formatter')
                 event_val_string = _G[events_lookup[params:get('event_name')].formatter](params:string('event_value'))
                 
-
-              -- params with a formatter
-              elseif events_lookup[params:get('event_name')].event_type == 'param'
                 
-              -- params:t gets the param type! I *think* type 2 are add_options params but pretty sure was is an existing bug here...
-              -- and params:t(events_lookup[params:get('event_name')].id) == 2 then
-              -- print('event_name = ' .. event_name)
-              and params:t('event_name') == 2 then
-              print('options param event')
+              elseif events_lookup[params:get('event_name')].event_type == 'param' 
               
-                print('event_name = ' .. event_name)
-                -- Uses event index to look up all the options for that param
-                -- nill with event_name = 'midi_dest'
-                -- local options = params.params[params.lookup[events_lookup[params:get('event_name')].id]].options
+              -- params:2 == 2 means it's an add_options type param                
+              and params:t(events_lookup[params:get('event_name')].id) == 2 then
                 
-                -- param_option_to_index(event_name, params:get('event_value'))
-                -- local options = params.params[params.lookup[events_lookup[event_name].id]].options
-                
-                -- params.lookup['midi_dest'] -- 136
-                -- event_val_string =param_option_to_index('midi_dest', params:string('midi_dest'))
-                
-                -- event_val_string = param_option_to_index('midi_dest', params:get('midi_dest'))
-
-                local options = params.params[params.lookup['midi_dest']].options
-                tab.print(options)
-                
-                print('selected_events_menu = ' .. selected_events_menu)
-
-                -- from 1.0.5                
-                -- event_val_string = options[params:get(automator_events_menus[i])]                
-                event_val_string = options[params:get(selected_events_menu)]
-                
-                print('event_val_string = ' .. event_val_string)
+                -- print('value set options')
+                -- Uses event index to look up all the options for that param, then select using index
+                local options = get_options(events_lookup[params:get('event_name')].id)
+                event_val_string = options[get_selected_param]
 
               end
-            end  
-          end
-  
-  
-          
+            -- print('value set without formatter or options')
+            end
+          -- print('value set meets no conditions')
+          end -- end of event_value stuff
+    
           -- Draw menu and <> indicators for scroll range
           -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
           local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
@@ -3608,7 +3530,7 @@ function redraw()
             local range =
               (selected_events_menu == 'event_category' 
                 or selected_events_menu == 'event_subcategory'
-                or selected_events_menu == 'event_value_type') and params:get_range(selected_param)
+                or selected_events_menu == 'event_operation') and params:get_range(selected_param)
               or selected_events_menu == 'event_name' and {event_category_min_index, event_category_max_index}
               or event_range
               
@@ -3617,21 +3539,24 @@ function redraw()
             local menu_value_pre = single and '>' or get_selected_param == range[2] and '<' or ' '
             local menu_value_suf = single and '<' or get_selected_param == range[1] and '>' or ''
             local events_menu_txt = first_to_upper(param_formatter(param_id_to_name(selected_param))) .. menu_value_pre .. string.sub(event_val_string, 1, events_menu_trunc) .. menu_value_suf
+
             screen.text(events_menu_txt)
           else
-            -- print('param_id_to_name(selected_param) = ' .. param_id_to_name(selected_param))
-            -- print('event_val_string = ' .. event_val_string)
+            
+
             screen.text(first_to_upper(param_formatter(param_id_to_name(selected_param))) .. ' ' .. string.sub(event_val_string, 1, events_menu_trunc))
           end
         
           line = line + 1
         end
-
-
+        
+        
+    
         -- -- Dynamic events menu rework - WIP
+        -- -- Revisit this and steal some stuff probably but it's junky
         -- -- local menu_offset = scroll_offset(events_index,#events_menus, 5, 10)
         -- -- line = 1
-        -- -- need a way to get event_value_type up-fron. params:string('event_value_type') Seems to not get reset every time (maybe that's how we're retaining values for copy+paste?)
+        -- -- need a way to get event_operation up-fron. params:string('event_operation') Seems to not get reset every time (maybe that's how we're retaining values for copy+paste?)
         -- -- cheesing this with #events_menus = 5 at the moment but this might break
         -- for i = 1,#events_menus do
           
@@ -3656,7 +3581,7 @@ function redraw()
         --   if selected_events_menu == 'event_value' then
             
         --     -- inc, trigger
-        --     if not (events_lookup[params:get('event_name')].value_type == 'increment' and params:string('event_value_type') == 'Increment') then
+        --     if not (events_lookup[params:get('event_name')].value_type == 'continuous' and params:string('event_operation') == 'Increment') then
               
         --       -- no formatter needed
         --       if events_lookup[params:get('event_name')].formatter ~= nil then
@@ -3706,7 +3631,7 @@ function redraw()
         --     local range =
         --       (selected_events_menu == 'event_category' 
         --         or selected_events_menu == 'event_subcategory'
-        --         or selected_events_menu == 'event_value_type') and params:get_range(selected_param)
+        --         or selected_events_menu == 'event_operation') and params:get_range(selected_param)
         --       or selected_events_menu == 'event_name' and {event_category_min_index, event_category_max_index}
         --       or event_range
               

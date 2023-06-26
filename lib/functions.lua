@@ -150,8 +150,25 @@ function gen_event_tables()
   
     event_category_min_index = event_indices[event_category .. '_' .. event_subcategory].first_index
     event_category_max_index = event_indices[event_category .. '_' .. event_subcategory].last_index
+    
+    --wag if this should be here because I think this also needs to fire when changing event_name but let's try
+    -- loads event_operations param with new options based on the currently-active event_type
+    update_event_operation_options()
   end
   
+  
+  function get_options(param)
+    local options = params.params[params.lookup[param]].options
+    return (options)
+  end
+    
+    
+  -- loads event_operations param with new options based on the currently-active event_type
+  function update_event_operation_options()
+  
+    swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
+    -- print('loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
+  end
   
   -- called whenever event_name changes to point to the correct param
   function set_selected_event_value_type(event_index)
@@ -167,6 +184,14 @@ function gen_event_tables()
   
   
   --- UTILITY FUNCTIONS
+  
+  
+  -- function to swap options table on an existing param and reset count
+  function swap_param_options(param, table)
+    params:lookup_param(param).options = table
+    params:lookup_param(param).count = #table
+  end
+  
   
   -- converts the string value of an 'add_options' param into a value index # suitable for params:set
   -- args: param id and string value         eg 'event_category', 'Arp' == 3
