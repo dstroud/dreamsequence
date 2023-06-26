@@ -27,17 +27,86 @@ norns.version.required = 230526
 
 function init()
   -----------------------------
-  -- UPDATE BEFORE RELEASE!
+  -- todo prerelease ALSO MAKE SURE TO UPDATE ABOVE!
   -- saved with pset files to suss out issues in the future
-  version = 'v1.0.6' -- todo prerelease ALSO MAKE SURE TO UPDATE ABOVE!
+  version = 'v1.0.6'
   -----------------------------
 
-  init_generator()
-  crow.ii.jf.mode(1)
-  -- Turn off built-in Crow clock so it doesn't conflict with ours which only fires when transport is running.
-  params:set('clock_crow_out', 1) -- todo p0 store state and reset on script load
+  -- thanks @dndrks for this little bit of magic to check crow version ^^!!
+  -- todo prerelease
+  norns.crow.events.version = function(...)
+    crow_version = ...
+  end
+  crow.version() -- now redefined to perform the above!
+  crow_version_clock = clock.run(
+    function()
+      clock.sleep(0.1) -- a small hold for usb round-trip
+      if crow_version ~= nil then
+        local crow_major_version = find_number(crow_version)
+        if crow_version ~= 'v3.0.1' then
+          init_message = 'Crow version warning'
+          redraw()
+        end
+        print('Crow version ' .. crow_version)
+      end
+    end
+  )
+
+  crow.ii.jf.event = function(e, value)
+    if e.name == 'mode' then
+      print('preinit jf.mode = '..value)
+      preinit_jf_mode = value
+    elseif e.name == 'time' then
+      jf_time = value
+      print('jf_time = ' .. value)
+    end
+  end
+  
+  function capture_preinit()
+    preinit_clock_source = params:get('clock_source')
+    print('preinit_clock_source = ' .. preinit_clock_source)
+    preinit_clock_crow_out = params:get('clock_crow_out')
+    print('preinit_clock_crow_out = ' .. preinit_clock_crow_out)
+    
+      preinit_jf_mode = clock.run(
+    function()
+      clock.sleep(0.005) -- a small hold for usb round-trip
+      crow.ii.jf.get ('mode') -- will trigger the above .event function
+      -- Activate JF Synthesis mode here so it happens after the hold
+      crow.ii.jf.mode(1)
+    end
+  )
+  
+    -- If syncing to Crow clock, turn this off since we need to use Crow inputs for harmonizer. Revert in cleanup()
+    if preinit_clock_source == 4 then params:set('clock_source',1) end
+    
+    -- Turn off system Crow clock out so it doesn't conflict with DS' custom one. Revert in cleanup()
+    -- Todo p2 look at dynamically turning this on/off rather than use the DS custom clock. Or allow choice.
+    params:set('clock_crow_out', 1)
+  end
+  capture_preinit()
+
+
+  -- Reverts changes to crow and jf that might have been made by DS
+  function cleanup()
+    clock.link.stop()
+    if preinit_clock_source == 4 then 
+      params:set('clock_source', preinit_clock_source)
+      print('Restoring clock_source to ' .. preinit_clock_source)
+    end
+    if preinit_clock_crow_out ~= 1 then 
+      params:set('clock_crow_out', preinit_clock_crow_out)
+      print('Restoring clock_crow_out to ' .. preinit_clock_crow_out)
+    end
+    if preinit_jf_mode == 0 then
+      crow.ii.jf.mode(preinit_jf_mode)
+      print('Restoring jf.mode to ' .. preinit_jf_mode)
+    end
+  end
   
   clock.link.stop() -- or else transport won't start if external link clock is already running
+
+  init_generator()
   
   -- midi stuff
   midi_device = {} -- container for connected midi devices
@@ -141,8 +210,8 @@ function init()
   
   function update_event_operation_options()
     swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
-    print('printing from update_event_operation_options:')
-    print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
+    -- print('printing from update_event_operation_options:')
+    -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
   end
   
   params:add_option('event_name', 'Event', events_lookup_names, 1) -- Default value overwritten later in Init
@@ -596,26 +665,6 @@ countdown_timer.event = countdown -- call the 'countdown' function below,
 countdown_timer.time = .1 -- 1/10s
 countdown_timer.count = -1 -- for.evarrr
 
--- thanks @dndrks for this little bit of magic to check crow version!
--- todo prerelease
-norns.crow.events.version = function(...)
-  crow_version = ...
-end
-crow.version() -- now redefined to perform the above!
-crow_version_clock = clock.run(
-  function()
-    clock.sleep(0.005) -- a small hold for usb round-trip
-    if crow_version ~= nil then
-      local crow_major_version = find_number(crow_version)
-      if crow_version ~= 'v3.0.1' then
-        init_message = 'Crow version warning'
-        redraw()
-      end
-      print('Crow version ' .. crow_version)
-    end
-  end
-)
-
 grid_redraw()
 redraw()
 end
@@ -913,7 +962,7 @@ end
 
 function crow_pullup()
   crow.ii.pullup(t_f_bool(params:get('crow_pullup')))
-  print('crow pullup: ' .. t_f_string(params:get('crow_pullup')))
+  -- print('crow pullup: ' .. t_f_string(params:get('crow_pullup')))
 end
 
 
@@ -926,7 +975,7 @@ function param_dump()
 end
 
 
-  function first_to_upper(str)
+function first_to_upper(str)
   return (str:gsub("^%l", string.upper))
 end
 
@@ -1967,19 +2016,20 @@ function to_crow(source, note)
 end
 
 
---WIP for estimating JF's envelope time using regression analysis. Doesn't update on call though because of an issue with crow.ii.jf.event?
--- todo: revisit after Crow 4.x bugs are worked out
--- crow.ii.jf.event = function( e, value )
---   if e.name == 'time' then
---     jf_time_v = value
---     jf_time_v_to_s = math.exp(-0.694351 * value + 3.0838)
---   end
--- end
-
--- function jf_time()
---   crow.ii.jf.get( 'time' )
---   return(jf_time_v_to_s)
--- end
+--todo p2 check JF code and/or with Trent to see if there is a calc we can use rather than the regression
+function est_jf_time()
+  crow.ii.jf.get ('time') --populates jf_time global
+  
+  jf_time_hold = clock.run(
+    function()
+      clock.sleep(0.005) -- a small hold for usb round-trip
+      local jf_time_s = math.exp(-0.694351 * jf_time + 3.0838) -- jf_time_v_to_s. Should check code to see actuals
+      print('jf_time_s = ' .. jf_time_s)
+      -- return(jf_time_s)   
+      end
+  )
+  
+end
 
 
 function to_jf(source, note, amp)
@@ -3255,8 +3305,8 @@ function redraw()
 
   if init_message ~= nil then
     screen.level(15)
-    screen.move(2,8)
-    screen.text('WARNING!')    
+    -- screen.move(2,8)
+    -- screen.text('FYI!')    
     screen.move(2,18)
     screen.text('Crow v.3.0.1 is recommended.')
     screen.move(2,28)
