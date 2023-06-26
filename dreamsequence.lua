@@ -197,8 +197,11 @@ function init()
   
   params:add_separator ('chord_midi', 'MIDI')
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
-  params:add_number('chord_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  params:add_number('chord_midi_out_port', 'MIDI out',1,#midi.vports,1)
+  
+  params:add_number('chord_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  params:set_action("chord_midi_cc_1_val",function(val) send_cc('chord', 1, val) end)
+  
+  params:add_number('chord_midi_out_port', 'Port',1,#midi.vports,1)
     -- params:set_action('chord_midi_out_port', function(value) chord_midi_out = midi_device[value] end)    
   params:add_number('chord_midi_ch','Channel',1, 16, 1)
   
@@ -230,11 +233,14 @@ function init()
   params:add_number("arp_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
   
   params:add_separator ('arp_midi', 'MIDI')
-  params:add_number('arp_midi_out_port', 'MIDI out',1,#midi.vports,1)
+  params:add_number('arp_midi_out_port', 'Port',1,#midi.vports,1)
   params:add_number('arp_midi_ch','Channel',1, 16, 1)
   params:add_number('arp_midi_velocity','Velocity',0, 127, 100)
-  params:add_number('arp_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
   
+  params:add_number('arp_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  params:set_action("arp_midi_cc_1_val",function(val) send_cc('arp', 1, val) end)
+
+
   params:add_separator ('arp_jf', 'Just Friends')
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   
@@ -252,7 +258,7 @@ function init()
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
     
-  params:add_number('midi_in_port', 'MIDI in',1,#midi.vports,1)
+  params:add_number('midi_in_port', 'Port in',1,#midi.vports,1)
     params:set_action('midi_in_port', function(value)
       in_midi.event = nil
       in_midi = midi.connect(params:get('midi_in_port'))
@@ -275,12 +281,14 @@ function init()
   params:add_number("midi_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
   
   params:add_separator ('midi_harmonizer_midi', 'MIDI')
-  params:add_number('midi_midi_out_port', 'MIDI out',1,#midi.vports,1)   -- (clock out ports configured in global midi parameters) 
+  params:add_number('midi_midi_out_port', 'Port out',1,#midi.vports,1)   -- (clock out ports configured in global midi parameters) 
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('do_midi_velocity_passthru', 'Pass velocity', 0, 1, 0, function(param) return t_f_string(param:get()) end)
     params:set_action("do_midi_velocity_passthru",function() update_menus() end)  
   params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
-  params:add_number('midi_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  
+  params:add_number('midi_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  params:set_action("midi_midi_cc_1_val",function(val) send_cc('midi', 1, val) end)
   
   params:add_separator ('Just Friends')
   params:add_number('midi_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -315,10 +323,13 @@ function init()
   params:add_number("crow_pp_pw","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
   
   params:add_separator ('cv_harmonizer_midi', 'MIDI')
-  params:add_number('crow_midi_out_port', 'MIDI out',1,#midi.vports,1)
+  params:add_number('crow_midi_out_port', 'Port',1,#midi.vports,1)
   params:add_number('crow_midi_ch','Channel',1, 16, 1)
   params:add_number('crow_midi_velocity','Velocity',0, 127, 100)
-  params:add_number('crow_midi_cc_1_val', 'CC Mod', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+
+  params:add_number('crow_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  params:set_action("crow_midi_cc_1_val",function(val) send_cc('crow', 1, val) end)
+
   
   params:add_separator ('cv_harmonizer_jf', 'Just Friends')
   params:add_number('crow_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
@@ -1192,26 +1203,6 @@ end
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
 function sequence_clock()
 
-  -- if arranger_seq_position == 0 and chord_seq_position == 0 then
-  --   if start == true then
-  --     transport_state = 'starting'
-  --   else
-  --     transport_state = 'stopped'
-  --   end
-  -- elseif transport_active == true then
-  --   if stop ~= true then  -- account for nils
-  --     transport_state = 'playing'
-  --   else
-  --     transport_state = 'pausing'
-  --   end
-  -- else
-  --   if start == true then
-  --     transport_state = 'starting'
-  --   else
-  --     transport_state = 'paused'
-  --   end
-  -- end
-  
   transport_state = 'starting'
   print(transport_state)
 
@@ -1249,8 +1240,10 @@ function sequence_clock()
     -- STOP LOGIC DEPENDING ON CLOCK SOURCE
     -- Immediate or instant stop
     if stop == true then
-        transport_state = 'pausing'
-        print(transport_state)
+        if transport_state ~= 'pausing' then
+          transport_state = 'pausing'
+          print(transport_state)
+        end
       -- When internally clocked, stop is quantized to occur at the end of the chord step. todo p1 also use this when running off norns link beat_count
       if params:string('clock_source') == 'internal' then
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
@@ -1580,15 +1573,17 @@ function do_events()
         if event_path ~= nil and math.random() <= event_path.probability / 100 then
           local event_type = event_path.event_type
           local event_name = event_path.id
-          local value = event_path.event_value or ''
+          local value = event_path.value or ''
           local operation = event_path.operation
           local action = event_path.action or nil
           local action_var = event_path.action_var or nil
           
           -- 2023-06-25 changing value_types to lowercase
           if event_type == 'param' then
-            -- pretty sure I got this right but do test becase 'increment' got set to 'continuous' in the Great Find and Replace Wars
-            params:set(event_name, (value + (operation == 'increment' and params:get(event_name) or 0)))
+            -- this got fucked up in the Great Find and Replace Wars of 2023-06-25... 
+            print('value = ' .. value)
+            print('operation = ' .. operation)
+            params:set(event_name, (value + (operation == 'Increment' and params:get(event_name) or 0)))
           else -- functions
             _G[event_name](value)
           end
@@ -1671,12 +1666,8 @@ function play_chord(destination, channel)
       to_engine('chord', note)
     end
   elseif destination == 'MIDI' then
-      local channel = params:get('chord_midi_ch')
-      local port = params:get('chord_midi_out_port')
-      local cc_1 = params:get('chord_midi_cc_1_val')
-      if cc_1 ~= 0 then
-        midi_device[port]:cc(1, cc_1, channel)
-      end
+    local channel = params:get('chord_midi_ch')
+    local port = params:get('chord_midi_out_port')
     for i = 1, params:get('chord_type') do
       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
@@ -1791,10 +1782,6 @@ function advance_arp_seq()
     elseif destination == 'MIDI' then
       local channel = params:get('arp_midi_ch')
       local port = params:get('arp_midi_out_port')
-      local cc_1 = params:get('arp_midi_cc_1_val')
-      if cc_1 ~= 0 then
-        midi_device[port]:cc(1, cc_1, channel)
-      end
       to_midi(note, params:get('arp_midi_velocity'), channel, arp_duration, port)
     elseif destination == 'Crow' then
       to_crow('arp',note)
@@ -1832,10 +1819,6 @@ function sample_crow(volts)
     elseif destination == 'MIDI' then
       local channel = params:get('crow_midi_ch')
       local port = params:get('crow_midi_out_port')
-      local cc_1 = params:get('crow_midi_cc_1_val')
-      if cc_1 ~= 0 then
-        midi_device[port]:cc(1, cc_1, channel)
-      end      
       to_midi(note, params:get('crow_midi_velocity'), channel, crow_duration, port)
     elseif destination == 'Crow' then
       to_crow('crow', note)
@@ -1862,10 +1845,6 @@ midi_event = function(data)
     elseif destination == 'MIDI' then
       local channel = params:get('midi_midi_ch')
       local port = params:get('midi_midi_out_port')
-      local cc_1 = params:get('midi_midi_cc_1_val')
-      if cc_1 ~= 0 then
-        midi_device[port]:cc(1, cc_1, channel)
-      end      
       to_midi(note, params:get('do_midi_velocity_passthru') == 1 and d.vel or params:get('midi_midi_velocity'), channel, midi_duration, port)
     elseif destination == 'Crow' then
       to_crow('midi', note)
@@ -2834,7 +2813,7 @@ function key(n,z)
                 event_type = event_type, 
                 value_type = value_type,
                 operation = operation,
-                value = event_value, 
+                value = value, 
                 probability = probability
               }
             
@@ -3710,8 +3689,8 @@ function redraw()
 
       -- simplify intermediate states for the glyph selection
       local transport_state = transport_state == 'starting' and 'playing' or transport_state == 'pausing' and 'paused' or transport_state
-      for i = 1, #glyphs_str[transport_state] do
-        screen.pixel(glyphs_str[transport_state][i][1] + x_offset, glyphs_str[transport_state][i][2] + y_offset)
+      for i = 1, #glyphs[transport_state] do
+        screen.pixel(glyphs[transport_state][i][1] + x_offset, glyphs[transport_state][i][2] + y_offset)
       end
       screen.fill()
     
@@ -3790,12 +3769,12 @@ function redraw()
       local x_offset = dash_x + 26
       local y_offset = arranger_dash_y + 4
       if params:string('playback') == 'Loop' then
-        for i = 1, #glyphs[1] do
-          screen.pixel(glyphs[1][i][1] + x_offset, glyphs[1][i][2] + y_offset)
+        for i = 1, #glyphs.loop do
+          screen.pixel(glyphs.loop[i][1] + x_offset, glyphs.loop[i][2] + y_offset)
         end
       else 
-        for i = 1, #glyphs[2] do
-          screen.pixel(glyphs[2][i][1] + x_offset, glyphs[2][i][2] + y_offset)
+        for i = 1, #glyphs.one_shot do
+          screen.pixel(glyphs.one_shot[i][1] + x_offset, glyphs.one_shot[i][2] + y_offset)
         end
       end
 

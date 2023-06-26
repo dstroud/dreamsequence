@@ -220,3 +220,13 @@ function gen_event_tables()
     
     return extents
   end
+  
+  
+  -- param action to send cc out as encoder is turned
+  function send_cc(source, cc_no, val)
+    if val > -1 then
+      local channel = params:get(source .. '_midi_ch')
+      local port = params:get(source .. '_midi_out_port')
+      midi_device[port]:cc(cc_no, val, channel)
+    end
+  end
