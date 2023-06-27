@@ -47,7 +47,49 @@ function gen_event_tables()
   end
   
   
+  
+  ------------------------------------------------------------------------------------------------
+    -- Event menu param options swapping functions
+  ------------------------------------------------------------------------------------------------
+  
+  -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...) + subcategory
+  -- Also called when K3 opens events menu and when recalling a populated event slot
+  function set_selected_event_indices()
+    local event_category = params:string('event_category')
+    update_event_subcategory_options()
+    local subcategory = params:string('event_subcategory')
+    event_category_min_index = event_indices[event_category .. '_' .. subcategory].first_index
+    event_category_max_index = event_indices[event_category .. '_' .. subcategory].last_index
+    
+    --wag if this should be here because I think this also needs to fire when changing event_name but let's try
+    -- loads event_operations param with new options based on the currently-active event_type
+    update_event_operation_options('set_selected_event_indices')
+  end
+  
+  
+  function get_options(param)
+    local options = params.params[params.lookup[param]].options
+    return (options)
+  end
+  
+  
+  function update_event_subcategory_options(source)
+    swap_param_options('event_subcategory', event_subcategories[params:string('event_category')])
+    print('update_event_subcategory_options called by ' .. (source or 'nil'))
+    -- print('printing from update_event_operation_options:')
+    -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
+  end
+  
+  function update_event_operation_options(source)
+    print('update_event_operation_options called by ' .. (source or 'nil'))
+    swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
+    -- print('printing from update_event_operation_options:')
+    -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
+  end
+    
+  -------------------------------------- 
   -- functions called by scheduled events
+  ----------------------------------------
   
   -- --for queuing pset load in-advance
   -- function load_pset()
@@ -135,49 +177,6 @@ function gen_event_tables()
       end
     end  
   end   
-  
-  
-  -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...) + subcategory
-  -- Also called when K3 opens events menu and when recalling a populated event slot
-  function set_selected_event_indices()
-    local event_category = params:string('event_category')
-  
-    -- Also swaps out the events_subcategory with whatever the active category is so this can be used for enc and redraw functions
-    -- lookup is done on an "id" that doesn't exist in the og lookup table yet
-    selected_event_subcategory_param = event_subcategory_param[params:get('event_category')]
-    local event_subcategory = params:string(selected_event_subcategory_param)
-  
-  
-    event_category_min_index = event_indices[event_category .. '_' .. event_subcategory].first_index
-    event_category_max_index = event_indices[event_category .. '_' .. event_subcategory].last_index
-    
-    --wag if this should be here because I think this also needs to fire when changing event_name but let's try
-    -- loads event_operations param with new options based on the currently-active event_type
-    update_event_operation_options()
-  end
-  
-  
-  function get_options(param)
-    local options = params.params[params.lookup[param]].options
-    return (options)
-  end
-    
-    
-  -- loads event_operations param with new options based on the currently-active event_type
-  function update_event_operation_options()
-  
-    swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
-    -- print('loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
-  end
-  
-  -- called whenever event_name changes to point to the correct param
-  function set_selected_event_value_type(event_index)
-    local value_type = events_lookup[event_index].value_type
-    if value_type ~= 'trigger' then
-      event_value_type_param = 'event_value_type_' .. value_type
-    end
-  end
-          
   
   -- END OF EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
   
