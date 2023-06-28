@@ -220,7 +220,7 @@ function init()
   
   
   -- init values based on default event param
-  gen_menu_events(params:string('event_operation'))
+  gen_menu_events()
   set_event_indices()
 
 
@@ -3108,54 +3108,6 @@ function enc(n,d)
 end
 
 
--- -- todo p1 can get rid of this I think
--- -- global is set entering event editor (g.key) and when events menus are changed (category, subcategory, event)
--- function set_editing_event_id(source)
---   editing_event_id = events_lookup[params:get('event_name')].id
---   print(source .. ': editing_event_id = ' .. editing_event_id)
--- end
-
--- -- todo p1 can get rid of this I think. replace/merge this with change_operation stuff? Possibly into a new function.
--- -- two use-cases:
--- -- 1. when e3 selects a new category, subcategory, or event
--- -- 2. when g.key selecting a blank event, in which case we load up some values from the previously touched event to make iterative edits quicker
--- function init_event_value(source)
---   local event_type = events_lookup[params:get('event_name')].event_type
---   print('---------------------')
---   print('init_event_value called by ' .. source)
---   print('editing_event_id = ' .. editing_event_id)
---   print('event_type = ' .. event_type)
-
---   if events_lookup[params:get('event_name')].event_type == 'param' then
-    
---     local operation = params:string('event_operation')
---     print('operation = ' .. operation)
-
---     if operation == 'Set' then
---       print("'Set' operation: value from " .. editing_event_id .. ' param')
---       params:set('event_value', params:get(editing_event_id))
---     elseif operation == 'Wander' then
---       print("'Wander' operation: setting value to 1")
---       params:set('event_value', 1)
---     elseif operation == 'Increment' then
---       print("'Increment' operation: setting value to 0")
---       params:set('event_value', 0)
---     -- else ignore 'Trigger' and 'Random'
---       print("'Trigger' or 'Random operation: not setting value")
---     end
-
---   else -- functions
---     print("Function: setting value to 0")
---     params:set('event_value', 0)
---   end
---   -- always reset... todo: might want to carry this over as well but probably not since it can be off-screen ATM
---   params:set('event_probability', 100)
---   print('Setting probability to 100')
---   print('---------------------')
--- end
-
-  
-
 ---------------------------------------
 -- CASCADING EVENTS EDITOR FUNCTIONS --
 ---------------------------------------
@@ -3236,10 +3188,8 @@ function change_operation(source)
 		if debug_change_functions then print('    event_type = ' .. event_type) end
     if event_type == 'param' then
       if debug_change_functions then print('4.1 param value') end
-      -- operation_string = params:string('event_operation')
-      
       if operation == 'Set' then
-        local default_value = params:get(events_lookup[event_index].id) --params:get(editing_event_id) -- todo p1 don't think 
+        local default_value = params:get(events_lookup[event_index].id)
         local default_value = util.clamp(default_value, event_range[1], event_range[2])
         if debug_change_functions then print('5. Set: setting default value to ' .. default_value) end
         params:set('event_value', default_value)
@@ -3252,7 +3202,7 @@ function change_operation(source)
       end
     -- else -- SKIP TRIGGER AND RANDOM!!!
     end
-    gen_menu_events(operation)
+    gen_menu_events()
   end  
   prev_operation = operation
 end
