@@ -316,7 +316,7 @@ function arp_generator(mode)
   local er_table = ER.gen(math.random(1, math.max(1,length - 1)), length, 0) --pulses, steps, shift  -- max pulses?
   local er_note_on_count = 0
   for i = 1, #er_table do
-    local er_note_on_count = er_note_on_count + (er_table[i] and 1 or 0) -- made er_note_on_count local. Dis work?
+    er_note_on_count = er_note_on_count + (er_table[i] and 1 or 0)
   end
 
   -- Pre-randomizations which can be overwritten by the individual algorithms
@@ -371,6 +371,7 @@ function arp_generator(mode)
       arp_seq[1][i + peak] = arp_seq[1][peak] - i
     end
     
+    arp_check_bounds() -- confirmed issues
   end)
 
 
@@ -399,10 +400,11 @@ function arp_generator(mode)
       arp_seq[1][i + peak] = arp_seq[1][peak] + i
     end  
     
+    arp_check_bounds() -- confirmed issues
   end)
   
   
-  local arp_algo_name = 'ER 1-note'
+  local arp_algo_name = 'ER 1 -note'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()
     
@@ -410,10 +412,22 @@ function arp_generator(mode)
       arp_seq[1][i] = er_table[i] and arp_root or 0
     end
     rotate_pattern('Arp', math.random(0,percent_chance(50) and 7 or 0))
-    
+  
   end)
   
 
+  local arp_algo_name = 'ER 2-note'
+  table.insert(arp_algos['name'], arp_algo_name)
+  table.insert(arp_algos['func'], function()
+    
+    for i = 1, #er_table do
+      arp_seq[1][i] = er_table[i] and arp_root or arp_offset
+    end
+    rotate_pattern('Arp', math.random(0,percent_chance(50) and 7 or 0))
+  
+  end)
+  
+  
   local arp_algo_name = 'Strum up'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()  
@@ -452,72 +466,73 @@ function arp_generator(mode)
   end)
   
   
-  local arp_algo_name = 'ER seq +rests'
-  table.insert(arp_algos['name'], arp_algo_name)
-  table.insert(arp_algos['func'], function()
+  -- local arp_algo_name = 'ER seq +rests'
+  -- table.insert(arp_algos['name'], arp_algo_name)
+  -- table.insert(arp_algos['func'], function()
     
-    local note_shift = 0
-    if arp_root - er_note_on_count < 1 then
-      for i = 1, #er_table do
-        arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
-        note_shift = note_shift + (er_table[i] and 1 or 0)
-      end
-    elseif arp_root + er_note_on_count > 14 then
-      for i = 1, #er_table do
-        arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
-        note_shift = note_shift - (er_table[i] and 1 or 0)
-      end
-    else
-      local direction = (arp_root + math.random() > .5 and 1 or -1)
-      for i = 1, #er_table do    -- I don't think this is firing?
-        arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
-        note_shift = note_shift + (er_table[i] and direction or 0)
-      end
-    end
+  --   local note_shift = 0
+  --   if arp_root - er_note_on_count < 1 then
+  --     for i = 1, #er_table do
+  --       arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
+  --       note_shift = note_shift + (er_table[i] and 1 or 0)
+  --     end
+  --   elseif arp_root + er_note_on_count > 14 then
+  --     for i = 1, #er_table do
+  --       arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
+  --       note_shift = note_shift - (er_table[i] and 1 or 0)
+  --     end
+  --   else
+  --     local direction = (arp_root + math.random() > .5 and 1 or -1)
+  --     for i = 1, #er_table do    -- I don't think this is firing?
+  --       arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
+  --       note_shift = note_shift + (er_table[i] and direction or 0)
+  --     end
+  --   end
+  --   arp_check_bounds() -- confirmed issues
     
-  end)
+  -- end)
 
 
-  local arp_algo_name = 'ER drunk+rest'
-  table.insert(arp_algos['name'], arp_algo_name)
-  table.insert(arp_algos['func'], function() 
+  -- local arp_algo_name = 'ER drunk+rest'
+  -- table.insert(arp_algos['name'], arp_algo_name)
+  -- table.insert(arp_algos['func'], function() 
 
-    local note_shift = 0
-    for i = 1, #er_table do
-      arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
-      direction = math.random() > .5 and 1 or -1
-      note_shift = note_shift + (er_table[i] and direction or 0)
-    end
+  --   local note_shift = 0
+  --   for i = 1, #er_table do
+  --     arp_seq[1][i] = er_table[i] and (arp_root + note_shift) or 0
+  --     direction = math.random() > .5 and 1 or -1
+  --     note_shift = note_shift + (er_table[i] and direction or 0)
+  --   end
     
-  end)
+  -- end)
 
 
-  local arp_algo_name = 'Seq. up'
-  table.insert(arp_algos['name'], arp_algo_name)
-  table.insert(arp_algos['func'], function()
+  -- local arp_algo_name = 'Seq. up'
+  -- table.insert(arp_algos['name'], arp_algo_name)
+  -- table.insert(arp_algos['func'], function()
   
-    -- arp_pattern_length[arp_pattern] = math.random(3,4) * (percent_chance(30) and 2 or 1)
-    -- local tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
+  --   -- arp_pattern_length[arp_pattern] = math.random(3,4) * (percent_chance(30) and 2 or 1)
+  --   -- local tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
-    -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
-    -- if params:get('clock_tempo') < 80 then
-    --   params:set('arp_div_index', math.random(2,3) * 2 - tuplet_shift)
-    -- elseif params:get('clock_tempo') < 100 then
-    --   params:set('arp_div_index', math.random(3,4) * 2 - tuplet_shift)
-    -- elseif params:get('clock_tempo') < 120 then
-    --   params:set('arp_div_index', math.random(4,5) * 2 - tuplet_shift)
-    -- else
-    --   params:set('arp_div_index', math.random(5,6) * 2 - tuplet_shift)
-    -- end
+  --   -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
+  --   -- if params:get('clock_tempo') < 80 then
+  --   --   params:set('arp_div_index', math.random(2,3) * 2 - tuplet_shift)
+  --   -- elseif params:get('clock_tempo') < 100 then
+  --   --   params:set('arp_div_index', math.random(3,4) * 2 - tuplet_shift)
+  --   -- elseif params:get('clock_tempo') < 120 then
+  --   --   params:set('arp_div_index', math.random(4,5) * 2 - tuplet_shift)
+  --   -- else
+  --   --   params:set('arp_div_index', math.random(5,6) * 2 - tuplet_shift)
+  --   -- end
     
-    -- -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-    -- params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
+  --   -- -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
+  --   -- params:set('arp_duration_index',math.max(math.random(params:get('arp_div_index'), params:get('arp_div_index') + 4), 5))
     
-    for i = 1, arp_pattern_length[arp_pattern] do
-      arp_seq[1][i] = arp_min - 1 + i
-    end
+  --   for i = 1, arp_pattern_length[arp_pattern] do
+  --     arp_seq[1][i] = arp_min - 1 + i
+  --   end
     
-  end)
+  -- end)
 
 
   local arp_algo_name = 'Seq. down'
@@ -567,24 +582,81 @@ function arp_generator(mode)
     for i = 1, length/2  do
       arp_seq[1][i*2 - 1 + 1] = arp_max + 1 - i * x
     end
-  
+
+    arp_check_repeats()
+    
+    -- local x1 = math.random(1,2)
+    -- local x2 = math.random(1,2)
+    -- for i = 1, length / 2 do
+    --   arp_seq[1][i*2 - 1] = arp_min - 1 + i * x1
+    --   if arp_seq[1][i*2 - 1] == arp_seq[1][i*2 - 2] then
+    --     print('dual seq repeat')
+    --     arp_seq[1] = {0,0,0,0,0,0}
+    --     load(arp_algos['func'][arp_algo])
+    --     break
+    --   end
+      
+    --   arp_seq[1][i*2 - 1 + 1] = arp_max + 1 - i * 2
+    --   if arp_seq[1][i*2 - 1 + 1] == arp_seq[1][i*2 - 1] then
+    --     print('dual seq repeat')
+    --     arp_seq[1] = {}
+    --     load(arp_algos['func'][arp_algo])
+    --     break
+    --   end
+    -- end
+    
+
+    
+      -- load(arp_algos['func'][chord_algo])
+
+    -- pass = false
+    -- while pass == false do
+    --   local x = math.random(1,2)
+    --   for i = 1, length/2  do
+    --     arp_seq[1][i*2 - 1 + 1] = arp_max + 1 - i * x
+    --     -- pass = arp_seq[1][i + 1] == arp_seq[1] and false or true
+    --     if arp_seq[1][i*2 - 1 + 1] == arp_seq[1][i*2 - 1] then
+    --       print('failed')
+    --       pass = false
+    --     else
+    --       pass = true
+    --     end
+    --   if pass == false then break end
+    --   end
+    -- end
+    
+    -- if arp_max + 1 - i * x == arp_seq[1][i*2 - 1]
+    
+    -- tab.print(arp_seq[1])
+    
+    -- if arp_seq[1][1] < 7 then
+    --   print('reroll')
+    --   local x = math.random(1,2)
+    --     for i = 1, length/2  do
+    --       arp_seq[1][i*2 - 1 + 1] = arp_max + 1 - i * x
+    --     end
+    -- end
+
+
   end)
   
   
-  local arp_algo_name = 'Rnd. +ER rest'
-  table.insert(arp_algos['name'], arp_algo_name)
-  table.insert(arp_algos['func'], function()  
+  -- local arp_algo_name = 'Rnd. +ER rest'
+  -- table.insert(arp_algos['name'], arp_algo_name)
+  -- table.insert(arp_algos['func'], function()  
     
-    for i = 1, length do
-      arp_seq[1][i] = math.random(1,7) + random_note_offset
-    end
-    if percent_chance(60) then --add some rests to the arp
-      for i = 1, length do
-        arp_seq[1][i] = er_table[i] and arp_seq[1][i] or 0
-      end
-    end
-    
-  end)
+  --   for i = 1, length do
+  --     arp_seq[1][i] = math.random(1,7) + random_note_offset
+  --   end
+  --   if percent_chance(60) then --add some rests to the arp
+  --     for i = 1, length do
+  --       arp_seq[1][i] = er_table[i] and arp_seq[1][i] or 0
+  --     end
+  --   end
+  
+  -- arp_check_repeats()
+  
+  -- end)
 
 
   -- Set the arp pattern  
@@ -595,7 +667,7 @@ function arp_generator(mode)
     end
     
   -- arp_generator index 1 is reserved for Randomize, otherwise fire the selected algo.
-    local arp_algo = params:get('arp_generator') == 1 and math.random(2,#arp_algos['name']) or params:get('arp_generator')
+    arp_algo = params:get('arp_generator') == 1 and math.random(2,#arp_algos['name']) or params:get('arp_generator')
     print('Arp algo: ' .. arp_algos['name'][arp_algo])
     load(arp_algos['func'][arp_algo])
   end
@@ -638,4 +710,58 @@ function octave_split_up()
     progression[i] = x < split and x +7 or x
   end
 end
+
+
+-- checks arp pattern for out-of-bound notes
+-- if found, wipe pattern and rerun algo
+-- don't hate the player- hate. the. game.
+function arp_check_bounds()   
+  error_check = false
+  local length = arp_pattern_length[arp_pattern]
+  for i = 2, length do
+    if arp_seq[1][i] < 0 or arp_seq[1][i] > 14 then
+      error_check = true
+      print('off-grid note on row ' .. i)
+      break
+    end
+  end
+  if error_check then
+    print('clearing')
+    clear_arp(arp_pattern)
+    print('rerolling')
+    load(arp_algos['func'][arp_algo])
+  end
+end
+
+
+-- checks arp pattern for repeat notes
+-- if found, wipe pattern and rerun algo
+function arp_check_repeats()   
+  error_check = false
+  local length = arp_pattern_length[arp_pattern]
+  for i = 2, length do
+    if arp_seq[1][i] == arp_seq[1][i - 1] then
+      error_check = true
+      -- print('repeat on row ' .. i)
+      break
+    end
+  end
+  if error_check then
+    -- print('clearing')
+    clear_arp(arp_pattern)
+    -- print('rerolling')
+    load(arp_algos['func'][arp_algo])
+  end
+end
+
+
+function clear_arp(pattern)
+  for i = 1, arp_pattern_length[pattern] do
+    arp_seq[1][i] = 0
+  end
+end
+
+
+
+
 -----------------------------------------------------------------

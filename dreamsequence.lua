@@ -172,8 +172,10 @@ function init()
   params:set_action('playback', function() grid_redraw(); arranger_ending() end)
   -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- todo
 
-  
-  -- EVENT PARAMS
+
+  ------------------
+  -- EVENT PARAMS --
+  ------------------
   params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI harmonizer', 'CV harmonizer'}, 1)
   params:set_action('event_category', function(param) change_category(param) end)
   params:hide(params.lookup['event_category'])
@@ -192,19 +194,35 @@ function init()
   event_operation_options_continuous = {'Set', 'Increment', 'Wander', 'Random'}
   event_operation_options_discreet = {'Set', 'Random'}
   event_operation_options_trigger = {'Trigger'} 
-  --todo p2 need to do a print with this and see where this overlaps with other setting of options via function
   params:add_option('event_operation', 'Operation', _G['event_operation_options_' .. events_lookup[1].value_type], 1)
   params:hide(params.lookup['event_operation'])
-  
-  params:add_number('event_value', 'Value', -9999, 9999, 0)
+
+  params:add_number('event_value', 'Value', -9999, 9999, get_default_event_value())
   params:hide(params.lookup['event_value'])
 
   params:add_number('event_probability', 'Probability', 0, 100, 100, function(param) return percent(param:get()) end)
   params:hide(params.lookup['event_probability'])
+  
+  params:add_option('event_op_limit', 'Limit', {'Off', 'Clamp', 'Wrap'}, 1)
+  params:set_action('event_op_limit',function() gen_menu_events() end)
+  params:hide(params.lookup['event_op_limit'])
 
+  params:add_option('event_op_limit_random', 'Limit', {'Off', 'On'}, 1)
+  params:set_action('event_op_limit_random',function() gen_menu_events() end)
+  params:hide(params.lookup['event_op_limit_random'])
+
+  
+  params:add_number('event_op_limit_min', 'Min', -9999, 9999, 0)
+  params:hide(params.lookup['event_op_limit_min'])
+  
+  params:add_number('event_op_limit_max', 'Max', -9999, 9999, 0)
+  params:hide(params.lookup['event_op_limit_max'])  
+  
+  
   -- init values based on default event param
-  gen_events_menu(events_lookup[params:get('event_name')].value_type, params:string('event_operation'))
+  gen_menu_events(params:string('event_operation'))
   set_event_indices()
+
 
   --CHORD PARAMS
   params:add_group('chord', 'CHORD', 23)  
@@ -257,11 +275,14 @@ function init()
   params:add_group('arp', 'ARP', 25)  
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
-    params:set_action('arp_div_index',function() set_div('arp') end)
+  params:set_action('arp_div_index',function() set_div('arp') end)
+  
   params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-    params:set_action("arp_dest",function() update_menus() end)
+  params:set_action("arp_dest",function() update_menus() end)
+  
   params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
-    params:set_action('arp_duration_index',function() set_duration('arp') end)
+  params:set_action('arp_duration_index',function() set_duration('arp') end)
+  
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   params:add_option("arp_mode", "Mode", {'Loop','One-shot'},1)    
@@ -562,19 +583,19 @@ function init()
     -- clock_tempo isn't stored in .pset for some reason so set it from misc.data (todo: look into inserting into .pset)
     params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
     
-    -- reset event-related params so the event editor opens to the default view
+    -- reset event-related params so the event editor opens to the default view rather than the last-loaded event
     params:set('event_category', 1)  
     params:set('event_subcategory', 1)
     params:set('event_name', 1)
     params:set('event_operation', 1)
-    params:set('event_value', 0)
-    selected_events_menu = 'event_category'
+    params:set('event_op_limit', 1)
+    params:set('event_op_limit_random', 1)
+    params:set('event_probability', 100) -- todo p1 change after float
+    params:set('event_value', get_default_event_value())
     events_index = 1
-    set_event_indices()
-    params:set('event_name', event_subcategory_index_min)
-    set_editing_event_id('params.action_read')
-    set_event_range()
-    init_event_value('action_read')
+    selected_events_menu = events_menus[evens_index]
+    gen_menu_events()
+    event_edit_active = false
 
     -- Reset arranger or pattern
     reset_external_clock() -- todo: check if this fires when syncing externally
@@ -620,7 +641,7 @@ function init()
   ---------------------------
 
 -- Optional: load most recent pset on init
--- params:default() -- todo prerelease disable. Set preference for autoloading!
+params:default() -- todo prerelease disable. Set preference for autoloading!
 params:bang()
 
 -- Some actions need to be added post-bang
@@ -1573,20 +1594,39 @@ function do_events()
           local event_type = event_path.event_type
           local event_name = event_path.id
           local value = event_path.value or ''
+          local limit = event_path.limit  -- can be 'events_op_limit' or, for Random op, 'events_op_limit_random'
+          local limit_min = event_path.limit_min
+          local limit_max = event_path.limit_max
           local operation = event_path.operation
           local action = event_path.action or nil
           local action_var = event_path.action_var or nil
           
-          -- 2023-06-25 changing value_types to lowercase
           if event_type == 'param' then
             if operation == 'Set' then
               params:set(event_name, value)
             elseif operation == 'Increment' then
-              params:set(event_name, params:get(editing_event_id) + value)
+              if limit == 'Clamp' then
+                params:set(event_name, util.clamp(params:get(event_name) + value, limit_min, limit_max))
+              elseif limit == 'Wrap' then
+                params:set(event_name, util.wrap(params:get(event_name) + value, limit_min, limit_max))
+              else
+                params:set(event_name, params:get(event_name) + value)
+              end  
             elseif operation == 'Wander' then
-              params:set(event_name, params:get(editing_event_id) + cointoss_inverse(value))
+              if limit == 'Clamp' then
+                params:set(event_name, util.clamp(params:get(event_name) + cointoss_inverse(value), limit_min, limit_max))
+              elseif limit == 'Wrap' then
+                params:set(event_name, util.wrap(params:get(event_name) + cointoss_inverse(value), limit_min, limit_max))
+              else
+                params:set(event_name, params:get(event_name) + cointoss_inverse(value))
+              end  
             elseif operation == 'Random' then
-               params:set(event_name, math.random(1, 4)) --need range lookup
+              if limit == 'On' then
+                params:set(event_name, math.random(limit_min, limit_max))
+              else
+                -- This makes sure we pick up the latest range in case it has changed since event was saved (pset load)
+                params:set(event_name, math.random(event_range[1], event_range[2]))
+              end  
             end
           else -- functions
             _G[event_name](value)
@@ -2285,10 +2325,9 @@ function g.key(x,y,z)
             event_edit_status = '(Saved)'
           end
 
-          -- If the event is populated, Load the Event vars back to the displayed param
+          -- If the event is populated, Load the Event vars back to the displayed param. Otherwise keep the last touched event's settings so we can iterate quickly.
           if events_path ~= nil then
             
-            -- If we're selecting a populated event, we reset the menu index to the Category, but if we're selecting a blank event we keep everything where it was so it's easy to set the same event and just make small value adjustments
             events_index = 1
             selected_events_menu = events_menus[events_index]
 
@@ -2296,41 +2335,27 @@ function g.key(x,y,z)
             local index = events_lookup_index[id]
             local value = events_path.value
             local operation = events_path.operation
-            local selected_event_category = event_categories[index]
-            local selected_event_subcategory = events_lookup[index].subcategory
+            local limit = events_path.limit or 'Off'
 
-            -- look up string ids for 'add_options' type params, return index, and set the params with this
-            params:set('event_category', param_option_to_index('event_category', selected_event_category))
-
-            update_event_subcategory_options('loading populated event')
-            params:set('event_subcategory', param_option_to_index('event_subcategory', selected_event_subcategory))
-            
-            -- This sets the index ranges needed to set events and values
-            set_event_indices()
-            
-            -- Look up event id to get the index #
-            -- needs to be set before update_event_operation_options runs
+            params:set('event_category', param_option_to_index('event_category', events_lookup[index].category))
+            params:set('event_subcategory', param_option_to_index('event_subcategory', events_lookup[index].subcategory))
             params:set('event_name', index)
-
-            if value ~= nil then
-              params:set('event_value', value)
-              if operation ~= nil then
-                -- swap out the param's options for whatever event we're loading
-                update_event_operation_options('loading populated event')
-                params:set('event_operation', param_option_to_index('event_operation', operation))
-              end
+            params:set('event_operation', param_option_to_index('event_operation', operation))
+            if operation == 'Random' then
+              print('Random operation, setting limit ' .. limit)
+              params:set('event_op_limit_random', param_option_to_index('event_op_limit_random', limit))
+            else
+              print('Not random operation, setting limit ' .. limit)
+              params:set('event_op_limit', param_option_to_index('event_op_limit', limit))
             end
-            
+            if limit ~= 'Off' then
+              params:set('event_op_limit_min', events_path.limit_min)
+              params:set('event_op_limit_max', events_path.limit_max)
+            end
+            if value ~= nil then params:set('event_value', value) end -- triggers don't save
             params:set('event_probability', events_path.probability)
-            
-            set_editing_event_id('g.key populated event')
-            
-          else
-            set_editing_event_id('g.key nil event')       
-            set_event_range()
-            init_event_value('g.key')
           end
-          
+          gen_menu_events()
           event_edit_active = true
           
         else -- Subsequent keys down paste event
@@ -2740,7 +2765,8 @@ function key(n,z)
         end
       grid_redraw()
       
-      ---------------------------------------------------------------------------  
+      ---------------------------------------------------------------------------
+      -- Event Editor --
       -- K3 with Event Timeline key held down enters Event editor / function key event editor
       ---------------------------------------------------------------------------        
       elseif arranger_loop_key_count > 0 and interaction == nil then -- blocked by d_cuml if shifting arranger
@@ -2759,7 +2785,7 @@ function key(n,z)
         ---------------------------------------
         -- print('event_edit_active ' .. (event_edit_active and 'true' or 'false'))
         if event_edit_active then
-          
+
           local event_index = params:get('event_name')
           
           -- function or param
@@ -2774,7 +2800,13 @@ function key(n,z)
           local action = events_lookup[event_index].action
           local action_var_1 = events_lookup[event_index].action_var
           
-          local probability = params:get('event_probability') -- todo p2 convert to float
+          local limit = params:string(operation == 'Random' and 'event_op_limit_random' or 'event_op_limit')
+          -- variant for 'Random' op -- todo p1 make sure we can store here and get it loaded into the right param correctly
+          -- local limit_random = params:string('event_op_limit_random')
+          local limit_min = params:get('event_op_limit_min')
+          local limit_max = params:get('event_op_limit_max')
+          
+          local probability = params:get('event_probability') -- todo p1 convert to 0-1 float?
           
           -- Keep track of how many events are populated in this step so we don't have to iterate through them all later
           local step_event_count = events[event_edit_pattern][event_edit_step].populated or 0
@@ -2796,16 +2828,18 @@ function key(n,z)
                 id = events_lookup[event_index].id, 
                 event_type = event_type,
                 value_type = value_type,
+                operation = operation,  -- sorta redundant but we do use it to simplify reads
                 probability = probability
               }
-
+              
             print('Saving to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')
             print('>> id = ' .. events_lookup[event_index].id)
             print('>> event_type = ' .. event_type)
             print('>> value_type = ' .. value_type)
+            print('>> operation = ' .. operation)
             print('>> probability = ' .. probability)
             
-          else
+          elseif operation == 'Set' then
             events[event_edit_pattern][event_edit_step][event_edit_lane] = 
               {
                 id = events_lookup[event_index].id, 
@@ -2815,15 +2849,92 @@ function key(n,z)
                 value = value, 
                 probability = probability
               }
+              
+            print('Saving to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')     
+            print('>> id = ' .. events_lookup[event_index].id)
+            print('>> event_type = ' .. event_type)
+            print('>> value_type = ' .. value_type)
+            print('>> operation = ' .. operation)
+            print('>> value = ' .. value)
+            print('>> probability = ' .. probability)
+              
+          elseif operation == 'Random' then
+            if limit == 'Off' then -- so clunky yikes
+              events[event_edit_pattern][event_edit_step][event_edit_lane] = 
+              {
+                id = events_lookup[event_index].id, 
+                event_type = event_type, 
+                value_type = value_type,
+                operation = operation,
+                limit = limit, -- note different source here but using the same field for storage              
+                probability = probability
+              }
+              else
+              events[event_edit_pattern][event_edit_step][event_edit_lane] = 
+              {
+                id = events_lookup[event_index].id, 
+                event_type = event_type, 
+                value_type = value_type,
+                operation = operation,
+                limit = limit, -- note different source here but using the same field for storage
+                  limit_min = limit_min,  -- adding
+                  limit_max = limit_max,  -- adding
+                probability = probability
+              }
+            end
             
-            print('Saving to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')              
-              print('>> id = ' .. events_lookup[event_index].id)
-              print('>> event_type = ' .. event_type)
-              print('>> value_type = ' .. value_type)
-              print('>> operation = ' .. operation)
-              print('>> value = ' .. value)
-              print('>> probability = ' .. probability)
-          
+            print('Saving to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')       
+            print('>> id = ' .. events_lookup[event_index].id)
+            print('>> event_type = ' .. event_type)
+            print('>> value_type = ' .. value_type)
+            print('>> operation = ' .. operation)
+            print('>> limit = ' .. limit)
+            if limit ~= 'Off' then
+              print('>> limit_min = ' .. limit_min)
+              print('>> limit_max = ' .. limit_max)
+            end
+            print('>> probability = ' .. probability)
+           
+              
+          else --operation == 'Increment' or 'Wander'
+           if limit == 'Off' then -- so clunky yikes
+            events[event_edit_pattern][event_edit_step][event_edit_lane] = 
+              {
+                id = events_lookup[event_index].id, 
+                event_type = event_type, 
+                value_type = value_type,
+                operation = operation,
+                limit = limit,
+                value = value, 
+                probability = probability
+              }
+            else
+            events[event_edit_pattern][event_edit_step][event_edit_lane] = 
+              {
+                id = events_lookup[event_index].id, 
+                event_type = event_type, 
+                value_type = value_type,
+                operation = operation,
+                limit = limit,
+                limit_min = limit_min,  -- adding
+                limit_max = limit_max,  -- adding
+                value = value, 
+                probability = probability
+              }
+            end  
+            print('Saving to events[' .. event_edit_pattern ..'][' .. event_edit_step ..'][' .. event_edit_lane .. ']')       
+            print('>> id = ' .. events_lookup[event_index].id)
+            print('>> event_type = ' .. event_type)
+            print('>> value_type = ' .. value_type)
+            print('>> operation = ' .. operation)
+            print('>> limit = ' .. limit)
+            if limit ~= 'Off' then
+              print('>> limit_min = ' .. limit_min)
+              print('>> limit_max = ' .. limit_max)            
+            end
+            print('>> value = ' .. value)
+            print('>> probability = ' .. probability)
+            
           end
           
           -- Extra fields are added if action is assigned to param/function
@@ -2938,16 +3049,32 @@ function enc(n,d)
     -- might just drop param actions for all of the event params because the inconsistency annoys me.
     if selected_events_menu == 'event_subcategory' then
       params:delta(selected_events_menu, d)
-      change_subcategory()
+      change_subcategory()  -- no param action (options swap issue) so call directly
     elseif selected_events_menu == 'event_operation' then
       params:delta(selected_events_menu, d)
-      change_operation()
-    -- cap this guy  
+      change_operation()  -- no param action (options swap issue) so call directly
     elseif selected_events_menu == 'event_name' then
       local value = params:get(selected_events_menu) + d
         if value >= event_subcategory_index_min and value <= event_subcategory_index_max then
           params:set(selected_events_menu, value)
         end
+    elseif selected_events_menu == 'event_value' then
+      local value = params:get(selected_events_menu) + d
+        if value >= event_range[1] and value <= event_range[2] then
+          params:set(selected_events_menu, value)
+        end
+    elseif selected_events_menu == 'event_op_limit_min' then
+      local value = params:get(selected_events_menu) + d
+        if value >= event_range[1] and value <= params:get('event_op_limit_max') then
+          params:set(selected_events_menu, value)
+        end
+    elseif selected_events_menu == 'event_op_limit_max' then
+      local value = params:get(selected_events_menu) + d
+        if value >= params:get('event_op_limit_min') and value <= event_range[2] then
+          params:set(selected_events_menu, value)
+        end        
+    
+        
     else
       params:delta(selected_events_menu, d)
     end
@@ -2981,51 +3108,51 @@ function enc(n,d)
 end
 
 
--- todo p1 can get rid of this I think
--- global is set entering event editor (g.key) and when events menus are changed (category, subcategory, event)
-function set_editing_event_id(source)
-  editing_event_id = events_lookup[params:get('event_name')].id
-  print(source .. ': editing_event_id = ' .. editing_event_id)
-end
+-- -- todo p1 can get rid of this I think
+-- -- global is set entering event editor (g.key) and when events menus are changed (category, subcategory, event)
+-- function set_editing_event_id(source)
+--   editing_event_id = events_lookup[params:get('event_name')].id
+--   print(source .. ': editing_event_id = ' .. editing_event_id)
+-- end
 
--- todo p1 can get rid of this I think. replace/merge this with change_operation stuff? Possibly into a new function.
--- two use-cases:
--- 1. when e3 selects a new category, subcategory, or event
--- 2. when g.key selecting a blank event, in which case we load up some values from the previously touched event to make iterative edits quicker
-function init_event_value(source)
-  local event_type = events_lookup[params:get('event_name')].event_type
-  print('---------------------')
-  print('init_event_value called by ' .. source)
-  print('editing_event_id = ' .. editing_event_id)
-  print('event_type = ' .. event_type)
+-- -- todo p1 can get rid of this I think. replace/merge this with change_operation stuff? Possibly into a new function.
+-- -- two use-cases:
+-- -- 1. when e3 selects a new category, subcategory, or event
+-- -- 2. when g.key selecting a blank event, in which case we load up some values from the previously touched event to make iterative edits quicker
+-- function init_event_value(source)
+--   local event_type = events_lookup[params:get('event_name')].event_type
+--   print('---------------------')
+--   print('init_event_value called by ' .. source)
+--   print('editing_event_id = ' .. editing_event_id)
+--   print('event_type = ' .. event_type)
 
-  if events_lookup[params:get('event_name')].event_type == 'param' then
+--   if events_lookup[params:get('event_name')].event_type == 'param' then
     
-    local operation = params:string('event_operation')
-    print('operation = ' .. operation)
+--     local operation = params:string('event_operation')
+--     print('operation = ' .. operation)
 
-    if operation == 'Set' then
-      print("'Set' operation: value from " .. editing_event_id .. ' param')
-      params:set('event_value', params:get(editing_event_id))
-    elseif operation == 'Wander' then
-      print("'Wander' operation: setting value to 1")
-      params:set('event_value', 1)
-    elseif operation == 'Increment' then
-      print("'Increment' operation: setting value to 0")
-      params:set('event_value', 0)
-    -- else ignore 'Trigger' and 'Random'
-      print("'Trigger' or 'Random operation: not setting value")
-    end
+--     if operation == 'Set' then
+--       print("'Set' operation: value from " .. editing_event_id .. ' param')
+--       params:set('event_value', params:get(editing_event_id))
+--     elseif operation == 'Wander' then
+--       print("'Wander' operation: setting value to 1")
+--       params:set('event_value', 1)
+--     elseif operation == 'Increment' then
+--       print("'Increment' operation: setting value to 0")
+--       params:set('event_value', 0)
+--     -- else ignore 'Trigger' and 'Random'
+--       print("'Trigger' or 'Random operation: not setting value")
+--     end
 
-  else -- functions
-    print("Function: setting value to 0")
-    params:set('event_value', 0)
-  end
-  -- always reset... todo: might want to carry this over as well but probably not since it can be off-screen ATM
-  params:set('event_probability', 100)
-  print('Setting probability to 100')
-  print('---------------------')
-end
+--   else -- functions
+--     print("Function: setting value to 0")
+--     params:set('event_value', 0)
+--   end
+--   -- always reset... todo: might want to carry this over as well but probably not since it can be off-screen ATM
+--   params:set('event_probability', 100)
+--   print('Setting probability to 100')
+--   print('---------------------')
+-- end
 
   
 
@@ -3039,7 +3166,7 @@ function change_category(category)
   if category ~= prev_category then   -- todo p0 probably need to init prev_category and category vars for all of these
     -- print('new category')
     update_event_subcategory_options('change_category')
-    params:set('event_subcategory', 1) -- won't call change_subcategory because param events don't work (options change but index may remain the same)
+    params:set('event_subcategory', 1) -- no action- calling manually on next step
     change_subcategory()
   end
   prev_category = category  -- todo p1 can this be local and persist on next call? I think not.
@@ -3051,13 +3178,13 @@ function change_subcategory()  -- don't need args passed because it's an index t
   local subcategory = params:string('event_subcategory')
 
   if subcategory ~= prev_subcategory then
-  if debug_change_functions then print('  new subcategory = ' .. subcategory .. '  prev_subcategory = ' .. (prev_subcategory or 'nil')) end
+  if debug_change_functions then print('    new subcategory = ' .. subcategory .. '  prev_subcategory = ' .. (prev_subcategory or 'nil')) end
 
     -- print('new subcategory')
     set_event_indices()
     
     params:set('event_name', event_subcategory_index_min)  -- calls change_event
-    if debug_change_functions then print('  setting event to ' .. events_lookup[event_subcategory_index_min].name) end
+    if debug_change_functions then print('    setting event to ' .. events_lookup[event_subcategory_index_min].name) end
   end  
   prev_subcategory = subcategory
 end
@@ -3066,19 +3193,20 @@ end
 function change_event(event)
   if debug_change_functions then print('3. change_event called') end
   if event ~= prev_event then
-    if debug_change_functions then print('  new event: ' .. events_lookup[event].name) end
-    set_event_range()   -- out of order??
+    if debug_change_functions then print('   new event: ' .. events_lookup[event].name) end
+    update_event_operation_options('change_event')
     
-    -- todo p1
-    -- This might not need to be run on triggers. Look into it
-    -- if events_lookup[event].event_type == 'param' then
-    -- if events_lookup[event].value_type ~= 'trigger' then
+    -- Currently only changing on new event. Changing operation keeps the limit type
+    params:set('event_op_limit', 1)
+    params:set('event_op_limit_random', 1)
+
+    set_event_range()
     
-      update_event_operation_options('change_event')
-      -- set_params('event_limiter_min', event_range[1]) -- todo
-      -- set_params('event_limiter_max', event_range[2]) -- todo
-      params:set('event_operation', 1) -- won't call change_operation because param events don't work (options change but index may remain the same)
-    -- end
+    -- can also move to set_event_range() but this seems fine
+    params:set('event_op_limit_min', event_range[1])
+    params:set('event_op_limit_max', event_range[2])
+    
+    params:set('event_operation', 1) -- no action so call on next line
     change_operation('change_event')
   end
   prev_event = event
@@ -3095,45 +3223,59 @@ function change_operation(source)
   
   -- We also need to set default value if the event changed!
   if source == 'change_event' or operation ~= prev_operation then -- todo p1 might also need a source override on event load
-    if debug_change_functions then print('  setting default values') end
+    
+    -- alternative placement if we want to reset change event_op_limit and event_op_limit_random on both event and op change
+    
+    if debug_change_functions then print('    setting default values') end
 
     local event_index = params:get('event_name')
     local value_type = events_lookup[event_index].value_type
     local event_type = events_lookup[event_index].event_type
 
 		-- set default_value for this operation
-		if debug_change_functions then print('  event_type = ' .. event_type) end
+		if debug_change_functions then print('    event_type = ' .. event_type) end
     if event_type == 'param' then
       if debug_change_functions then print('4.1 param value') end
-      operation_string = params:string('event_operation')
+      -- operation_string = params:string('event_operation')
       
-      if operation_string == 'Set' then
+      if operation == 'Set' then
         local default_value = params:get(events_lookup[event_index].id) --params:get(editing_event_id) -- todo p1 don't think 
         local default_value = util.clamp(default_value, event_range[1], event_range[2])
         if debug_change_functions then print('5. Set: setting default value to ' .. default_value) end
         params:set('event_value', default_value)
-      elseif operation_string == 'Wander' then
+      elseif operation == 'Wander' then
         if debug_change_functions then print('5. Wander: setting default value to ' .. 1) end
         params:set('event_value', 1)
-      elseif operation_string == 'Increment' then
+      elseif operation == 'Increment' then
       if debug_change_functions then print('5. Increment: setting default value to ' .. 0) end
       params:set('event_value', 0)
       end
     -- else -- SKIP TRIGGER AND RANDOM!!!
     end
-    gen_events_menu(value_type, operation_string)
+    gen_menu_events(operation)
   end  
   prev_operation = operation
 end
 
 
-function gen_events_menu(value_type, operation)
-  if value_type == 'trigger' then
+-- todo p3 handle with insert/removes or make a lookup table
+function gen_menu_events()
+  operation = params:string('event_operation')
+  if operation == 'Trigger' then
     events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_probability'}
-  elseif operation_string == 'Random' then
-    events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_probability'} 
-  else
+  elseif operation == 'Set' then -- no limits
     events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_value', 'event_probability'}    
+  elseif operation == 'Random' then  -- no value, swap in event_op_limit_random
+    if params:string('event_op_limit_random') == 'Off' then
+      events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_op_limit_random', 'event_probability'}
+    else
+      events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_op_limit_random', 'event_op_limit_min', 'event_op_limit_max', 'event_probability'} 
+    end
+  elseif params:string('event_op_limit') == 'Off' then  -- Increment and Wander get it all
+    events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_value', 'event_op_limit', 'event_probability'}
+  else
+    events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_value', 'event_op_limit', 'event_op_limit_min', 'event_op_limit_max', 'event_probability'}    
+  
   end
 end
   
@@ -3152,7 +3294,6 @@ function set_event_range()
   local event_index = params:get('event_name')
   -- Determine if event range should be clamped
   if events_lookup[event_index].event_type == 'param' then
-    -- v3 adapting to handle new values for trigger but getting rid of the dynamic param thing
         if events_lookup[event_index].value_type ~= 'trigger' then
           if params:string('event_operation') == 'Increment' then
             event_range = {-9999,9999}
@@ -3173,16 +3314,26 @@ end
 
 
 function update_event_subcategory_options(source)
+  if debug_change_functions then print('   update_event_subcategory_options called by ' .. (source or 'nil')) end
   swap_param_options('event_subcategory', event_subcategories[params:string('event_category')])
-  if debug_change_functiong then print('  update_event_subcategory_options called by ' .. (source or 'nil')) end
 end
 
 function update_event_operation_options(source)
-  if debug_change_functiong then print('  update_event_operation_options called by ' .. (source or 'nil')) end
+  if debug_change_functions then print('   updating operations on ' .. (params:string('event_name') or 'nil')) end
   swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
 end
 
 
+-- used to set default value of event after init and pset load
+function get_default_event_value()  
+  if events_lookup[params:get('event_name')].event_type == 'param' then
+    return(params.params[params.lookup[events_lookup[params:get('event_name')].id]].default)
+  else
+    return(0)
+  end
+end  
+  
+  
 function chord_steps_to_seconds(steps)
   return(steps * 60 / params:get('clock_tempo') / global_clock_div * chord_div) -- switched to var Fix: timing
 end
