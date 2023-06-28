@@ -4,11 +4,41 @@
 
 
 
--- EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
 
--- init functions
+--------------------------------------------
+-- PATTERN TRANSFORMATIONS --
+--------------------------------------------
 
-function gen_event_tables()
+-- Rotate looping portion of pattern
+function rotate_pattern(view, direction)
+    if view == 'Chord' then
+      local length = chord_pattern_length[pattern]
+      local temp_chord_seq = {}
+      for i = 1, length do
+        temp_chord_seq[i] = chord_seq[pattern][i]
+      end
+      for i = 1, length do
+        chord_seq[pattern][i] = temp_chord_seq[util.wrap(i - direction,1,length)]
+      end
+    elseif view == 'Arp' then
+      local length = arp_pattern_length[arp_pattern]
+      local temp_arp_seq = {}
+      for i = 1, length do
+        temp_arp_seq[i] = arp_seq[arp_pattern][i]
+      end
+      for i = 1, length do
+        arp_seq[arp_pattern][i] = temp_arp_seq[util.wrap(i - direction,1,length)]
+      end
+    end
+  end
+  
+  
+  ------------------------------------------------------
+  -- EVENT-SPECIFIC FUNCTIONS --
+  ------------------------------------------------------
+  -- init functions
+  
+  function gen_event_tables()
     event_subcategories = {}
     event_indices = {}
   
@@ -52,40 +82,48 @@ function gen_event_tables()
     -- Event menu param options swapping functions
   ------------------------------------------------------------------------------------------------
   
-  -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...) + subcategory
-  -- Also called when K3 opens events menu and when recalling a populated event slot
-  function set_selected_event_indices()
-    local event_category = params:string('event_category')
-    update_event_subcategory_options()
-    local subcategory = params:string('event_subcategory')
-    event_category_min_index = event_indices[event_category .. '_' .. subcategory].first_index
-    event_category_max_index = event_indices[event_category .. '_' .. subcategory].last_index
+  -- -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...) + subcategory
+  -- -- Also called when K3 opens events menu and when recalling a populated event slot
+  -- function set_selected_event_indices()
+  --   local event_category = params:string('event_category')
     
-    --wag if this should be here because I think this also needs to fire when changing event_name but let's try
-    -- loads event_operations param with new options based on the currently-active event_type
-    update_event_operation_options('set_selected_event_indices')
-  end
+  --   update_event_subcategory_options('set_selected_event_indices')
+  --   -- at this point there is a chance that the current subcategory index exceeds what was just set. need to reset but not every time or we can never actually change the subcategory value. Feels like we need to pull out all this and keep this function for just what it says on the tin: indices.
+  --   -- params:set('event_subcategory', 1) -- set to index 1 because existing index may exceed #table
+  
+  --   -- print('post- subcategory_options update')
+  --   local subcategory = params:string('event_subcategory')
+  --   print('subcategory index == ' .. params:get('event_subcategory'))
+  --   print('subcategory = ' .. (subcategory or 'nil'))
+  --   event_category_min_index = event_indices[event_category .. '_' .. subcategory].first_index
+  --   event_category_max_index = event_indices[event_category .. '_' .. subcategory].last_index
+    
+  --   --wag if this should be here because I think this also needs to fire when changing event_name but let's try
+  --   -- loads event_operations param with new options based on the currently-active event_type
+  --   update_event_operation_options('set_selected_event_indices')
+  -- end
   
   
-  function get_options(param)
-    local options = params.params[params.lookup[param]].options
-    return (options)
-  end
+  -- function get_options(param)
+  --   local options = params.params[params.lookup[param]].options
+  --   return (options)
+  -- end
   
   
-  function update_event_subcategory_options(source)
-    swap_param_options('event_subcategory', event_subcategories[params:string('event_category')])
-    print('update_event_subcategory_options called by ' .. (source or 'nil'))
-    -- print('printing from update_event_operation_options:')
-    -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
-  end
+  -- function update_event_subcategory_options(source)
+  --   swap_param_options('event_subcategory', event_subcategories[params:string('event_category')])
+  --   -- print(' post-options set subcategory string = ' .. params:string('event_subcategory'))
+  --   print('update_event_subcategory_options called by ' .. (source or 'nil'))
+  --   -- print('printing from update_event_operation_options:')
+  --   -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
+  -- end
   
-  function update_event_operation_options(source)
-    print('update_event_operation_options called by ' .. (source or 'nil'))
-    swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
-    -- print('printing from update_event_operation_options:')
-    -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
-  end
+  -- function update_event_operation_options(source)
+  --   print('update_event_operation_options called by ' .. (source or 'nil'))
+  --   swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
+  --   -- print('printing from update_event_operation_options:')
+  --   -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
+  -- end
     
   -------------------------------------- 
   -- functions called by scheduled events
@@ -185,10 +223,34 @@ function gen_event_tables()
   --- UTILITY FUNCTIONS
   
   
+  function deepcopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+      copy = {}
+      for orig_key, orig_value in next, orig, nil do
+        copy[deepcopy(orig_key)] = deepcopy(orig_value)
+      end
+      setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+      copy = orig
+    end
+    return copy
+  end
+  
+  
+  -- equal probability of returning the inverse of arg
+  function cointoss_inverse(val)
+    return(val * (math.random(2) == 1 and -1 or 1))
+  end
+  
+  
   -- function to swap options table on an existing param and reset count
   function swap_param_options(param, table)
     params:lookup_param(param).options = table
-    params:lookup_param(param).count = #table
+    -- print('setting ' .. param .. ' options to :')
+    -- tab.print(table)
+    params:lookup_param(param).count = #table   -- existing index may exceed this so it needs to be set afterwards by whatever called (not every time)
   end
   
   
