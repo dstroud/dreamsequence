@@ -1,4 +1,4 @@
--- IT'S CRAZY IN HERE DON'T JUDGE
+-- IT'S CRAZY IN HERE DON'T JUDGE Meeeeeee
 function init_generator()
   chord_reroll_attempt = 0
   chord_generator('init')
@@ -404,7 +404,7 @@ function arp_generator(mode)
   end)
   
   
-  local arp_algo_name = 'ER 1 -note'
+  local arp_algo_name = 'ER 1-note'
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()
     

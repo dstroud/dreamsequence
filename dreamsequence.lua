@@ -1,13 +1,13 @@
 -- Dreamsequence
--- v1.0.6 @modularbeat
+-- v1.1 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
 -- arpeggiator, and harmonizer 
 -- for Monome Norns+Grid
 -- 
--- KEY 2: Play/pause
--- KEY 3: Reset
+-- KEY 2: Pause/Stop(2x)
+-- KEY 3: Play
 --
 -- ENC 2: Select
 -- ENC 3: Edit 
@@ -29,10 +29,10 @@ function init()
   -----------------------------
   -- todo prerelease ALSO MAKE SURE TO UPDATE ABOVE!
   -- saved with pset files to suss out issues in the future
-  version = 'v1.0.6'
+  version = 'v1.1'
   -----------------------------
 
-  -- thanks @dndrks for this little bit of magic to check crow version ^^!!
+  -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
   -- todo prerelease
   norns.crow.events.version = function(...)
     crow_version = ...
@@ -593,20 +593,16 @@ function init()
     params:set('event_probability', 100) -- todo p1 change after float
     params:set('event_value', get_default_event_value())
     events_index = 1
-    selected_events_menu = events_menus[evens_index]
+    selected_events_menu = events_menus[events_index]
     gen_menu_events()
     event_edit_active = false
 
-    -- Reset arranger or pattern
-    reset_external_clock() -- todo: check if this fires when syncing externally
-    -- print('pset read existing clock check: ' .. (sequence_clock_id or 'nil'))
-    -- this is needed if clock is already running or weirdness happens
-    if sequence_clock_id ~= nil then
-      print('PSET READ canceling sequence_clock_id ' .. (sequence_clock_id or 0))
-      clock.cancel(sequence_clock_id)-- or 0)
+    -- todo p2 loading pset while transport is active gets a little weird with Link and MIDI but I got other stuff to deal with
+    if params:get('clock_source') == 'internal' then 
+      reset_clock()
+    else
+      gen_arranger_seq_padded()
     end
-    stop = false
-    reset_clock() -- resets clock step and generates arranger_seq_padded
     arranger_queue = nil
     arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
     pattern_queue = false
@@ -614,6 +610,9 @@ function init()
     chord_seq_position = 0
     arranger_seq_position = 0
     pattern = arranger_seq_padded[1]
+    if transport_state == 'paused' then
+      transport_state = 'stopped' -- just flips to the stop icon so user knows they don't have to do this manually
+    end  
     get_next_chord()
     chord_raw = next_chord
     chord_no = 0 -- wipe chord readout
@@ -621,10 +620,12 @@ function init()
     gen_dash('params.action_read')
     
     -- if transport_active, reset and continue playing so user can demo psets from the system menu
-    -- todo p2 when link clock is running we can pick up on the wrong beat. Pretty minor but worth fixing.
-    if transport_active == true then
-      clock.transport.start()
-    end
+    -- todo p2 need to send different sync values depending on clock source.
+    -- when link clock is running we can pick up on the wrong beat.
+    -- unsure about MIDI
+    -- if transport_active == true then
+    --   clock.transport.start()
+    -- end
   end
 
   grid_redraw()
@@ -1221,8 +1222,7 @@ end
 
 
  -- Clock to control sequence events including chord pre-load, chord/arp sequence, and crow clock out
-function sequence_clock()
-
+function sequence_clock(sync_val)
   transport_state = 'starting'
   print(transport_state)
 
@@ -1231,6 +1231,9 @@ function sequence_clock()
     clock.sync(1)
   elseif params:string('clock_source') == 'link' then
     clock.sync(params:get('link_quantum'))
+    
+  elseif sync_val ~= nil then -- indicates MIDI clock but starting from K3
+    clock.sync(sync_val)  -- uses sync 1 to come in on the beat of an already running MIDI clock
   end
   
   transport_state = 'playing'
@@ -1260,28 +1263,25 @@ function sequence_clock()
     -- STOP LOGIC DEPENDING ON CLOCK SOURCE
     -- Immediate or instant stop
     if stop == true then
-        if transport_state ~= 'pausing' then
-          transport_state = 'pausing'
-          print(transport_state)
-        end
+        
       -- When internally clocked, stop is quantized to occur at the end of the chord step. todo p1 also use this when running off norns link beat_count
-      if params:string('clock_source') == 'internal' then
+      if params:string('clock_source') == 'internal' or params:string('clock_source') == 'midi' then
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
-          print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+          -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           clock_step = clock_step - 1, 0
-          print('internal stop. setting clock_step to ' .. clock_step)
           transport_multi_stop()
           transport_active = false
-          transport_state = 'paused'
-          print(transport_state)
+          if transport_state ~= 'stopped' then -- Probably a better way of blocking this
+            transport_state = 'paused'
+            print(transport_state)
+          end
           stop = false
         end
       elseif link_stop_source == 'norns' then
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
-          print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+          -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           clock.link.stop()
           clock_step = clock_step - 1, 0
-          print('internal stop. setting clock_step to ' .. clock_step)
           transport_multi_stop()
           transport_active = false
           transport_state = 'paused'
@@ -1424,18 +1424,21 @@ function timing_clock()
 end
     
     
-function clock.transport.start()
-  print('Transport starting')
-  start = true
-  stop = false -- 2023-07-19 added so when arranger stops in 1-shot and then external clock stops, it doesn't get stuck
-  transport_active = true
-  print ('transport set to active in transport.start')
-
-  -- Clock for chord/arp/arranger sequences
-  sequence_clock_id = clock.run(sequence_clock)
-
-  --Clock used to refresh arranger countdown timer 10x a second
-  countdown_timer:start()
+function clock.transport.start(sync_value)
+  -- little check for MIDI because user can technically start and stop as per usual and we don't want to restart coroutine
+  if not (params:string('clock_source') == 'midi' and transport_active) then
+    print('Transport starting')
+    start = true
+    stop = false -- 2023-07-19 added so when arranger stops in 1-shot and then external clock stops, it doesn't get stuck
+    transport_active = true
+    print ('transport set to active via transport.start')
+  
+    -- Clock for chord/arp/arranger sequences
+    sequence_clock_id = clock.run(sequence_clock, sync_value)
+  
+    --Clock used to refresh arranger countdown timer 10x a second
+    countdown_timer:start()
+  end
 end
 
 
@@ -2320,7 +2323,7 @@ function g.key(x,y,z)
 
           local events_path = events[event_edit_pattern][y][x]
           if events_path == nil then
-            event_edit_status = '(Blank)'
+            event_edit_status = '(New)'
           else
             event_edit_status = '(Saved)'
           end
@@ -2644,17 +2647,15 @@ function key(n,z)
       
     -- KEY 2  
     elseif n == 2 then
-  
-      if keys[1] == 1 then
+      -- if keys[1] == 1 then
       -- Not used at the moment
         
       -- Arranger Events strip held down
-      elseif arranger_loop_key_count > 0 and interaction == nil then        
+      if arranger_loop_key_count > 0 and interaction == nil then
         arranger_queue = event_edit_pattern
         grid_redraw()
       
       elseif screen_view_name == 'Events' then
-        
         ------------------------
         -- K2 DELETE EVENT
         ------------------------
@@ -2702,35 +2703,76 @@ function key(n,z)
         gen_dash('K2 events editor closed') -- update events strip in dash after making changes in events editor
         grid_redraw()
         
-      -- Start/resume todo p3: make a concat clock.xxxx.start/stop() string from clock_source callback. I guess.
-      -- Todo p1 need to have a way of canceling a pending pause once transport controls are reworked
-      elseif interaction == nil and params:string('clock_source') == 'internal' then
-        if transport_active then
-          clock.transport.stop() -- todo move to sequence_clock for consistency with link logic?
-          clock_start_method = 'continue'
-          start = true
-        else
-          clock.transport.start()
+        
+      ----------------------------------------
+      -- Transport controls K2 - STOP/RESET --
+      ----------------------------------------
+        
+      elseif interaction == nil then
+
+        if params:string('clock_source') == 'internal' then
+          -- print('internal clock')
+          if transport_state == 'starting' or transport_state == 'playing' then
+            clock.transport.stop() -- todo move to sequence_clock for consistency with link logic?
+            transport_state = 'pausing'
+            print(transport_state)        
+            clock_start_method = 'continue'
+            start = true
+          elseif transport_state == 'pausing' or transport_state == 'paused' then
+            reset_external_clock()
+            if params:get('arranger_enabled') == 1 then
+              reset_arrangement()
+            else
+              reset_pattern()       
+            end 
+          end
+        elseif params:string('clock_source') == 'link' then
+          -- print('link clock')
+          if transport_state == 'starting' or transport_state == 'playing' then
+            link_stop_source = 'norns'
+            stop = true -- replaces clock.link.stop() so we can fire that in sequence_clock
+            clock_start_method = 'continue'
+            start = true
+            -- captures a play that was canceled but this might not be the best place for this
+            transport_state = 'pausing'
+            print(transport_state)
+          -- don't let link reset while transport is active or it gets outta sync
+          elseif transport_state == 'paused' then
+            if params:get('arranger_enabled') == 1 then
+              reset_arrangement()
+            else
+              reset_pattern()       
+            end
+          end
+        
+        -- WIP todo p0    
+        -- todo maybe there is some stuff to be done with MIDI in?
+        -- looks like norns doesn't call clock.transport.stop() 
+          elseif params:string('clock_source') == 'midi' then
+          if transport_state == 'starting' or transport_state == 'playing' then
+            -- print('stopping via K2 while MIDI synced')
+            clock.transport.stop() -- todo move to sequence_clock for consistency with link logic?
+            transport_state = 'pausing'
+            print(transport_state)        
+            clock_start_method = 'continue'
+            start = true
+          elseif transport_state == 'pausing' or transport_state == 'paused' then
+            reset_external_clock()
+            if params:get('arranger_enabled') == 1 then
+              reset_arrangement()
+            else
+              reset_pattern()       
+            end 
+          end
         end
-      elseif interaction == nil and params:string('clock_source') == 'link' then
-        if transport_active then
-          link_stop_source = 'norns'
-          stop = true -- replaces clock.link.stop() so we can fire that in sequence_clock
-          clock_start_method = 'continue'
-          start = true
-          -- captures a play that was canceled but this might not be the best place for this
-          transport_state = 'pausing'
-          print(transport_state)
-        else
-          -- disabling until issue with internal link start clobbering clocks is addressed
-          -- clock.link.start()
-        end
+        
       end
-      
+  
+    -----------------------  
     -- KEY 3  
+    -----------------------
     elseif n == 3 then
       -- if keys[1] == 1 then
-      
       if init_message ~= nil then
         init_message = nil
       
@@ -2963,29 +3005,33 @@ function key(n,z)
           gen_dash('K3 events saved') -- update events strip in dash after making changes in events editor
           grid_redraw()
         end
-        
-      elseif interaction == nil then
-        -- Reset pattern/arp/arranger for standard K3 functionality-----------------
-        if params:string('clock_source') ~= 'link' then
-          reset_external_clock()
-          if params:get('arranger_enabled') == 1 then
-            reset_arrangement()
-          else
-            reset_pattern()       
-          end
-        else 
-          -- don't let link reset while transport is active or it gets outta sync
-          if transport_active ~= true then
 
-            if params:get('arranger_enabled') == 1 then
-              reset_arrangement()
-            else
-              reset_pattern()       
-            end          
+      ----------------------------------
+      -- Transport controls K3 - PLAY --
+      ----------------------------------
+      -- Todo p1 need to have a way of canceling a pending pause once transport controls are reworked
+      elseif interaction == nil then
+        if params:string('clock_source') == 'internal' then
+          -- todo p0 evaluate this vs transport_state
+          if transport_active == false then
+            clock.transport.start()
           end
-      end
+        elseif params:string('clock_source') == 'midi' then
+          
+          if transport_active == false then
+            clock.transport.start(1)  -- pass along sync value so we know to sync on the next beat rather than immediately
+          end
+        end
         
+      -- -- disabling pending a solution for clock.link.start clobbering clocks!  
+      -- elseif interaction == nil and params:string('clock_source') == 'link' then
+      --   if transport_active == false then
+      --     -- disabling until issue with internal link start clobbering clocks is addressed
+      --     -- clock.link.start()
+      --   end
       end
+      -----------------------------------
+        
     end
   elseif z == 0 then
     keys[n] = nil
@@ -3043,8 +3089,11 @@ function enc(n,d)
   ----------------------    
   elseif screen_view_name == 'Events' and event_saved == false then
     
-    event_edit_status = '(Edited)' -- todo p1 can actually do this in the change_ functions so it only fires when there is a new value!
-
+    -- todo p0 can actually do this in the change_ functions so it only fires when there is a new value!
+    if event_edit_status == '(Saved)' then
+      event_edit_status = '(Edited)'
+    end
+      
     -- have to manually call these two functions because param actions won't work on them (string changes but not index)
     -- might just drop param actions for all of the event params because the inconsistency annoys me.
     if selected_events_menu == 'event_subcategory' then
@@ -3076,6 +3125,7 @@ function enc(n,d)
     
         
     else
+      -- todo p0 getting an error here at some point need to debug. Seems like maybe it was with event_op_limit_max
       params:delta(selected_events_menu, d)
     end
     
@@ -3760,7 +3810,7 @@ function redraw()
 
       -- Draw transport status glyph
       screen.level(((transport_state == 'starting' or transport_state == 'pausing') and fast_blinky or 0) * 2)
-      local x_offset = dash_x + 26
+      local x_offset = dash_x + 27
       local y_offset = 3
 
       -- simplify intermediate states for the glyph selection
@@ -3774,8 +3824,12 @@ function redraw()
       -- Pattern position readout
       --------------------------------------------      
       screen.level(0)
-      screen.move(dash_x + 3, y_offset + 5)
-      screen.text(pattern_name[pattern] .. '.' .. chord_seq_position)
+      screen.move(dash_x + 2, y_offset + 5)
+      if chord_seq_position == 0 then
+        screen.text(pattern_name[pattern].. '.RST')
+      else
+        screen.text(pattern_name[pattern] ..'.'.. chord_seq_position .. '/' .. chord_pattern_length[pattern])
+      end
       
       --------------------------------------------
       -- Chord readout
@@ -3842,7 +3896,7 @@ function redraw()
       
       -- Arranger mode glyph
       screen.level(0)
-      local x_offset = dash_x + 26
+      local x_offset = dash_x + 27
       local y_offset = arranger_dash_y + 4
       if params:string('playback') == 'Loop' then
         for i = 1, #glyphs.loop do
@@ -3857,7 +3911,7 @@ function redraw()
       --------------------------------------------
       -- Arranger position readout
       --------------------------------------------      
-      screen.move(dash_x + 3,arranger_dash_y + 9)
+      screen.move(dash_x + 2,arranger_dash_y + 9)
 
       if arranger_seq_position == 0 then
         if arranger_queue == nil then
