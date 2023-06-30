@@ -1276,6 +1276,7 @@ function sequence_clock(sync_val)
             print(transport_state)
           end
           stop = false
+          start = false
         end
       elseif link_stop_source == 'norns' then
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
@@ -1291,11 +1292,11 @@ function sequence_clock(sync_val)
           link_stop_source = nil
         end      
       
-      -- External clock_source. No quantization. Just resets pattern/arrangement
+      -- External clock_source. No quantization. Just resets pattern/arrangement immediately
       -- todo p2 look at options for a start/continue mode for external sources that support this
       else
         transport_multi_stop()
-        print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
+        -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
         
         if arranger_active then
           print(transport_state)
@@ -1307,7 +1308,6 @@ function sequence_clock(sync_val)
         reset_arrangement()
         transport_state = 'stopped'
         stop = false
-        print('external clock just set stop to nil')
       end
     end -- of stop handling
     
@@ -1442,12 +1442,12 @@ function clock.transport.start(sync_value)
 end
 
 
+-- only used for external clock messages. Otherwise we just set stop directly
 function clock.transport.stop()
   stop = true
 end
 
 
--- Does not set start = true since this can be called by clock.transport.stop() when pausing
 function reset_pattern() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
   transport_state = 'stopped'
   print(transport_state)
@@ -1463,7 +1463,6 @@ function reset_pattern() -- todo: Also have the chord readout updated (move from
 end
 
 
--- Does not set start = true since this can be called by clock.transport.stop() when pausing
 function reset_arrangement() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
   arranger_queue = nil
   arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
@@ -1512,10 +1511,9 @@ function advance_chord_seq()
       
       -- Check if it's the last pattern in the arrangement.
       if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
-
         arrangement_reset = true
         reset_arrangement()
-        clock.transport.stop()
+        stop = true
       else
         -- changed from wrap to a check if incremented arranger_seq_position exceeds seq_length
         arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or (arranger_seq_position + 1 > arranger_seq_length) and 1 or arranger_seq_position + 1
@@ -2713,11 +2711,12 @@ function key(n,z)
         if params:string('clock_source') == 'internal' then
           -- print('internal clock')
           if transport_state == 'starting' or transport_state == 'playing' then
-            clock.transport.stop() -- todo move to sequence_clock for consistency with link logic?
+            stop = true
             transport_state = 'pausing'
             print(transport_state)        
             clock_start_method = 'continue'
-            start = true
+            -- 2023-06-30 removing start = true. Not sure why I was doing this 
+            -- start = true
           elseif transport_state == 'pausing' or transport_state == 'paused' then
             reset_external_clock()
             if params:get('arranger_enabled') == 1 then
@@ -2730,10 +2729,8 @@ function key(n,z)
           -- print('link clock')
           if transport_state == 'starting' or transport_state == 'playing' then
             link_stop_source = 'norns'
-            stop = true -- replaces clock.link.stop() so we can fire that in sequence_clock
+            stop = true
             clock_start_method = 'continue'
-            start = true
-            -- captures a play that was canceled but this might not be the best place for this
             transport_state = 'pausing'
             print(transport_state)
           -- don't let link reset while transport is active or it gets outta sync
@@ -2745,17 +2742,13 @@ function key(n,z)
             end
           end
         
-        -- WIP todo p0    
-        -- todo maybe there is some stuff to be done with MIDI in?
-        -- looks like norns doesn't call clock.transport.stop() 
           elseif params:string('clock_source') == 'midi' then
           if transport_state == 'starting' or transport_state == 'playing' then
-            -- print('stopping via K2 while MIDI synced')
-            clock.transport.stop() -- todo move to sequence_clock for consistency with link logic?
+            stop = true
             transport_state = 'pausing'
             print(transport_state)        
             clock_start_method = 'continue'
-            start = true
+            -- start = true
           elseif transport_state == 'pausing' or transport_state == 'paused' then
             reset_external_clock()
             if params:get('arranger_enabled') == 1 then
@@ -3015,20 +3008,29 @@ function key(n,z)
           -- todo p0 evaluate this vs transport_state
           if transport_active == false then
             clock.transport.start()
+          else -- we can cancel a pending pause by pressing K3 before it fires
+            stop = false
+            transport_state = 'playing'
+            print(transport_state)            
           end
         elseif params:string('clock_source') == 'midi' then
-          
           if transport_active == false then
             clock.transport.start(1)  -- pass along sync value so we know to sync on the next beat rather than immediately
+          else -- we can cancel a pending pause by pressing K3 before it fires
+            stop = false
+            transport_state = 'playing'
+            print(transport_state)            
+          end
+        elseif params:string('clock_source') == 'link' then
+          if transport_active == false then
+            -- disabling until issue with internal link start clobbering clocks is addressed
+            -- clock.link.start()        
+          else -- we can cancel a pending pause by pressing K3 before it fires
+            stop = false
+            transport_state = 'playing'
+            print(transport_state)            
           end
         end
-        
-      -- -- disabling pending a solution for clock.link.start clobbering clocks!  
-      -- elseif interaction == nil and params:string('clock_source') == 'link' then
-      --   if transport_active == false then
-      --     -- disabling until issue with internal link start clobbering clocks is addressed
-      --     -- clock.link.start()
-      --   end
       end
       -----------------------------------
         
@@ -3090,12 +3092,12 @@ function enc(n,d)
   elseif screen_view_name == 'Events' and event_saved == false then
     
     -- todo p0 can actually do this in the change_ functions so it only fires when there is a new value!
-    if event_edit_status == '(Saved)' then
-      event_edit_status = '(Edited)'
-    end
+    -- if event_edit_status == '(Saved)' then
+    --   event_edit_status = '(Edited)'
+    -- end
       
     -- have to manually call these two functions because param actions won't work on them (string changes but not index)
-    -- might just drop param actions for all of the event params because the inconsistency annoys me.
+    -- might just drop param actions for all of the event params because the inconsistency is confusing
     if selected_events_menu == 'event_subcategory' then
       params:delta(selected_events_menu, d)
       change_subcategory()  -- no param action (options swap issue) so call directly
@@ -3109,24 +3111,38 @@ function enc(n,d)
         end
     elseif selected_events_menu == 'event_value' then
       local value = params:get(selected_events_menu) + d
+      if params:string('event_operation') == 'Set' then
         if value >= event_range[1] and value <= event_range[2] then
           params:set(selected_events_menu, value)
+          edit_status_edited()
         end
+      else
+        params:set(selected_events_menu, value)
+        edit_status_edited()
+      end
     elseif selected_events_menu == 'event_op_limit_min' then
       local value = params:get(selected_events_menu) + d
         if value >= event_range[1] and value <= params:get('event_op_limit_max') then
           params:set(selected_events_menu, value)
+          edit_status_edited()
         end
     elseif selected_events_menu == 'event_op_limit_max' then
       local value = params:get(selected_events_menu) + d
         if value >= params:get('event_op_limit_min') and value <= event_range[2] then
           params:set(selected_events_menu, value)
+          edit_status_edited()
         end        
-    
-        
+
+    -- event_op_limit, event_op_limit_random, event_probability have no function but we do a little extra work to not trigger edit_status_edited() if delta is outside of range. todo p3 can probably do the smae with other stuff using 'event_range['
     else
-      -- todo p0 getting an error here at some point need to debug. Seems like maybe it was with event_op_limit_max
-      params:delta(selected_events_menu, d)
+      local prev_value = params:get(selected_events_menu)
+      local value = prev_value + d
+      local value_min = params:get_range(selected_events_menu)[1]
+      local value_max = params:get_range(selected_events_menu)[2]
+      if value >= value_min and value <= value_max then
+        params:set(selected_events_menu, value)
+        edit_status_edited()
+      end
     end
     
   --------------------
@@ -3166,7 +3182,7 @@ debug_change_functions = false
 function change_category(category)
   if debug_change_functions then print('1. change_category called') end
   if category ~= prev_category then   -- todo p0 probably need to init prev_category and category vars for all of these
-    -- print('new category')
+    print('  1.1 new category')
     update_event_subcategory_options('change_category')
     params:set('event_subcategory', 1) -- no action- calling manually on next step
     change_subcategory()
@@ -3177,11 +3193,11 @@ end
 
 function change_subcategory()  -- don't need args passed because it's an index that has to be contextualized by looking up options. Using string instead. Oof, so param action doesn't fire if the index isn't changed. This will affect operation as well.
   if debug_change_functions then print('2. change_subcategory called') end
-  local subcategory = params:string('event_subcategory')
+  -- concat this because subcategory string isn't unique and index resets with options swap!
+  local subcategory = params:string('event_category') .. params:string('event_subcategory')
+  if debug_change_functions then print('  new subcategory = ' .. subcategory .. '  prev_subcategory = ' .. (prev_subcategory or 'nil')) end
 
   if subcategory ~= prev_subcategory then
-  if debug_change_functions then print('    new subcategory = ' .. subcategory .. '  prev_subcategory = ' .. (prev_subcategory or 'nil')) end
-
     -- print('new subcategory')
     set_event_indices()
     
@@ -3192,10 +3208,10 @@ function change_subcategory()  -- don't need args passed because it's an index t
 end
 
 
-function change_event(event)
+function change_event(event) -- index
   if debug_change_functions then print('3. change_event called') end
+  if debug_change_functions then print('   new event: ' .. events_lookup[event].name) end
   if event ~= prev_event then
-    if debug_change_functions then print('   new event: ' .. events_lookup[event].name) end
     update_event_operation_options('change_event')
     
     -- Currently only changing on new event. Changing operation keeps the limit type
@@ -3210,13 +3226,10 @@ function change_event(event)
     
     params:set('event_operation', 1) -- no action so call on next line
     change_operation('change_event')
-  end
+    params:set('event_probability', 100) -- Only reset probability when event changes
+    end
   prev_event = event
 end
-
-
--- function change_limiter(range)   -- no function needed?
--- end
 
 
 function change_operation(source)
@@ -3224,7 +3237,7 @@ function change_operation(source)
   local operation = params:string('event_operation')
   
   -- We also need to set default value if the event changed!
-  if source == 'change_event' or operation ~= prev_operation then -- todo p1 might also need a source override on event load
+  if source == 'change_event' or operation ~= prev_operation then
     
     -- alternative placement if we want to reset change event_op_limit and event_op_limit_random on both event and op change
     
@@ -3253,6 +3266,7 @@ function change_operation(source)
     -- else -- SKIP TRIGGER AND RANDOM!!!
     end
     gen_menu_events()
+  edit_status_edited() -- captures change in category, subcategory, and event as well
   end  
   prev_operation = operation
 end
@@ -3275,11 +3289,18 @@ function gen_menu_events()
     events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_value', 'event_op_limit', 'event_probability'}
   else
     events_menus =  {'event_category', 'event_subcategory', 'event_name', 'event_operation', 'event_value', 'event_op_limit', 'event_op_limit_min', 'event_op_limit_max', 'event_probability'}    
-  
   end
 end
   
-  
+
+-- Flip event edit status. IDK if it makes sense to do a function for this but it saves some rows ¯\_(ツ)_/¯
+-- Running this in change_ events so it only fires if the value actually changes (rather than enc delta'd)
+function edit_status_edited()
+  if event_edit_status == '(Saved)' then
+    event_edit_status = '(Edited)'
+  end
+end
+    
 -- Fetches the min and max events_lookup index for the selected subcategory so we know what events are available
 function set_event_indices()
   local category = params:string('event_category')
