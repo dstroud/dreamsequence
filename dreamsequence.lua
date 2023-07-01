@@ -484,7 +484,7 @@ function init()
   set_event_indices()
   params:set('event_name', event_subcategory_index_min)  -- Overwrites initial value
   
-  event_edit_pattern = 0
+  event_edit_pattern = 0 --todo p1 rename to event_edit_segment
   event_edit_step = 0
   event_edit_lane = 0
   steps_remaining_in_arrangement = 0
@@ -492,8 +492,12 @@ function init()
   percent_step_elapsed = 0
   seconds_remaining = 0
   chord_no = 0
-  arranger_loop_key_count = 0    
   pattern_keys = {}
+  -- arranger_pattern_keys = {}
+  arranger_pattern_key_first = nil -- simpler way to identify the first key held down so we can handle this as a "copy" action and know when to act on it or ignore it. Don't need a whole table.
+  arranger_loop_key_count = 0 -- rename arranger_events_strip_key_count?
+  arranger_pattern_key_count = 0
+  arranger_pattern_key_interrupt = false
   pattern_key_count = 0
   chord_key_count = 0
   view_key_count = 0
@@ -2125,8 +2129,7 @@ function grid_redraw()
       ----------------------------------------------------------------------------
       -- Arranger shifting rework here
       ----------------------------------------------------------------------------
-      -- todo p3 limit how far off the screen we can shift for when encoders flip out
-      if arranger_loop_key_count > 0 then
+      if arranger_loop_key_count > 0 or arranger_pattern_key_count > 0 then
         x_draw_shift = 0
         local within_seq = event_edit_pattern <= arranger_seq_length -- some weird stuff needs to be handled if user is shifting events past the end of the pattern length
         if d_cuml >= 0 then -- Shifting arranger pattern to the right and opening up this many segments between event_edit_pattern and event_edit_pattern + d_cuml
@@ -2343,10 +2346,10 @@ function g.key(x,y,z)
             params:set('event_name', index)
             params:set('event_operation', param_option_to_index('event_operation', operation))
             if operation == 'Random' then
-              print('Random operation, setting limit ' .. limit)
+              -- print('Random operation, setting limit ' .. limit)
               params:set('event_op_limit_random', param_option_to_index('event_op_limit_random', limit))
             else
-              print('Not random operation, setting limit ' .. limit)
+              -- print('Not random operation, setting limit ' .. limit)
               params:set('event_op_limit', param_option_to_index('event_op_limit', limit))
             end
             if limit ~= 'Off' then
@@ -2381,7 +2384,7 @@ function g.key(x,y,z)
 
             -- If this is the first event to be added to this step, increment count of populated event STEPS in the segment
             if (events[event_edit_pattern][y].populated or 0) == 1 then
-              print('incrementing segment populated')
+              -- print('incrementing segment populated')
               events[event_edit_pattern].populated = (events[event_edit_pattern].populated or 0) + 1
             end
           end
@@ -2425,38 +2428,81 @@ function g.key(x,y,z)
           arranger_grid_offset = (x -7) * 16
         end
         
+      
+      -- ARRANGER SEGMENT CHORD PATTERNS
+      -- now work with event copy+paste and give promps to jump to segment or enter event editor
+      elseif y < 5 then
+        -- store the first key pressed so we can ignore it later if it's being used as a way to copy and past events
+        if arranger_pattern_key_count == 0 then arranger_pattern_key_first = x end
+        
+        arranger_pattern_key_count = arranger_pattern_key_count + 1
+
+        -- First pattern key down is special because it needs to enable alternate K2/K3 and E3 modes. If user interacts with those, we don't want to toggle the pattern. So we do all that on key up wheras any copy+paste of patterns/events can happen here on key down.
+        if arranger_pattern_key_count == 1 and arranger_loop_key_count == 0 then
+          event_edit_pattern = x_offset
+
+        elseif arranger_loop_key_count == 0 and arranger_pattern_key_count > 1 and interaction == nil then
+
+          -- todo same as below. simplify
+          -----------------------------------
+          -- apply changes to chord pattern
+          if y == arranger_seq[x_offset] then
+            arranger_seq[x_offset] = 0
+          else
+            arranger_seq[x_offset] = y
+          end
+          gen_arranger_seq_padded()
+            
+          -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
+          events[x_offset] = deepcopy(events[event_edit_pattern])
+          print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
+          gen_dash('Event copy+paste')
+          -----------------------------------
+
+          -- an event paste was just performed so block any change on the final key release
+          arranger_pattern_key_interrupt = true
+          -- print('SETTING arranger_pattern_key_interrupt = TRUE')
+          
+        elseif arranger_loop_key_count == 1 and interaction == nil then
+          
+          -- todo same as above. simplify
+          -----------------------------------
+          -- apply changes to chord pattern
+          if y == arranger_seq[x_offset] then
+            arranger_seq[x_offset] = 0
+          else
+            arranger_seq[x_offset] = y
+          end
+          gen_arranger_seq_padded()
+        
+          events[x_offset] = deepcopy(events[event_edit_pattern])
+          print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
+          gen_dash('Event copy+paste')
+          -----------------------------------
+        end
+        
       -- Arranger events strip key down
       elseif y == 5 then
         arranger_loop_key_count = arranger_loop_key_count + 1
 
         -- First touched pattern is the one we edit, effectively resetting on key_count = 0
-        if arranger_loop_key_count == 1 then
+        if arranger_pattern_key_count == 0 and arranger_loop_key_count == 1 then
           event_edit_pattern = x_offset
 
         -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
         -- arranger shift interaction will block this
+        -- implicit here that more than 1 key is held down so we're pasting
         elseif interaction == nil then
           events[x_offset] = deepcopy(events[event_edit_pattern])
           print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
           gen_dash('Event copy+paste')
         end
-        
-      -- ARRANGER SEGMENT PATTERNS
-      elseif y < 5 then
-        if y == arranger_seq[x_offset]then
-          arranger_seq[x_offset] = 0
-        else
-          arranger_seq[x_offset] = y
-        end  
-        gen_arranger_seq_padded()
-        
-      end
-      if transport_active == false then -- Update chord for when play starts
-        get_next_chord()
-        chord_raw = next_chord
+        if arranger_pattern_key_count == 1 then 
+          arranger_pattern_key_interrupt = true
+        end
       end
       
-    --CHORD KEYS
+    --CHORD PATTERN KEYS
     elseif grid_view_name == 'Chord' then
       if x < 15 then
         chord_key_count = chord_key_count + 1
@@ -2481,13 +2527,13 @@ function g.key(x,y,z)
         elseif pattern_key_count > 1 then
           print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
           pattern_copy_performed = true
-          -- todo: deepcopy
           for i = 1,8 do
             chord_seq[y][i] = chord_seq[pattern_copy_source][i]
           end
           chord_pattern_length[y] = chord_pattern_length[pattern_copy_source]
         end
       end
+      
       if transport_active == false then -- Pre-load chord for when play starts
         get_next_chord()
         chord_raw = next_chord
@@ -2511,7 +2557,6 @@ function g.key(x,y,z)
   --G.KEY RELEASED
   --------------
   elseif z == 0 then
-
     -- Events key up
     if screen_view_name == 'Events' then
       event_key_count = math.max(event_key_count - 1,0)
@@ -2578,7 +2623,7 @@ function g.key(x,y,z)
       elseif x < 15 then
         chord_key_count = chord_key_count - 1
         if chord_key_count == 0 then
-          -- This reverts the chord readout to the currently loaded chord but it is kinda confusing when paused so now it just wipes and refreshes at the next chord step.
+          -- This reverts the chord readout to the currently loaded chord but it is kinda confusing when paused so now it just wipes and refreshes at the next chord step. Could probably be improved todo p2
           -- chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)          
           -- gen_chord_readout()
           chord_no = 0
@@ -2587,49 +2632,110 @@ function g.key(x,y,z)
     
     -- Arranger key up  
     elseif grid_view_name == 'Arranger' then
-      -- Arranger loop strip
-      if y == 5 then
-        arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
-        
-        
-        -- Insert/remove patterns/events after arranger shift with K3
-        if arranger_loop_key_count == 0 then --only do the copy after the last key is released so we don't keep resetting d_cuml if multiple events are held for some reason
-          if d_cuml > 0 then
-            for i = 1, d_cuml do
-              table.insert(arranger_seq, event_edit_pattern, 0)
-              table.remove(arranger_seq, max_arranger_seq_length + 1)
-              table.insert(events, event_edit_pattern, nil)
-              events[event_edit_pattern] = {{},{},{},{},{},{},{},{}}
-              table.remove(events, max_arranger_seq_length + 1)
+      local x_offset = x + arranger_grid_offset -- currently only used 
+
+      -- ARRANGER SEGMENT CHORD PATTERNS
+      -- extra check on arranger_pattern_key_count to toss out any key up that is a result of having a g.key held down in event editor and releasing after switching back to arranger.
+      
+      if y < 5 and arranger_pattern_key_count > 0 then
+        arranger_pattern_key_count = math.max(arranger_pattern_key_count - 1, 0)
+        -- arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
+
+        -- print('---------- KEY UP ------------')
+        if arranger_loop_key_count == 0 then
+          -- print('arranger_loop_key_count == 0')
+          
+          if x == arranger_pattern_key_first then
+            -- print('arranger_pattern_key_first = TRUE')
+            arranger_pattern_key_first = nil
+            -- print('setting arranger_pattern_key_first to NIL')
+            
+            -- check if this key was used to perform a pseudo copy. If so, don't do anything on release (but reset this check)
+            if arranger_pattern_key_interrupt == true then
+              arranger_pattern_key_interrupt = false
+            else
+            -- apply changes to chord pattern
+              if y == arranger_seq[x_offset]then
+                arranger_seq[x_offset] = 0
+              else
+                arranger_seq[x_offset] = y
+              end
+              gen_arranger_seq_padded()
             end
-            gen_arranger_seq_padded()
-            d_cuml = 0
-  
-          elseif d_cuml < 0 then
-            for i = 1, math.abs(d_cuml) do --math.min(math.abs(d_cuml), 1) do
-              table.remove(arranger_seq, math.max(event_edit_pattern - i, 1))
-              table.insert(arranger_seq, 0)
-              table.remove(events, math.max(event_edit_pattern - i, 1))
-              table.insert(events, {})
-              events[max_arranger_seq_length] = {{},{},{},{},{},{},{},{}}
-            end
-            gen_arranger_seq_padded()
-            d_cuml = 0
+          else
+            -- print('arranger_pattern_key_first = FALSE')
           end
-        interaction = nil
+
+            -- Insert/remove patterns/events after arranger shift with K3
+          if arranger_loop_key_count == 0 and arranger_pattern_key_count == 0 then
+            apply_arranger_shift()
+            interaction = nil
+          end
+          
+          -- additional check for a really rare situation. Be sure to test when attempting a refactor of this mess:
+          -- pattern key 1 down
+          --                   pattern key 2 down
+          -- pattern key 1 up
+          -- pattern key 1 down
+          -- pattern key 1 up
+          --                   pattern key 2 up
+          -- pattern key 1 down is now blocked
+          if arranger_loop_key_count == 0 and arranger_pattern_key_count == 0 then
+            arranger_pattern_key_interrupt = false
+            -- print('No keys held: setting arranger_pattern_key_interrupt to FALSE')  
+          end
+          
         end
         
+      
+      -- Arranger loop strip
+      elseif y == 5 then
+        arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
+        
+        -- Insert/remove patterns/events after arranger shift with K3
+        if arranger_loop_key_count == 0 and arranger_pattern_key_count == 0 then 
+          apply_arranger_shift()
+          interaction = nil
+          -- print('event strip setting arranger_pattern_key_interrupt to FALSE')
+          arranger_pattern_key_interrupt = false
+        end
       end
     end
   
     if pattern_key_count == 0 then
-      pattern_copy_performed = false
+      pattern_copy_performed = false 
     end
   end
   redraw()
   grid_redraw()
 end
 
+
+-- todo p3 relocated
+function apply_arranger_shift()
+  if d_cuml > 0 then  -- same as interaction == 'arranger_shift'? todo p2 clean up anywhere this check is used
+    for i = 1, d_cuml do
+      table.insert(arranger_seq, event_edit_pattern, 0)
+      table.remove(arranger_seq, max_arranger_seq_length + 1)
+      table.insert(events, event_edit_pattern, nil)
+      events[event_edit_pattern] = {{},{},{},{},{},{},{},{}}
+      table.remove(events, max_arranger_seq_length + 1)
+    end
+    gen_arranger_seq_padded()
+    d_cuml = 0
+
+  elseif d_cuml < 0 then
+    for i = 1, math.abs(d_cuml) do --math.min(math.abs(d_cuml), 1) do
+      table.remove(arranger_seq, math.max(event_edit_pattern - i, 1))
+      table.insert(arranger_seq, 0)
+      table.remove(events, math.max(event_edit_pattern - i, 1))
+      table.insert(events, {})
+      events[max_arranger_seq_length] = {{},{},{},{},{},{},{},{}}
+    end
+    gen_arranger_seq_padded()
+    d_cuml = 0
+  end
+end
 
 
 ----------------------
@@ -2649,15 +2755,22 @@ function key(n,z)
       -- Not used at the moment
         
       -- Arranger Events strip held down
-      if arranger_loop_key_count > 0 and interaction == nil then
+      if (arranger_loop_key_count > 0 or arranger_pattern_key_count > 0) and interaction == nil then
         arranger_queue = event_edit_pattern
+        -- jumping arranger queue cancels pattern change on key up
+        -- print('setting arranger_pattern_key_interrupt to TRUE')
+        arranger_pattern_key_interrupt = true -- don't change pattern on g.key up
         grid_redraw()
       
       elseif screen_view_name == 'Events' then
+       
+       
         ------------------------
         -- K2 DELETE EVENT
         ------------------------
         if event_edit_active then
+
+          --todo p0 change this to Back and only do delete if key is being held
 
           -- Record the count of events on this step
           local event_count = events[event_edit_pattern][event_edit_step].populated or 0
@@ -2697,6 +2810,7 @@ function key(n,z)
             events[event_edit_pattern].populated = 0
           
           screen_view_name = 'Session'
+          event_key_count = 0
         end
         gen_dash('K2 events editor closed') -- update events strip in dash after making changes in events editor
         grid_redraw()
@@ -2715,8 +2829,6 @@ function key(n,z)
             transport_state = 'pausing'
             print(transport_state)        
             clock_start_method = 'continue'
-            -- 2023-06-30 removing start = true. Not sure why I was doing this 
-            -- start = true
           elseif transport_state == 'pausing' or transport_state == 'paused' then
             reset_external_clock()
             if params:get('arranger_enabled') == 1 then
@@ -2804,8 +2916,9 @@ function key(n,z)
       -- Event Editor --
       -- K3 with Event Timeline key held down enters Event editor / function key event editor
       ---------------------------------------------------------------------------        
-      elseif arranger_loop_key_count > 0 and interaction == nil then -- blocked by d_cuml if shifting arranger
-        arranger_loop_key_count = 0        
+      elseif (arranger_loop_key_count > 0 or arranger_pattern_key_count > 0) and interaction == nil then
+        arranger_loop_key_count = 0
+        arranger_pattern_key_count = 0
         event_edit_step = 0
         event_edit_lane = 0
         event_edit_active = false
@@ -2814,11 +2927,10 @@ function key(n,z)
   
       -- K3 saves event to events
       elseif screen_view_name == 'Events' then
-        
+
         ---------------------------------------
         -- K3 TO SAVE EVENT
         ---------------------------------------
-        -- print('event_edit_active ' .. (event_edit_active and 'true' or 'false'))
         if event_edit_active then
 
           local event_index = params:get('event_name')
@@ -2995,6 +3107,7 @@ function key(n,z)
         
         else
           screen_view_name = 'Session'
+          event_key_count = 0
           gen_dash('K3 events saved') -- update events strip in dash after making changes in events editor
           grid_redraw()
         end
@@ -3080,84 +3193,82 @@ function enc(n,d)
   -- n == ENC 3 -------------------------------------------------------------  
   else
   
-  if view_key_count > 0 then
-    if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
-      transpose_pattern(grid_view_name, d)
-      grid_redraw()
-    end
-      
-  ----------------------    
-  -- Event editor menus
-  ----------------------    
-  elseif screen_view_name == 'Events' and event_saved == false then
-    
-    -- todo p0 can actually do this in the change_ functions so it only fires when there is a new value!
-    -- if event_edit_status == '(Saved)' then
-    --   event_edit_status = '(Edited)'
-    -- end
-      
-    -- have to manually call these two functions because param actions won't work on them (string changes but not index)
-    -- might just drop param actions for all of the event params because the inconsistency is confusing
-    if selected_events_menu == 'event_subcategory' then
-      params:delta(selected_events_menu, d)
-      change_subcategory()  -- no param action (options swap issue) so call directly
-    elseif selected_events_menu == 'event_operation' then
-      params:delta(selected_events_menu, d)
-      change_operation()  -- no param action (options swap issue) so call directly
-    elseif selected_events_menu == 'event_name' then
-      local value = params:get(selected_events_menu) + d
-        if value >= event_subcategory_index_min and value <= event_subcategory_index_max then
-          params:set(selected_events_menu, value)
-        end
-    elseif selected_events_menu == 'event_value' then
-      local value = params:get(selected_events_menu) + d
-      if params:string('event_operation') == 'Set' then
-        if value >= event_range[1] and value <= event_range[2] then
-          params:set(selected_events_menu, value)
-          edit_status_edited()
-        end
-      else
-        params:set(selected_events_menu, value)
-        edit_status_edited()
+    if view_key_count > 0 then
+      if (grid_view_name == 'Chord' or grid_view_name == 'Arp') then-- Chord/Arp 
+        transpose_pattern(grid_view_name, d)
+        grid_redraw()
       end
-    elseif selected_events_menu == 'event_op_limit_min' then
-      local value = params:get(selected_events_menu) + d
-        if value >= event_range[1] and value <= params:get('event_op_limit_max') then
+        
+    ----------------------    
+    -- Event editor menus
+    ----------------------    
+    elseif screen_view_name == 'Events' and event_saved == false then
+        
+      -- have to manually call these two functions because param actions won't work on them (string changes but not index)
+      -- might just drop param actions for all of the event params because the inconsistency is confusing
+      if selected_events_menu == 'event_subcategory' then
+        params:delta(selected_events_menu, d)
+        change_subcategory()  -- no param action (options swap issue) so call directly
+      elseif selected_events_menu == 'event_operation' then
+        params:delta(selected_events_menu, d)
+        change_operation()  -- no param action (options swap issue) so call directly
+      elseif selected_events_menu == 'event_name' then
+        local value = params:get(selected_events_menu) + d
+          if value >= event_subcategory_index_min and value <= event_subcategory_index_max then
+            params:set(selected_events_menu, value)
+          end
+      elseif selected_events_menu == 'event_value' then
+        local value = params:get(selected_events_menu) + d
+        if params:string('event_operation') == 'Set' then
+          if value >= event_range[1] and value <= event_range[2] then
+            params:set(selected_events_menu, value)
+            edit_status_edited()
+          end
+        else
           params:set(selected_events_menu, value)
           edit_status_edited()
         end
-    elseif selected_events_menu == 'event_op_limit_max' then
-      local value = params:get(selected_events_menu) + d
-        if value >= params:get('event_op_limit_min') and value <= event_range[2] then
-          params:set(selected_events_menu, value)
-          edit_status_edited()
-        end        
-
-    -- event_op_limit, event_op_limit_random, event_probability have no function but we do a little extra work to not trigger edit_status_edited() if delta is outside of range. todo p3 can probably do the smae with other stuff using 'event_range['
-    else
-      local prev_value = params:get(selected_events_menu)
-      local value = prev_value + d
-      local value_min = params:get_range(selected_events_menu)[1]
-      local value_max = params:get_range(selected_events_menu)[2]
-      if value >= value_min and value <= value_max then
-        params:set(selected_events_menu, value)
-        edit_status_edited()
-      end
-    end
-    
-  --------------------
-  -- Arranger shift --  
-  --------------------
-  -- moving from arranger keys 1-4 to the arranger loop strip on row 5. This still trips me up but avoids weirdness around handling dual-use keypress (enable/disable vs. entering event editor). Todo p1: have this work for both? I feel like we can use the new interaction global to make sure it doesn't get weird. Will have to set on/off on key up but that is probably fine here.
+      elseif selected_events_menu == 'event_op_limit_min' then
+        local value = params:get(selected_events_menu) + d
+          if value >= event_range[1] and value <= params:get('event_op_limit_max') then
+            params:set(selected_events_menu, value)
+            edit_status_edited()
+          end
+      elseif selected_events_menu == 'event_op_limit_max' then
+        local value = params:get(selected_events_menu) + d
+          if value >= params:get('event_op_limit_min') and value <= event_range[2] then
+            params:set(selected_events_menu, value)
+            edit_status_edited()
+          end        
   
-  elseif grid_view_name == 'Arranger' and arranger_loop_key_count > 0 then
-    -- Arranger segment detail options are on-screen
-    -- block event copy+paste, K2 and K3 (arranger jump and event editor)
-    -- new global to identify types of user interactions that should block certain other interactions e.g. copy+paste, arranger jump, and entering event editor
-    interaction = 'arranger_shift'
-    d_cuml = util.clamp(d_cuml + d, -64, 64)
-    grid_redraw()
-
+      -- event_op_limit, event_op_limit_random, event_probability have no function but we do a little extra work to not trigger edit_status_edited() if delta is outside of range. todo p3 can probably do the smae with other stuff using 'event_range['
+      else
+        local prev_value = params:get(selected_events_menu)
+        local value = prev_value + d
+        local value_min = params:get_range(selected_events_menu)[1]
+        local value_max = params:get_range(selected_events_menu)[2]
+        if value >= value_min and value <= value_max then
+          params:set(selected_events_menu, value)
+          edit_status_edited()
+        end
+      end
+      
+    --------------------
+    -- Arranger shift --  
+    --------------------
+    -- todo p0 might need to have an interaction state when pasting in arranger (or holding down more than 1 key?) to block this. IDK, testing needed.
+    elseif grid_view_name == 'Arranger' and (arranger_loop_key_count > 0 or arranger_pattern_key_count > 0) then
+      -- Arranger segment detail options are on-screen
+      -- block event copy+paste, K2 and K3 (arranger jump and event editor)
+      -- new global to identify types of user interactions that should block certain other interactions e.g. copy+paste, arranger jump, and entering event editor
+      interaction = 'arranger_shift'
+      d_cuml = util.clamp(d_cuml + d, -64, 64)
+      
+      -- an event paste was just performed so block any change on the final key release
+      -- todo p2 thought: can probably set a special interaction that works in place of arranger_pattern_key_interrupt
+      arranger_pattern_key_interrupt = true
+      grid_redraw()
+  
     elseif screen_view_name == 'Session' then
       if menu_index == 0 then
         menu_index = 0
@@ -3169,7 +3280,7 @@ function enc(n,d)
       end
     end
   
-  end
+  end -- n
   redraw()
 end
 
@@ -3181,8 +3292,8 @@ debug_change_functions = false
 
 function change_category(category)
   if debug_change_functions then print('1. change_category called') end
-  if category ~= prev_category then   -- todo p0 probably need to init prev_category and category vars for all of these
-    print('  1.1 new category')
+  if category ~= prev_category then
+  if debug_change_functions then print('  1.1 new category') end
     update_event_subcategory_options('change_category')
     params:set('event_subcategory', 1) -- no action- calling manually on next step
     change_subcategory()
@@ -3618,8 +3729,8 @@ function redraw()
     screen.stroke()    
   
     
-    -- Arranger events strip held down
-  elseif arranger_loop_key_count > 0 then
+  -- Arranger events timeline held down
+  elseif arranger_loop_key_count > 0 or arranger_pattern_key_count > 0 then
     screen.level(15)
     screen.move(2,8)
     screen.text('ARRANGER SEGMENT ' .. event_edit_pattern)
@@ -3698,7 +3809,8 @@ function redraw()
         --------------------------
         -- Scrolling events menu
         --------------------------
-        local menu_offset = scroll_offset(events_index, #events_menus, 4, 10)
+        -- footer chops off some space so if it's more than 4 lines we report 3.5 "visible" lines
+        local menu_offset = scroll_offset(events_index, #events_menus, #events_menus <= 4 and 4 or 3.5, 10)
         line = 1
         for i = 1,#events_menus do
           local debug = false
@@ -3760,7 +3872,6 @@ function redraw()
               or menu_id == 'event_name' and {event_subcategory_index_min, event_subcategory_index_max}
               or event_range -- if all else fails, slap -9999 to 9999 on it from set_event_range lol
               
-            -- flag if it's the only item in a subcategory. todo p0 needs some sort of indicator or it feels frozen!
             local single = menu_index == range[1] and (range[1] == range[2]) or false
             local menu_value_pre = single and '>' or menu_index == range[2] and '<' or ' '
             local menu_value_suf = single and '<' or menu_index == range[1] and '>' or ''
