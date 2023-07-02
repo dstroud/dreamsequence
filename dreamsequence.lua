@@ -44,8 +44,11 @@ function init()
       if crow_version ~= nil then
         local crow_major_version = find_number(crow_version)
         if crow_version ~= 'v3.0.1' then
-          init_message = 'Crow version warning'
-          redraw()
+          
+          -- todo prerelease
+            init_message = nil
+          -- init_message = 'Crow version warning'
+          -- redraw()
         end
         print('Crow version ' .. crow_version)
       end
@@ -311,7 +314,8 @@ function init()
   
   params:add_separator ('arp_crow', 'Crow')
   params:add_option("arp_tr_env", "Output", {'Trigger','AD env.'},1)
-    params:set_action("arp_tr_env",function() update_menus() end)
+  params:set_action("arp_tr_env",function() update_menus() end)
+  
   params:add_number('arp_ad_skew','AD env. skew',0, 100, 0)
   
   
@@ -346,7 +350,7 @@ function init()
   params:add_number('midi_midi_out_port', 'Port out',1,#midi.vports,1)   -- (clock out ports configured in global midi parameters) 
   params:add_number('midi_midi_ch','Channel',1, 16, 1)
   params:add_number('do_midi_velocity_passthru', 'Pass velocity', 0, 1, 0, function(param) return t_f_string(param:get()) end)
-    params:set_action("do_midi_velocity_passthru",function() update_menus() end)  
+  params:set_action("do_midi_velocity_passthru",function() update_menus() end)  
   params:add_number('midi_midi_velocity','Velocity',0, 127, 100)
   
   params:add_number('midi_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
@@ -360,7 +364,8 @@ function init()
   
   params:add_separator ('midi_harmonizer_crow','Crow')
   params:add_option("midi_tr_env", "Output", {'Trigger','AD env.'},1)
-    params:set_action("midi_tr_env",function() update_menus() end)
+  params:set_action("midi_tr_env",function() update_menus() end)
+  
   params:add_number('midi_ad_skew','AD env. skew',0, 100, 0)
 
   
@@ -368,11 +373,14 @@ function init()
   params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)  
   -- Crow clock uses hybrid notation/PPQN
   params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
-    params:set_action('crow_clock_index',function() set_crow_clock() end)
+  params:set_action('crow_clock_index',function() set_crow_clock() end)
+  
   params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-    params:set_action("crow_dest",function() update_menus() end)
+  params:set_action("crow_dest",function() update_menus() end)
+  
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
-    params:set_action('crow_duration_index',function() set_duration('crow') end)
+  params:set_action('crow_duration_index',function() set_duration('crow') end)
+  
   params:add_number('crow_octave','Octave',-2, 4, 0)
   params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)    
 
@@ -498,6 +506,7 @@ function init()
   arranger_loop_key_count = 0 -- rename arranger_events_strip_key_count?
   arranger_pattern_key_count = 0
   arranger_pattern_key_interrupt = false
+  key_counter = 4
   pattern_key_count = 0
   chord_key_count = 0
   view_key_count = 0
@@ -971,7 +980,7 @@ function divisions_string(index)
 end
 
 
---Creates a variable for each source's div.
+--Creates a variable for each source's div
 function set_div(source)
   _G[source .. '_div'] = division_names[params:get(source .. '_div_index')][1]
 end
@@ -1627,22 +1636,44 @@ function do_events()
               end  
             elseif operation == 'Random' then
               if limit == 'On' then
-                params:set(event_name, math.random(limit_min, limit_max))
+                local rand = math.random(limit_min, limit_max)
+                -- print('Event randomization (limited) value ' .. event_name .. ' to ' .. rand)
+                params:set(event_name, rand)
               else
                 -- This makes sure we pick up the latest range in case it has changed since event was saved (pset load)
-                params:set(event_name, math.random(event_range[1], event_range[2]))
+                local rand = math.random(event_range[1], event_range[2])
+                -- print('Event randomization value ' .. event_name .. ' to ' .. rand)                
+                params:set(event_name, rand)
               end  
             end
           else -- functions
-            _G[event_name](value)
+            -- currently the only function ops are Trigger and Discreet. So we just need to have a check for Random. Will likely need to expand this later.
+            if operation == 'Random' then
+              if limit == 'On' then
+                local value = math.random(limit_min, limit_max)
+                _G[event_name](value)
+                
+                -- currently not using actions other than param actions which will fire automatically.
+                -- todo: if/when param actions are set up this needs to be replicated (or a global var used) to pick up random/wander values
+                if action ~= nil then
+                  _G[action](action_var)
+                end                
+              else
+                -- This makes sure we pick up the latest range in case it has changed since event was saved (pset load)
+                local value = math.random(event_range[1], event_range[2])
+                _G[event_name](value)
+                
+                -- currently not using actions other than param actions which will fire automatically.
+                -- todo: if/when param actions are set up this needs to be replicated (or a global var used) to pick up random/wander values
+                if action ~= nil then
+                  _G[action](action_var)
+                end                    
+              end
+            else
+              _G[event_name](value)
+            end
           end
-          
-          if action ~= nil then
-            _G[action](action_var)
-          end
-          
         end
-        
       end
     end
   end
@@ -1849,6 +1880,8 @@ end
 
 
 function crow_trigger() --Trigger in used to sample voltage from Crow IN 1
+    -- for crow v4.0.0 and earlier
+    -- todo p0 testing with/without 3 and 4
     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
 end
@@ -2323,15 +2356,17 @@ function g.key(x,y,z)
           event_saved = false
 
           local events_path = events[event_edit_pattern][y][x]
-          if events_path == nil then
+          if events[event_edit_pattern][y][x] == nil then
             event_edit_status = '(New)'
+            print('setting event_edit_status to ' .. event_edit_status)
           else
             event_edit_status = '(Saved)'
+            print('setting event_edit_status to ' .. event_edit_status)
           end
 
           -- If the event is populated, Load the Event vars back to the displayed param. Otherwise keep the last touched event's settings so we can iterate quickly.
-          if events_path ~= nil then
-            
+          if events[event_edit_pattern][y][x] ~= nil then
+
             events_index = 1
             selected_events_menu = events_menus[events_index]
 
@@ -2363,9 +2398,9 @@ function g.key(x,y,z)
           event_edit_active = true
           
         else -- Subsequent keys down paste event
-          
+          local events_path = events[event_edit_pattern][y][x]
           -- But first check if the events we're working with are populated
-          local og_event_populated = events_path ~= nil
+          local og_event_populated = events[event_edit_pattern][y][x] ~= nil
           local copied_event_populated = events[event_edit_pattern][event_edit_step][event_edit_lane] ~= nil
 
           -- Then copy
@@ -2744,8 +2779,8 @@ end
 function key(n,z)
   if z == 1 then
   -- KEY 1 just increments keys and key_count to bring up alt menu (disabled currently but whatever) 
-  keys[n] = 1
-  key_count = key_count + 1
+    keys[n] = 1
+    key_count = key_count + 1
     if n == 1 then
       -- Fn menu is displayed since keys[1] == 1
       
@@ -2802,16 +2837,15 @@ function key(n,z)
           
           redraw()
           
-        -- K2 here deletes ALL events in arranger SEGMENT
-        else
-          for step = 1,8 do
-            events[event_edit_pattern][step] = {}
-          end
-            events[event_edit_pattern].populated = 0
           
-          screen_view_name = 'Session'
-          event_key_count = 0
+        -------------------------------------------
+        -- K2 DELETE ALL EVENTS IN SEGMENT
+        -------------------------------------------
+        else
+          event_k2 = true
+          clock.run(delete_all_events_segment)
         end
+        
         gen_dash('K2 events editor closed') -- update events strip in dash after making changes in events editor
         grid_redraw()
         
@@ -3151,6 +3185,10 @@ function key(n,z)
   elseif z == 0 then
     keys[n] = nil
     key_count = key_count - 1
+    if n == 2 then
+      -- reset this for event segment delete countdown
+      event_k2 = false
+    end
   end
   redraw()
 end
@@ -3406,9 +3444,11 @@ end
 
 -- Flip event edit status. IDK if it makes sense to do a function for this but it saves some rows ¯\_(ツ)_/¯
 -- Running this in change_ events so it only fires if the value actually changes (rather than enc delta'd)
+-- todo p0 this is getting called not just when enc changes but also when loading a new event. So switching from one populated event to another flips to Edited...
 function edit_status_edited()
   if event_edit_status == '(Saved)' then
     event_edit_status = '(Edited)'
+    print('setting event_edit_status to ' .. event_edit_status)
   end
 end
     
@@ -3785,24 +3825,32 @@ function redraw()
     -- Events screen (function redraw events)
     ----------------    
     if screen_view_name == 'Events' then
-      screen.level(4)
+      screen.level(15)
       screen.move(2,8)
       if event_edit_active == false then
-        screen.text('EDITING SEGMENT ' .. event_edit_pattern)
-        screen.move(2,28)
-        screen.level(15)
-        screen.text('Use Grid to select step (↑↓)')
-        screen.move(2,38)
-        screen.text('and event number (←→)')
-        screen.level(4)
-        screen.move(1,54)
-        screen.line(128,54)
-        screen.stroke()
-        screen.level(3)      
-        screen.move(1,62)
-        screen.text('(K2) DELETE ALL')
-        screen.move(128,62)
-        screen.text_right('(K3) DONE')
+        if key_counter == 4 then
+          screen.text('ARRANGER SEGMENT ' .. event_edit_pattern .. ' EVENTS')
+          screen.level(15)
+          screen.move(2,23)
+          screen.text('Select an event slot on Grid')
+          screen.move(2,33)
+          screen.text('1↓8: chord pattern step')
+          screen.move(2,43)
+          screen.text('1→16: order of execution')
+          screen.level(4)
+          screen.move(1,54)
+          screen.line(128,54)
+          screen.stroke()
+          screen.level(3)      
+          screen.move(1,62)
+          screen.text('(K1 HOLD) DEL.')
+          screen.move(128,62)
+          screen.text_right('(K3) ARRANGER')
+        else
+          screen.level(15)      
+          screen.move(36,33)
+          screen.text('DELETING IN ' .. key_counter)
+        end
       else
    
    
@@ -3901,7 +3949,6 @@ function redraw()
         screen.level(0)
         screen.text('SEG ' .. event_edit_pattern .. '.' .. event_edit_step .. ', EVENT ' .. event_edit_lane .. '/16')
         screen.move(126,8)
-        -- screen.level(event_edit_status == '(Edited)' and 11 or 0)
         screen.text_right(event_edit_status)           
       
     -- Events editor footer

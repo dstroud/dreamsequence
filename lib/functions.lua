@@ -291,3 +291,29 @@ function rotate_pattern(view, direction)
       midi_device[port]:cc(cc_no, val, channel)
     end
   end
+  
+  -------------------------
+  -- UI FUNCTIONS
+  -------------------------
+  function delete_all_events_segment()
+    key_counter = 4
+    
+    while event_k2 == true do
+      key_counter = key_counter - 1
+      redraw()
+      if key_counter == 0 then
+        print('Deleting all events in segment ' .. event_edit_pattern)
+        for step = 1,8 do
+          events[event_edit_pattern][step] = {}
+        end
+        events[event_edit_pattern].populated = 0
+        grid_redraw()
+        key_counter = 4
+        break
+      end
+      clock.sleep(.2)
+    end
+    key_counter = 4
+    --todo p3 should probably have a 'Deleted message appear until key up'
+    redraw()
+  end
