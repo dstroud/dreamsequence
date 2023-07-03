@@ -5,8 +5,8 @@ Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid
 Required: Monome Norns (**v2.7.6 or later**) and Grid
 
 Optional:
-- Crow (**[v3.0.1](https://github.com/monome/crow/releases/tag/v3.0.1)** due to issues with v4.0.2) can be used to process incoming CV+triggers as well as to send sequences to CV gear or certain i2c gear (currently Just Friends and Disting EX).
-- MIDI can be used to process incoming notes (from a sequencer or MIDI controller) as well as to send sequences to synths, samplers, DAWs, etc..
+- Crow (**[v3.0.1](https://github.com/monome/crow/releases/tag/v3.0.1)** is recommended when using the CV Harmonizer due to intermittent freezing of Norns that seems to have been introduced with Crow v4. Usually this occurs when there are a lot of triggers being sent to Crow and can be resolved by temporarily unplugging cables from crow inputs 1-2. Crow v4.0.4 is mostly stable in typical operation, however.
+- MIDI sequencers/controllers/DAW
 
 [![Watch the video](https://img.youtube.com/vi/Z6plHOHKwdg/0.jpg)](https://youtu.be/Z6plHOHKwdg)
 
@@ -29,6 +29,10 @@ Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger 
 - Run a MIDI keyboard into the harmonizer for a delightfully bizarre experience wherein nothing is as it should be but everything feels just right
 
 If you'd like to learn more about exactly _how_ Dreamsequence works, the following sections should sort you out. If you're more of a the skim-the-manual type, I'd suggest jumping right to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) part of this read-me handy for reference.
+
+NOTE: Dreamsequence 1.1 suppports saving/loading of parameters, patterns, arrangement, and events through the system Parameters>>Pset menu. Data is stored in /home/we/dust/data/dreamsequence/*pset no*. BEWARE: SAVES ARE DEFINITELY GOING TO BREAK AS FUTURE UPDATES COME OUT. More work is needed to restructure the existing data to be more future-proof and I figured I’d get *something* out in the meantime. Basically, this is good for saving your state between updates but isn’t a way to archive your songs. Thanks for your understanding.
+
+
 
 ### Grid-based chord sequencer
 - Create up to 4 chord patterns (A, B, C, D) by entering a pattern on Grid (or by using the procedural chord progression Generator).
@@ -113,7 +117,7 @@ If you'd like to learn more about exactly _how_ Dreamsequence works, the followi
 ### Arranger
 - Sequence playback of chord patterns (A, B, C, D) and schedule "Events" along the Arranger timeline.
 
-- Events set or increment parameter values as well as call functions. For example, you might create a dynamic crescendos/accelerandos, schedule a mode/key change, redirect sequences to various destinations, send triggers out from Crow to CV gear, and even generate or transform chord and arp patterns.
+- Events set, increment, or randomize parameter values as well as call functions. For example, you might create a dynamic crescendos/accelerandos, schedule a mode/key change, redirect sequences to various destinations, send triggers out from Crow to CV gear, and even generate or transform chord and arp patterns.
 
 ### Generator
 - Algorithmically generate chord progressions and arpeggios, along with some randomization of things like tempo, mode, and key.
@@ -183,22 +187,21 @@ The Arranger view is used to sequence chord patterns and enter the Events editor
 ![dreamsequence](doc/grid_events.svg)
 The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement.
 
-- Events view is entered by holding down an Arranger segment on row 5 of the Arranger view, then pressing K3.
+- Events view is entered by holding down an Arranger segment on rows 1-5 of the Arranger view, then pressing K3.
 
-- Each key represents an event, which fire from left to right then top to bottom.
-  - Columns 1-16 are 'event lanes', although you can mix event types if you wish.
-  - Rows 1-8 represent each step in the segment's chord pattern. Keys will be dimly-illuminated to indicate the length of the assigned pattern. Note that you can create events beyond the range of the chord pattern's length- they just won't fire.
+- Grid displays a view of events in the Arranger segment, where events fire left to right then top to bottom (like reading).
+  - Columns 1-16 are event 'lanes'. To make it easier to keep track of things, you'll typically dedicate one lane to a certain type of event, such as having chord velocity changes in lane 1, pattern manipulations in lane 2, etc.. however you can mix event types within a lane if you wish.
+  - Rows 1-8 represent each step in the segment's chord pattern, just like on the Grid chord view. Grid keys will be dimly-illuminated to indicate the length of the assigned pattern. Note that you can create events beyond the range of the chord pattern's length- they just won't fire.
 
-- If an event is present (brightly illuminated), tapping the key will show the event settings. If an event is empty, tapping it will default to the last-selected event type as a convenience.
+- Tapping on an unpopulated/dim event position will open the event settings and display "(New)" in the header. Settings will default to the last touched event which makes it easier to enter in a sequence of events with minor changes.
+    
+- Tapping on a populated/bright event will open the event settings for that event and display "(Saved)" in the header. Making any changes to the settings will display "(Edited)" in the header.
 
-- Events are set using E2 and E3, and are saved using K3.
+- While viewing an event's settings, use E2 and E3 to select menus and make changes. K3 saves and closes the event settings screen, and K2 deletes the event. If you don't want to delete or save changes to an event, just tap another event position.
 
-- K2 deletes the selected event or all events if none is selected.
+- Holding one event and tapping on another will copy and paste the settings from the held position- this can also be used to paste an empty event over a populated one, effectively deleting it.
 
-- Holding one event and tapping on another will copy and paste events from the held position.
-
-- K3 is used to return to the Arranger view once finished.
-
+- If no event is selected (immediately after launching the Events view or after deleting/saving an event, K3 will take you back to the Arranger and holding K2 until the countdown completes will delete all events in the segment.
 
 # Norns interface
 
