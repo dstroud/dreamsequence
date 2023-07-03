@@ -179,8 +179,8 @@ function init()
   ------------------
   -- EVENT PARAMS --
   ------------------
+  --todo p3 generate from events_lookup or derivative
   params:add_option('event_category', 'Category', {'Global', 'Chord', 'Arp', 'MIDI harmonizer', 'CV harmonizer'}, 1)
-  params:set_action('event_category', function(param) change_category(param) end)
   params:hide(params.lookup['event_category'])
   
   -- options will be dynamically swapped out based on the current event_global param
@@ -189,7 +189,6 @@ function init()
   params:hide(params.lookup['event_subcategory'])
  
   params:add_option('event_name', 'Event', events_lookup_names, 1) -- Default value overwritten later in Init
-  params:set_action('event_name',function(param) change_event(param) end)
   params:hide(params.lookup['event_name'])
   
   -- options will be dynamically swapped out based on the current event_name param
@@ -219,13 +218,8 @@ function init()
   params:hide(params.lookup['event_op_limit_min'])
   
   params:add_number('event_op_limit_max', 'Max', -9999, 9999, 0)
-  params:hide(params.lookup['event_op_limit_max'])  
+  params:hide(params.lookup['event_op_limit_max'])
   
-  
-  -- init values based on default event param
-  gen_menu_events()
-  set_event_indices()
-
 
   --CHORD PARAMS
   params:add_group('chord', 'CHORD', 23)  
@@ -487,10 +481,15 @@ function init()
       events[segment][step] = {}
     end
   end
+  
+  -- event menu init
   events_index = 1
   selected_events_menu = 'event_category'
-  set_event_indices()
-  params:set('event_name', event_subcategory_index_min)  -- Overwrites initial value
+  change_category()
+  params:set('event_name', event_subcategory_index_min)  -- Overwrites initial param value
+  change_subcategory()
+  change_event()
+  gen_menu_events()
   
   event_edit_pattern = 0 --todo p1 rename to event_edit_segment
   event_edit_step = 0
@@ -597,9 +596,11 @@ function init()
     params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
     
     -- reset event-related params so the event editor opens to the default view rather than the last-loaded event
-    params:set('event_category', 1)  
-    params:set('event_subcategory', 1)
+    params:set('event_category', 1)
+    change_category()
+    params:set('event_subcategory', 1) -- called by the above
     params:set('event_name', 1)
+    change_event()
     params:set('event_operation', 1)
     params:set('event_op_limit', 1)
     params:set('event_op_limit_random', 1)
@@ -2377,14 +2378,14 @@ function g.key(x,y,z)
             local limit = events_path.limit or 'Off'
 
             params:set('event_category', param_option_to_index('event_category', events_lookup[index].category))
+            change_category()
             params:set('event_subcategory', param_option_to_index('event_subcategory', events_lookup[index].subcategory))
             params:set('event_name', index)
+            change_event()
             params:set('event_operation', param_option_to_index('event_operation', operation))
             if operation == 'Random' then
-              -- print('Random operation, setting limit ' .. limit)
               params:set('event_op_limit_random', param_option_to_index('event_op_limit_random', limit))
             else
-              -- print('Not random operation, setting limit ' .. limit)
               params:set('event_op_limit', param_option_to_index('event_op_limit', limit))
             end
             if limit ~= 'Off' then
@@ -3198,7 +3199,7 @@ end
 -- ENCODERS
 ----------------------------------          
 function enc(n,d)
-  --todo p1 more refined switching between clamped and raw deltas
+  --todo p1 more refined switching between clamped and raw deltas depending on the use-case
   -- local d = util.clamp(d, -1, 1)
   
   -- Reserved for scrolling/extending Arranger, Chord, Arp sequences
@@ -3240,55 +3241,47 @@ function enc(n,d)
     ----------------------    
     -- Event editor menus
     ----------------------    
+    -- Not using param actions on these since some use dynamic .options which don't reliably fire on changes. Also we want to fire edit_status_edited() on encoder changes but not when params are set elsewhere (loading events etc)
     elseif screen_view_name == 'Events' and event_saved == false then
+
+      if selected_events_menu == 'event_category' then
+        if delta_menu(d) then
+          change_category()
+        end
         
-      -- have to manually call these two functions because param actions won't work on them (string changes but not index)
-      -- might just drop param actions for all of the event params because the inconsistency is confusing
-      if selected_events_menu == 'event_subcategory' then
-        params:delta(selected_events_menu, d)
-        change_subcategory()  -- no param action (options swap issue) so call directly
-      elseif selected_events_menu == 'event_operation' then
-        params:delta(selected_events_menu, d)
-        change_operation()  -- no param action (options swap issue) so call directly
+      elseif selected_events_menu == 'event_subcategory' then
+        if delta_menu(d) then
+          change_subcategory()
+        end
+        
       elseif selected_events_menu == 'event_name' then
-        local value = params:get(selected_events_menu) + d
-          if value >= event_subcategory_index_min and value <= event_subcategory_index_max then
-            params:set(selected_events_menu, value)
-          end
+        if delta_menu(d, event_subcategory_index_min, event_subcategory_index_max) then
+          change_event()
+        end
+        
+      elseif selected_events_menu == 'event_operation' then
+        if delta_menu(d) then
+          change_operation()
+        end
+        
       elseif selected_events_menu == 'event_value' then
-        local value = params:get(selected_events_menu) + d
         if params:string('event_operation') == 'Set' then
-          if value >= event_range[1] and value <= event_range[2] then
-            params:set(selected_events_menu, value)
-            edit_status_edited()
-          end
+          delta_menu(d, event_range[1], event_range[2]) -- Dynamic event_range lookup. no functions to call here
         else
-          params:set(selected_events_menu, value)
+          params:delta(selected_events_menu, d)
           edit_status_edited()
         end
+      
       elseif selected_events_menu == 'event_op_limit_min' then
-        local value = params:get(selected_events_menu) + d
-          if value >= event_range[1] and value <= params:get('event_op_limit_max') then
-            params:set(selected_events_menu, value)
-            edit_status_edited()
-          end
+        delta_menu(d, event_range[1], params:get('event_op_limit_max'))
+
       elseif selected_events_menu == 'event_op_limit_max' then
-        local value = params:get(selected_events_menu) + d
-          if value >= params:get('event_op_limit_min') and value <= event_range[2] then
-            params:set(selected_events_menu, value)
-            edit_status_edited()
-          end        
+        delta_menu(d, params:get('event_op_limit_min'), event_range[2])
   
-      -- event_op_limit, event_op_limit_random, event_probability have no function but we do a little extra work to not trigger edit_status_edited() if delta is outside of range. todo p3 can probably do the smae with other stuff using 'event_range['
+      -- this should work for the remaining event menus that don't need to fire functions: probability, limit, limit_random
       else
-        local prev_value = params:get(selected_events_menu)
-        local value = prev_value + d
-        local value_min = params:get_range(selected_events_menu)[1]
-        local value_max = params:get_range(selected_events_menu)[2]
-        if value >= value_min and value <= value_max then
-          params:set(selected_events_menu, value)
-          edit_status_edited()
-        end
+        delta_menu(d)
+        
       end
       
     --------------------
@@ -3323,12 +3316,33 @@ function enc(n,d)
 end
 
 
+-- utility function for enc deltas
+-- Performs a similar operation to params:delta with a couple of differences:
+-- 1. Can accept optional arguments for min/max for parameters that don't have this set
+-- 2. Calls edit_status_edited() as a psuedo param action (that we only want to run for encoder-initiaded set/deltas)
+-- 3. Returns whether or not the value changed so that we can call followup change_xxxxx functions
+function delta_menu(d, minimum, maximum)
+  local prev_value = params:get(selected_events_menu)
+  local minimum = minimum or params:get_range(selected_events_menu)[1]
+  local maximum = maximum or params:get_range(selected_events_menu)[2]
+  local value = util.clamp(prev_value + d, minimum, maximum)
+  if value ~= prev_value then
+    params:set(selected_events_menu, value)
+    edit_status_edited()
+    return(true)
+  else
+    return(false)
+  end
+end
+
+
 ---------------------------------------
 -- CASCADING EVENTS EDITOR FUNCTIONS --
 ---------------------------------------
 debug_change_functions = false
 
-function change_category(category)
+function change_category()
+  local category = params:get('event_category')
   if debug_change_functions then print('1. change_category called') end
   if category ~= prev_category then
   if debug_change_functions then print('  1.1 new category') end
@@ -3340,24 +3354,25 @@ function change_category(category)
 end
 
 
-function change_subcategory()  -- don't need args passed because it's an index that has to be contextualized by looking up options. Using string instead. Oof, so param action doesn't fire if the index isn't changed. This will affect operation as well.
+function change_subcategory()
   if debug_change_functions then print('2. change_subcategory called') end
   -- concat this because subcategory string isn't unique and index resets with options swap!
   local subcategory = params:string('event_category') .. params:string('event_subcategory')
   if debug_change_functions then print('  new subcategory = ' .. subcategory .. '  prev_subcategory = ' .. (prev_subcategory or 'nil')) end
 
   if subcategory ~= prev_subcategory then
-    -- print('new subcategory')
     set_event_indices()
-    
-    params:set('event_name', event_subcategory_index_min)  -- calls change_event
-    if debug_change_functions then print('    setting event to ' .. events_lookup[event_subcategory_index_min].name) end
+
+    if debug_change_functions then print('  setting event to ' .. events_lookup[event_subcategory_index_min].name) end
+    params:set('event_name', event_subcategory_index_min)
+    change_event()
   end  
   prev_subcategory = subcategory
 end
 
 
-function change_event(event) -- index
+function change_event() -- index
+  local event = params:get('event_name')
   if debug_change_functions then print('3. change_event called') end
   if debug_change_functions then print('   new event: ' .. events_lookup[event].name) end
   if event ~= prev_event then
@@ -3374,7 +3389,7 @@ function change_event(event) -- index
     params:set('event_op_limit_max', event_range[2])
     
     params:set('event_operation', 1) -- no action so call on next line
-    change_operation('change_event')
+    change_operation('change_event')  -- pass arg so we can tell change_operation to set values even if op hasn't changed
     params:set('event_probability', 100) -- Only reset probability when event changes
     end
   prev_event = event
@@ -3415,7 +3430,6 @@ function change_operation(source)
     -- else -- SKIP TRIGGER AND RANDOM!!!
     end
     gen_menu_events()
-  edit_status_edited() -- captures change in category, subcategory, and event as well
   end  
   prev_operation = operation
 end
@@ -3458,6 +3472,12 @@ function set_event_indices()
   local subcategory = params:string('event_subcategory')
   event_subcategory_index_min = event_indices[category .. '_' .. subcategory].first_index
   event_subcategory_index_max = event_indices[category .. '_' .. subcategory].last_index
+  
+  if debug_change_functions then 
+    print('  Set event_subcategory_index_min to ' .. event_subcategory_index_min) 
+    print('  Set event_subcategory_index_max to ' .. event_subcategory_index_max) 
+  end
+  
 end
 
 
@@ -3476,6 +3496,11 @@ function set_event_range()
   else -- function. May have hardcoded ranges in events_lookup at some point
     event_range = {-9999,9999}
   end
+  
+  if debug_change_functions then 
+    print('  Set event_range[1] to ' .. event_range[1]) 
+    print('  Set event_range[2] to ' .. event_range[2]) 
+  end  
 end  
 
 
@@ -3913,13 +3938,12 @@ function redraw()
           -- Leaving in param formatter and some code for truncating string in case we want to eventually add system param events that require formatting.
           local events_menu_trunc = 22 -- WAG Un-local if limiting using the text_extents approach below
           if events_index == i then
-            
             local range =
               (menu_id == 'event_category' or menu_id == 'event_subcategory' or menu_id == 'event_operation') 
               and params:get_range(menu_id)
               or menu_id == 'event_name' and {event_subcategory_index_min, event_subcategory_index_max}
               or event_range -- if all else fails, slap -9999 to 9999 on it from set_event_range lol
-              
+
             local single = menu_index == range[1] and (range[1] == range[2]) or false
             local menu_value_pre = single and '>' or menu_index == range[2] and '<' or ' '
             local menu_value_suf = single and '<' or menu_index == range[1] and '>' or ''
