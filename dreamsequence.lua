@@ -33,27 +33,39 @@ function init()
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
-  -- todo prerelease
   norns.crow.events.version = function(...)
     crow_version = ...
   end
-  crow.version() -- now redefined to perform the above!
+  crow.version() -- Uses redefined crow.version() function to set crow_version global var
   crow_version_clock = clock.run(
     function()
-      clock.sleep(0.1) -- a small hold for usb round-trip
-      if crow_version ~= nil then
-        local crow_major_version = find_number(crow_version)
-        if crow_version ~= 'v3.0.1' then
-          
-          -- todo prerelease
-            init_message = nil
-          -- init_message = 'Crow version warning'
-          -- redraw()
+      clock.sleep(.05) -- a small hold for usb round-trip
+      local major, minor, patch = string.match(crow_version or 'v9.9.9', "(%d+)%.(%d+)%.(%d+)")
+      local crow_version_num = major + (minor /10) + (patch / 100)  -- this feels like it's gonna break lol
+      if crow_version ~= nil then print('Crow version ' .. crow_version) end
+      if crow_version_num < 4.01 then
+        print('Crow compatibility mode enabled per https://github.com/monome/crow/pull/463')
+        crow_trigger = function()
+          crow.send("input[1].query = function() stream_handler(1, input[1].volts) end")
+          crow.input[1].query()
         end
-        print('Crow version ' .. crow_version)
+      else
+        crow_trigger = function()
+          crow.input[1].query()
+        end
       end
+      crow.input[1].stream = sample_crow
+      crow.input[1].mode("none")
+      -- voltage threshold, hysteresis, "rising", "falling", or “both"
+      -- TODO: might want to use as a gate with "both"
+      crow.input[2].mode("change",2,0.1,"rising")
+      crow.input[2].change = crow_trigger
+      -- time,level,polarity
+      crow.output[2].action = "pulse(.001,5,1)"
+      crow.output[3].slew = 0
     end
   )
+
 
   crow.ii.jf.event = function(e, value)
     if e.name == 'mode' then
@@ -64,6 +76,7 @@ function init()
       print('jf_time = ' .. value)
     end
   end
+  
   
   function capture_preinit()
     preinit_clock_source = params:get('clock_source')
@@ -218,7 +231,7 @@ function init()
   
 
   --CHORD PARAMS
-  params:add_group('chord', 'CHORD', 24)  
+  params:add_group('chord', 'CHORD', 28)  
   
   params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
@@ -243,7 +256,11 @@ function init()
   -- params:set_action('chord_rotate',function() pattern_rotate_abs('chord_rotate') end)  
   
   params:add_number('chord_shift', 'Pattern shift', -14, 14, 0)
-  params:set_action('chord_shift',function() pattern_shift_abs('chord_shift') end)  
+  params:set_action('chord_shift',function() pattern_shift_abs('chord_shift') end)
+  
+  for i = 1, 4 do
+    params:add_number('chord_pattern_length_' .. i, 'Pattern length ' .. i, 1, 8, 4)
+  end
   
   --------------------  
   params:add_separator ('chord_engine', 'Engine')
@@ -284,7 +301,7 @@ function init()
 
 
   --ARP PARAMS
-  params:add_group('arp', 'ARP', 27)  
+  params:add_group('arp', 'ARP', 28)  
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('arp_div_index',function() set_div('arp') end)
@@ -300,6 +317,8 @@ function init()
   
   params:add_number('arp_shift', 'Pattern shift', -14, 14, 0)
   params:set_action('arp_shift',function() pattern_shift_abs('arp_shift') end)
+  
+  params:add_number('arp_pattern_length_1', 'Pattern length', 1, 8, 8)
   
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
@@ -444,16 +463,6 @@ function init()
   transport_multi_stop()  
   arranger_active = false
   chord_seq_retrig = true
-  
-  crow.input[1].stream = sample_crow
-  crow.input[1].mode("none")
-  -- voltage threshold, hysteresis, "rising", "falling", or “both"
-  -- TODO: might want to use as a gate with "both"
-  crow.input[2].mode("change",2,0.1,"rising")
-  crow.input[2].change = crow_trigger
-  -- time,level,polarity
-  crow.output[2].action = "pulse(.001,5,1)"
-  crow.output[3].slew = 0
   
   screen_views = {'Session','Events'}
   screen_view_index = 1
@@ -687,7 +696,7 @@ function init()
   ---------------------------
 
 -- Optional: load most recent pset on init
--- params:default() -- todo prerelease disable. Set preference for autoloading!
+params:default() -- todo prerelease disable. Set preference for autoloading!
 params:bang()
 
 -- Some actions need to be added post-bang
@@ -1957,12 +1966,12 @@ function advance_arp_seq()
 end
 
 
-function crow_trigger() --Trigger in used to sample voltage from Crow IN 1
-    -- for crow v4.0.0 and earlier
-    -- todo p0 testing with/without 3 and 4
-    crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
-    crow.input[1].query() -- see https://github.com/monome/crow/pull/463
-end
+-- function crow_trigger() --Trigger in used to sample voltage from Crow IN 1
+--     -- for crow v4.0.0 and earlier
+--     -- todo p0 testing with/without 3 and 4
+--     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
+--     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
+-- end
 
 
 function sample_crow(volts)
@@ -2271,7 +2280,6 @@ function grid_redraw()
                 end
                 if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
               end
-              -- if x == 3 then print('1') end
               g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
               
             elseif x_offset < event_edit_pattern then
@@ -2384,28 +2392,39 @@ function grid_redraw()
       else
         next_pattern_indicator = pattern_queue or pattern
       end
-    for i = 1,4 do
-      g:led(16, i, i == next_pattern_indicator and 7 or pattern_keys[i] and 7 or 3) 
-      if i == pattern then
-        g:led(16, i, 15)
+      
+      -- chord pattern selector leds
+      for i = 1,4 do
+        g:led(16, i, i == next_pattern_indicator and 7 or pattern_keys[i] and 7 or 3) 
+        if i == pattern then
+          g:led(16, i, 15)
+        end
       end
-    end
-      g:led(16,7,15)
-      for i = 1,14 do                                                   -- chord seq playhead
-        g:led(i, chord_seq_position, 3)
+      
+      g:led(16, 7, 15)                                                  -- grid view selector
+      
+      if chord_seq_position > 0 then                                    -- fix for Midigrid
+        for i = 1, 14 do                                                -- chord seq playhead
+          g:led(i, chord_seq_position, 3)
+        end
       end
-      for i = 1,8 do
-        g:led(15, i, chord_pattern_length[pattern] < i and 4 or 15)     --set pattern_length LEDs
+      
+      for i = 1, 8 do
+        g:led(15, i, chord_pattern_length[pattern] < i and 4 or 15)     -- set pattern_length LEDs
         if chord_seq[pattern][i] > 0 then                               -- muted steps
-          g:led(chord_seq[pattern][i], i, 15)                         -- set LEDs for chord sequence
+          g:led(chord_seq[pattern][i], i, 15)                           -- set LEDs for chord sequence
         end
       end
       
     elseif grid_view_name == 'Arp' then
       g:led(16,8,15)
-      for i = 1,14 do                                                   -- chord seq playhead
-        g:led(i, arp_seq_position, 3)
+      
+      if arp_seq_position > 0 then                                        -- fix for Midigrid
+        for i = 1,14 do                                                   -- arp seq playhead
+          g:led(i, arp_seq_position, 3)
+        end
       end
+      
       for i = 1,8 do
         g:led(15, i, arp_pattern_length[arp_pattern] < i and 4 or 15)   --set pattern_length LEDs
         if arp_seq[arp_pattern][i] > 0 then                             -- muted steps
@@ -3749,36 +3768,10 @@ end
 function redraw()
   screen.clear()
   local dash_x = 94
-
-  if init_message ~= nil then
-    screen.level(15)
-    -- screen.move(2,8)
-    -- screen.text('FYI!')    
-    screen.move(2,18)
-    screen.text('Crow v.3.0.1 is recommended.')
-    screen.move(2,28)
-    screen.text('Your version is ' .. crow_version .. '.')
-    screen.move(2,38)
-    screen.text('If Norns locks up, try')
-    screen.move(2,48) 
-    screen.text('unplugging Crow inputs 1-2.')
-    screen.level(4)
-    screen.move(1,54)
-    screen.line(128,54)
-    screen.stroke()
-    screen.level(3)      
-    screen.move(128,62)
-    screen.text_right('(K3) OK')          
     
   -- Screens that pop up when g.keys are being held down take priority--------
   -- POP-up g.key tip always takes priority
-  elseif view_key_count > 0 then
-    -- screen.level(7)
-    -- screen.move(64,32)
-    -- screen.font_size(16)
-    -- screen.text_center(grid_view_name)
-    -- screen.font_size(8)
-    
+  if view_key_count > 0 then
     if screen_view_name == 'Chord+arp' then
       screen.level(15)
       screen.move(2,8)
