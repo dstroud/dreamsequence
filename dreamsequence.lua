@@ -1,4 +1,4 @@
--- Dreamsequence v1.0.5
+-- Dreamsequence v1.0.6
 -- Dan Stroud @modularbeat
 --
 -- KEY 2: Play/pause
@@ -1636,9 +1636,13 @@ function grid_redraw()
       end
     end
       g:led(16,7,15)
-      for i = 1,14 do                                                   -- chord seq playhead
-        g:led(i, chord_seq_position, 3)
+      
+      if chord_seq_position > 0 then                                    -- fix for Midigrid
+        for i = 1, 14 do                                                -- chord seq playhead
+          g:led(i, chord_seq_position, 3)
+        end
       end
+      
       for i = 1,8 do
         g:led(15, i, pattern_length[pattern] < i and 4 or 15)           --set pattern_length LEDs
         if chord_seq[pattern][i].x > 0 then                             -- muted steps
@@ -1648,9 +1652,13 @@ function grid_redraw()
       
     elseif grid_view_name == 'Arp' then
       g:led(16,8,15)
-      for i = 1,14 do                                                   -- chord seq playhead
-        g:led(i, arp_seq_position, 3)
+      
+      if arp_seq_position > 0 then                                        -- fix for Midigrid
+        for i = 1,14 do                                                   -- arp seq playhead
+          g:led(i, arp_seq_position, 3)
+        end
       end
+      
       for i = 1,8 do
         g:led(15, i, arp_pattern_length[arp_pattern] < i and 4 or 15)   --set pattern_length LEDs
         if arp_seq[arp_pattern][i] > 0 then                             -- muted steps
