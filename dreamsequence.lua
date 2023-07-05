@@ -135,14 +135,10 @@ function init()
   
   -- Generate subcategories lookup tables
   gen_event_tables()
-  
-  -- Unique, ordered event subcategories for each category
-  -- Used to generate a parameter for each event category containing the subcategories
-  -- event_subcategories
-  
-  -- key = conctat category_subcategory with first_index and last_index values
-  -- event_indices
-  
+  -- Derivatives:
+  -- event_subcategories: Unique, ordered event subcategories for each category. For generating subcategories
+  -- event_indices: key = conctat category_subcategory with first_index and last_index values
+
 
   --------------------
   --PARAMS
@@ -222,22 +218,38 @@ function init()
   
 
   --CHORD PARAMS
-  params:add_group('chord', 'CHORD', 23)  
+  params:add_group('chord', 'CHORD', 24)  
+  
   params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
-    params:set_action('chord_div_index',function() set_div('chord') end)
+  params:set_action('chord_div_index',function() set_div('chord') end)
+  
   params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
-    params:set_action("chord_dest",function() update_menus() end)
+  params:set_action("chord_dest",function() update_menus() end)
+  
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
-    params:set_action('chord_duration_index',function() set_duration('chord') end)
+  params:set_action('chord_duration_index',function() set_duration('chord') end)
+  
   params:add_number('chord_octave','Octave',-2, 4, 0)
+  
   params:add_number('chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  
   params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
-  params:add_number('chord_spread', 'Spread', 0, 6, 0)    
-    
+  
+  params:add_number('chord_spread', 'Spread', 0, 6, 0)
+
+  -- params:add_number('chord_rotate', 'Pattern rotate', -14, 14, 0)
+  -- params:set_action('chord_rotate',function() pattern_rotate_abs('chord_rotate') end)  
+  
+  params:add_number('chord_shift', 'Pattern shift', -14, 14, 0)
+  params:set_action('chord_shift',function() pattern_shift_abs('chord_shift') end)  
+  
+  --------------------  
   params:add_separator ('chord_engine', 'Engine')
+  
   params:add_number('chord_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
+  
   params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
   params:add_number('chord_pp_tracking', 'Fltr tracking',0,100,50, function(param) return percent(param:get()) end)
   pp_gain = controlspec.def{
@@ -249,9 +261,12 @@ function init()
     wrap=false,
     }
   params:add_control("chord_pp_gain","Gain",pp_gain,function(param) return util.round(param:get()) end)
+  
   params:add_number("chord_pp_pw","Pulse width",1, 99, 50, function(param) return percent(param:get()) end)
   
+  ------------------------------
   params:add_separator ('chord_midi', 'MIDI')
+  
   params:add_number('chord_midi_velocity','Velocity',0, 127, 100)
   
   params:add_number('chord_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
@@ -269,7 +284,7 @@ function init()
 
 
   --ARP PARAMS
-  params:add_group('arp', 'ARP', 25)  
+  params:add_group('arp', 'ARP', 27)  
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('arp_div_index',function() set_div('arp') end)
@@ -279,6 +294,12 @@ function init()
   
   params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('arp_duration_index',function() set_duration('arp') end)
+  
+  params:add_number('arp_rotate', 'Pattern rotate', -8, 8, 0)
+  params:set_action('arp_rotate',function() pattern_rotate_abs('arp_rotate') end)
+  
+  params:add_number('arp_shift', 'Pattern shift', -14, 14, 0)
+  params:set_action('arp_shift',function() pattern_shift_abs('arp_shift') end)
   
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
@@ -521,6 +542,9 @@ function init()
       arp_seq[p][i] = 0
     end
   end
+  current_shift_arp = 0
+  current_shift_chord = 0
+  current_rotation_arp = 0
   chord_seq_position = 0
   chord_raw = {}
   current_chord_o = 0
@@ -567,7 +591,11 @@ function init()
     misc.version = version
     misc.clock_tempo = params:get('clock_tempo')
     misc.clock_source = params:get('clock_source')
-    for i = 1,7 do
+    misc.current_shift_arp = current_shift_arp
+    misc.current_shift_chord = current_shift_chord
+    misc.current_rotation_arp = current_rotation_arp
+    
+    for i = 1, #pset_lookup do
       local tablename = pset_lookup[i]
       tab.save(_G[tablename],filepath..tablename..".data")
       print('table >> write: ' .. filepath..tablename..".data")
@@ -583,7 +611,7 @@ function init()
     screen_view_index = 1
     screen_view_name = 'Session'
     misc = {}
-    for i = 1,7 do
+    for i = 1, #pset_lookup do
       local tablename = pset_lookup[i]
         if util.file_exists(filepath..tablename..".data") then
         _G[tablename] = tab.load(filepath..tablename..".data")
@@ -594,6 +622,9 @@ function init()
     end
     -- clock_tempo isn't stored in .pset for some reason so set it from misc.data (todo: look into inserting into .pset)
     params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
+    current_shift_arp = misc.current_shift_arp
+    current_shift_chord = misc.current_shift_chord
+    current_rotation_arp = misc.current_rotation_arp
     
     -- reset event-related params so the event editor opens to the default view rather than the last-loaded event
     params:set('event_category', 1)
@@ -656,7 +687,7 @@ function init()
   ---------------------------
 
 -- Optional: load most recent pset on init
-params:default() -- todo prerelease disable. Set preference for autoloading!
+-- params:default() -- todo prerelease disable. Set preference for autoloading!
 params:bang()
 
 -- Some actions need to be added post-bang
@@ -681,34 +712,34 @@ function update_menus()
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_dest') == 'Disting' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- ARP MENU
   if params:string('arp_dest') == 'None' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', }
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', }
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
     else -- AD envelope
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
   elseif params:string('arp_dest') == 'Disting' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_disting_velocity'}    
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_disting_velocity'}    
   end
   
   -- MIDI HARMONIZER MENU
@@ -879,8 +910,54 @@ end
 -- end
 
 
+--todo p3 move and can simplify by arg concats (rename pattern to chord_pattern)
+function pattern_rotate_abs(source)
+  local new_rotation_val = params:get(source)
+  if source == 'arp_rotate' then
+    local offset = new_rotation_val or 0 - current_rotation_arp or 0 -- I actually have no idea why this requires the or 0 WTF??
+    local length = arp_pattern_length[arp_pattern]
+    local temp_arp_seq = {}
+    for i = 1, length do
+      temp_arp_seq[i] = arp_seq[arp_pattern][i]
+    end
+    
+    for i = 1, length do
+      arp_seq[arp_pattern][i] = temp_arp_seq[util.wrap(i - (offset - current_rotation_arp), 1, length)]
+    end
+    
+    current_rotation_arp = offset
+    
+  end
+  grid_redraw()
+end
+
+
+--todo p3 move and can simplify by arg concats (rename pattern to chord_pattern)
+function pattern_shift_abs(source)
+  local new_shift_val = params:get(source)
+  if source == 'arp_shift' then
+    local offset = new_shift_val or 0 - current_shift_arp or 0 -- I actually have no idea why this requires the or 0 WTF??
+    for y = 1,8 do
+      if arp_seq[arp_pattern][y] ~= 0 then
+        arp_seq[arp_pattern][y] = util.wrap(arp_seq[arp_pattern][y] + offset - current_shift_arp, 1, 14)
+      end
+    end    
+    current_shift_arp = offset
+  elseif source == 'chord_shift' then
+    local offset = new_shift_val or 0 - current_shift_chord or 0 -- I actually have no idea why this requires the or 0 WTF??
+    for y = 1,8 do
+      if chord_seq[pattern][y] ~= 0 then
+        chord_seq[pattern][y] = util.wrap(chord_seq[pattern][y] + offset - current_shift_chord, 1, 14)
+      end
+    end    
+    current_shift_chord = offset  
+  end
+  grid_redraw()
+end
+
+
 function refresh_midi_devices()
-  for i = 1,#midi.vports do -- query all ports
+  for i = 1, #midi.vports do -- query all ports
     midi_device[i] = midi.connect(i) -- connect each device
     table.insert( -- register its name:
       midi_device_names, -- table to insert to
@@ -3416,6 +3493,7 @@ function change_operation(source)
     if event_type == 'param' then
       if debug_change_functions then print('4.1 param value') end
       if operation == 'Set' then
+        --todo p2 if adding more Discreet functions, need to expand on this because it's setting param value on function event types
         local default_value = params:get(events_lookup[event_index].id)
         local default_value = util.clamp(default_value, event_range[1], event_range[2])
         if debug_change_functions then print('5. Set: setting default value to ' .. default_value) end

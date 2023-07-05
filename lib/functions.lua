@@ -1,11 +1,4 @@
 --------------------------------------------
--- GLOBAL VAR FUNCTIONS SETTING FUNCTIONS --
---------------------------------------------
-
-
-
-
---------------------------------------------
 -- PATTERN TRANSFORMATIONS --
 --------------------------------------------
 
@@ -174,28 +167,16 @@ function rotate_pattern(view, direction)
   end
         
             
-  -- Passes along 'Arp' var so we can have a specific event for just arp
-  function rotate_arp(direction)
-    rotate_pattern('Arp', direction)
-  end
+  -- -- Passes along 'Arp' var so we can have a specific event for just arp
+  -- function rotate_arp(direction)
+  --   rotate_pattern('Arp', direction)
+  -- end
   
   
   -- Event Crow trigger out
   function crow_event_trigger()
     crow.output[4].action = 'pulse(.001,10,1)' -- (time,level,polarity)
     crow.output[4]()
-  end
-  
-  
-  -- for event triggers
-  function transpose_chord_pattern(direction)
-    transpose_pattern('Chord', direction)
-  end
-  
-  
-  -- for event triggers
-  function transpose_arp_pattern(direction)
-    transpose_pattern('Arp', direction)
   end
   
   

@@ -13,7 +13,7 @@ events_lookup = {										--
 {	category= 'Global', 	subcategory= 'Song', 	event_type= 'param', 	id= 'crow_clock_index', 	name= 'Crow clock', 	value_type= 'continuous', 	formatter= 'crow_clock_string', 			},
 										
 -- Chord										
-{	category= 'Chord', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'transpose_chord_pattern', 	name= 'Transpose', 	value_type= 'discreet', 				},
+{	category= 'Chord', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'chord_shift', 	name= 'Pattern shift', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'continuous', 	formatter= 'chord_type', 			},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
@@ -35,8 +35,8 @@ events_lookup = {										--
 										
 -- Arp										
 {	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'shuffle_arp', 	name= 'Shuffle', 	value_type= 'trigger', 				},
-{	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'rotate_arp', 	name= 'Rotate', 	value_type= 'discreet', 				},
-{	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'transpose_arp_pattern', 	name= 'Transpose', 	value_type= 'discreet', 				},
+{	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'arp_rotate', 	name= 'Pattern rotate', 	value_type= 'continuous', 				},
+{	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'arp_shift', 	name= 'Pattern shift', 	value_type= 'continuous', 				},
 {	category= 'Arp', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'arp_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
 {	category= 'Arp', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'arp_chord_type', 	name= 'Chord type', 	value_type= 'continuous', 	formatter= 'chord_type', 			},
 {	category= 'Arp', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'arp_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
