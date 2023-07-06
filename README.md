@@ -5,8 +5,9 @@ Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid
 Required: Monome Norns (**v2.7.6 or later**) and Grid
 
 Optional:
-- Crow (**[v3.0.1](https://github.com/monome/crow/releases/tag/v3.0.1)** is recommended when using the CV Harmonizer due to intermittent freezing of Norns that seems to have been introduced with Crow v4. Usually this occurs when there are a lot of triggers being sent to Crow and can be resolved by temporarily unplugging cables from crow inputs 1-2. Crow v4.0.4 is mostly stable in typical operation, however.
-- MIDI sequencers/controllers/DAW
+- Crow
+- MIDI sequencers/controllers
+- Just Friends, Disting EX
 
 [![Watch the video](https://img.youtube.com/vi/Z6plHOHKwdg/0.jpg)](https://youtu.be/Z6plHOHKwdg)
 
@@ -16,7 +17,13 @@ Optional:
 
 # Overview
 
-Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It streamlines the process of composing by limiting your palette of chords and notes to _only what you need at the moment_. This approach does come with some tradeoffs (you won’t be making modal jazz with it) but it’s by no means a paint-by-numbers experience. You’ll find that there are ample opportunities to get weird:
+Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It can be a live performance tool, a compositional assistant, a generative playground... or all of these at once. Dreamsequence is fun all by itself, but really opens up when you bring friends (anything that can send CV or MIDI notes to the harmonizers).
+
+And despite what my 10,000-word Homeric README might suggest, I've tried my best to keep Dreamsequence intuitive to use. I think anyone can pick it up and get a song going in a few minutes without any music theory knowlege. As you get deeper into making arrangements and experimenting with "events", you'll find that the experience can get more technical and crunchy, but all of that is optional.
+
+Oh, there are also some algorithms for generating chord progressions and arpeggios. They aren't going to create anything you couldn't in a minute or two, but sometimes it's fun to have Dreamsequence shuffle the deck a few times before a session to get you out of a musical rut.
+
+You’ll find that there are ample opportunities to get weird:
 
 - Use the event scheduler to change dozens of parameters during song playback. Modulate to a different key or mode, transform your existing sequence, or algorithmically generate a new chord progression and arpeggio on the fly.
   
