@@ -120,6 +120,25 @@ function init()
     end
   end
   
+  
+  -------------
+  -- Read prefs
+  -------------
+  function read_prefs()  
+    prefs = {}
+    local filepath = norns.state.data
+    if util.file_exists(filepath) then
+      if util.file_exists(filepath.."prefs.data") then
+        prefs = tab.load(filepath.."prefs.data")
+        print('table >> read: ' .. filepath.."prefs.data")
+        else
+          print('table >> missing: ' .. filepath.."prefs.data")
+      end
+    end
+  end
+  
+  read_prefs()
+  
   clock.link.stop() -- or else transport won't start if external link clock is already running
 
   init_generator()
@@ -159,7 +178,7 @@ function init()
   params:add_separator ('DREAMSEQUENCE')
 
   --GLOBAL PARAMS
-  params:add_group('global', 'GLOBAL', 6)
+  params:add_group('global', 'GLOBAL', 7)
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end) -- post-bang action
   params:add_number("transpose","Key",-12, 12, 0, function(param) return transpose_string(param:get()) end)
 
@@ -173,8 +192,12 @@ function init()
   params:set_action("crow_pullup",function() crow_pullup() end)
   
   params:add_option('chord_readout', 'Chords as', {'Name', 'Degree'}, 1)
+  params:set('chord_readout', param_option_to_index('chord_readout', prefs.chord_readout) or 1)
 
+  params:add_option('autoload_pset', 'Autoload pset', {'False', 'True'}, 1)
+  params:set('autoload_pset', param_option_to_index('autoload_pset', prefs.autoload_pset) or 1)
 
+  
   --ARRANGER PARAMS
   params:add_group('arranger', 'ARRANGER', 2)
   params:add_number('arranger_enabled', 'Enabled', 0, 1, 0, function(param) return t_f_string(param:get()) end)
@@ -621,75 +644,79 @@ function init()
   end
 
 
- function params.action_read(filename,silent,number)
-  local filepath = norns.state.data..number.."/"
-  if util.file_exists(filepath) then
-    -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
-    screen_view_index = 1
-    screen_view_name = 'Session'
-    misc = {}
-    for i = 1, #pset_lookup do
-      local tablename = pset_lookup[i]
-        if util.file_exists(filepath..tablename..".data") then
-        _G[tablename] = tab.load(filepath..tablename..".data")
-        print('table >> read: ' .. filepath..tablename..".data")
-      else
-        print('table >> missing: ' .. filepath..tablename..".data")
+  function params.action_read(filename,silent,number)
+    local filepath = norns.state.data..number.."/"
+    if util.file_exists(filepath) then
+      -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
+      screen_view_index = 1
+      screen_view_name = 'Session'
+      misc = {}
+      for i = 1, #pset_lookup do
+        local tablename = pset_lookup[i]
+          if util.file_exists(filepath..tablename..".data") then
+          _G[tablename] = tab.load(filepath..tablename..".data")
+          print('table >> read: ' .. filepath..tablename..".data")
+        else
+          print('table >> missing: ' .. filepath..tablename..".data")
+        end
       end
+      -- clock_tempo isn't stored in .pset for some reason so set it from misc.data (todo: look into inserting into .pset)
+      params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
+      current_shift_arp = misc.current_shift_arp
+      current_shift_chord = misc.current_shift_chord
+      current_rotation_arp = misc.current_rotation_arp
+      
+      -- reset event-related params so the event editor opens to the default view rather than the last-loaded event
+      params:set('event_category', 1)
+      change_category()
+      params:set('event_subcategory', 1) -- called by the above
+      params:set('event_name', 1)
+      change_event()
+      params:set('event_operation', 1)
+      params:set('event_op_limit', 1)
+      params:set('event_op_limit_random', 1)
+      params:set('event_probability', 100) -- todo p1 change after float
+      params:set('event_value', get_default_event_value())
+      events_index = 1
+      selected_events_menu = events_menus[events_index]
+      gen_menu_events()
+      event_edit_active = false
+  
+      -- todo p2 loading pset while transport is active gets a little weird with Link and MIDI but I got other stuff to deal with
+      if params:get('clock_source') == 'internal' then 
+        reset_clock()
+      else
+        gen_arranger_seq_padded()
+      end
+      arranger_queue = nil
+      arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
+      pattern_queue = false
+      arp_seq_position = 0
+      chord_seq_position = 0
+      arranger_seq_position = 0
+      set_chord_pattern(arranger_seq_padded[1])
+      if transport_state == 'paused' then
+        transport_state = 'stopped' -- just flips to the stop icon so user knows they don't have to do this manually
+      end  
+      get_next_chord()
+      chord_raw = next_chord
+      chord_no = 0 -- wipe chord readout
+      gen_chord_readout()
+      gen_dash('params.action_read')
+      read_prefs()
+      -- if transport_active, reset and continue playing so user can demo psets from the system menu
+      -- todo p2 need to send different sync values depending on clock source.
+      -- when link clock is running we can pick up on the wrong beat.
+      -- unsure about MIDI
+      -- if transport_active == true then
+      --   clock.transport.start()
+      -- end
+      
+      -- Overwrite these prefs
+      params:set('chord_readout', param_option_to_index('chord_readout', prefs.chord_readout) or 1)
+      params:set('autoload_pset', param_option_to_index('autoload_pset', prefs.autoload_pset) or 1)
     end
-    -- clock_tempo isn't stored in .pset for some reason so set it from misc.data (todo: look into inserting into .pset)
-    params:set('clock_tempo', misc.clock_tempo or params:get('clock_tempo'))
-    current_shift_arp = misc.current_shift_arp
-    current_shift_chord = misc.current_shift_chord
-    current_rotation_arp = misc.current_rotation_arp
-    
-    -- reset event-related params so the event editor opens to the default view rather than the last-loaded event
-    params:set('event_category', 1)
-    change_category()
-    params:set('event_subcategory', 1) -- called by the above
-    params:set('event_name', 1)
-    change_event()
-    params:set('event_operation', 1)
-    params:set('event_op_limit', 1)
-    params:set('event_op_limit_random', 1)
-    params:set('event_probability', 100) -- todo p1 change after float
-    params:set('event_value', get_default_event_value())
-    events_index = 1
-    selected_events_menu = events_menus[events_index]
-    gen_menu_events()
-    event_edit_active = false
-
-    -- todo p2 loading pset while transport is active gets a little weird with Link and MIDI but I got other stuff to deal with
-    if params:get('clock_source') == 'internal' then 
-      reset_clock()
-    else
-      gen_arranger_seq_padded()
-    end
-    arranger_queue = nil
-    arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
-    pattern_queue = false
-    arp_seq_position = 0
-    chord_seq_position = 0
-    arranger_seq_position = 0
-    set_chord_pattern(arranger_seq_padded[1])
-    if transport_state == 'paused' then
-      transport_state = 'stopped' -- just flips to the stop icon so user knows they don't have to do this manually
-    end  
-    get_next_chord()
-    chord_raw = next_chord
-    chord_no = 0 -- wipe chord readout
-    gen_chord_readout()
-    gen_dash('params.action_read')
-    
-    -- if transport_active, reset and continue playing so user can demo psets from the system menu
-    -- todo p2 need to send different sync values depending on clock source.
-    -- when link clock is running we can pick up on the wrong beat.
-    -- unsure about MIDI
-    -- if transport_active == true then
-    --   clock.transport.start()
-    -- end
-  end
-
+  
   grid_redraw()
   redraw()
   end
@@ -703,29 +730,54 @@ function init()
   -- end of PSET callbacks --   
   ---------------------------
 
--- Optional: load most recent pset on init
-params:default() -- todo prerelease disable. Set preference for autoloading!
-params:bang()
 
--- Some actions need to be added post-bang
-params:set_action('mode', function() update_chord_action() end)
+  -------------
+  -- Write prefs
+  -------------
+  -- todo p3 this fires a bunch of times when all the source params bang at init. Pretty harmless.
+  function save_prefs()
+    local filepath = norns.state.data
+    -- os.execute("mkdir -p "..filepath)
+    -- Make table with version (for backward compatibility checks) and any useful system params
+    local prefs = {}
+    prefs.timestamp = os.date()
+    prefs.last_version = version
+    prefs.chord_readout = params:string('chord_readout')
+    prefs.autoload_pset = params:string('autoload_pset')
+    
+    tab.save(prefs, filepath .. "prefs.data")
+    -- print('table >> write: ' .. filepath.."prefs.data")
+  end 
 
-countdown_timer = metro.init()
-countdown_timer.event = countdown -- call the 'countdown' function below,
-countdown_timer.time = .1 -- 1/10s
-countdown_timer.count = -1 -- for.evarrr
 
-grid_redraw()
-redraw()
+  -- Optional: load most recent pset on init
+  if params:string('autoload_pset') == 'True' then
+    params:default()
+  end
+
+  params:bang()
+  
+  -- Some actions need to be added post-bang
+  params:set_action('mode', function() update_chord_action() end)
+  
+  countdown_timer = metro.init()
+  countdown_timer.event = countdown -- call the 'countdown' function below,
+  countdown_timer.time = .1 -- 1/10s
+  countdown_timer.count = -1 -- for.evarrr
+  
+  grid_redraw()
+  redraw()
 end
 
 
--- UPDATE_MENUS. todo p2: can be optimized by only calculating the current view+page or when certain actions occur
+  
+  
+  -- UPDATE_MENUS. todo p2: can be optimized by only calculating the current view+page or when certain actions occur
 function update_menus()
 
   -- GLOBAL MENU 
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
-      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator', 'chord_readout'}
+      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator', 'chord_readout', 'autoload_pset'}
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
@@ -3041,26 +3093,21 @@ function key(n,z)
       elseif view_key_count > 0 then -- Grid view key held down
         if screen_view_name == 'Chord+arp' then
         
-          -- When Chord+Arp Grid View keys are held down, K3 runs Generator and resets pattern+arp
+          -- When Chord+Arp Grid View keys are held down, K3 runs Generator (and resets pattern+arp on internal clock)
           generator()
-          
-          -- If we're sending MIDI clock out, send a stop msg. This has changed with the multi clock Norns update. Needs testing.
-          -- Tell the transport to Start on the next sync of sequence_clock
-          if #midi_transport_ports >0 then
-            
-            if transport_active then
-              transport_multi_stop()
+
+          -- This reset patterns and resynces arp, but only for internal clock. todo p2 think on this. Not great.
+          if params:string('clock_source') == 'internal' then
+            local prev_transport_state = transport_state
+            reset_external_clock()
+            -- Don't reset arranger it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
+            reset_pattern()
+            if transport_state ~= prev_transport_state then
+              transport_state = prev_transport_state
+              print(transport_state)
             end
-            
-          -- Tells sequence_clock to send a MIDI start/continue message after initial clock sync
-          clock_start_method = 'start'
-          start = true
-          end    
-    
-          -- For now, doing a pattern reset but not an arranger reset since it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
-          -- if params:get('arranger_enabled') == 1 then reset_arrangement() else reset_pattern() end
-          reset_pattern()
-          
+          end
+     
         elseif grid_view_name == 'Chord' then       
           chord_generator_lite()
           -- gen_dash('chord_generator_lite') -- will run when called from event but not from keys
@@ -3430,6 +3477,10 @@ function enc(n,d)
         selected_menu = menus[page_index][menu_index]
       else
         params:delta(selected_menu, d)
+        -- todo p2 seems like there has to be a better way of distinguishing between pset-read initiated param actions and encoder initiated param actions but until I figure it out, we do this
+        if selected_menu == 'chord_readout' or selected_menu == 'autoload_pset' then
+          save_prefs()
+        end
       end
     end
   
@@ -4086,7 +4137,11 @@ function redraw()
         screen.move(1,62)
         screen.text('(K2) DELETE')
         screen.move(128,62)
-        screen.text_right('(K3) SAVE')
+        if event_edit_status == '(Saved)' then
+          screen.text_right('(K3) EVENTS')
+        else
+          screen.text_right('(K3) SAVE')
+        end
       end
     
 

@@ -94,7 +94,7 @@ function chord_generator(mode)
   table.insert(chord_algos['name'], chord_algo_name)
   table.insert(chord_algos['func'], function()      
     
-    chord_pattern_length[pattern] = 4
+    params:set('chord_pattern_length', 4)
     build_mode_chord_types()
     progression_valid = false
     progression = {}
@@ -196,7 +196,7 @@ function chord_generator(mode)
       load(chord_algos['func'][chord_algo])
     end
       
-    chord_pattern_length[pattern] = 4
+    params:set('chord_pattern_length', 4)
     for i = 1, chord_pattern_length[pattern] do
       local x = progression[i]
       chord_seq[pattern][i] = x
@@ -211,7 +211,7 @@ function chord_generator(mode)
   table.insert(chord_algos['func'], function()  
     
     params:set('chord_div_index', div_to_index('1/4'))
-    chord_pattern_length[pattern] = 8
+    params:set('chord_pattern_length', 8)
     
     build_mode_chord_types()
 
@@ -323,7 +323,7 @@ function arp_generator(mode)
   -- This step is omitted when running init (used to populate algo table for menus)
   if mode == 'run' then
     -- Pattern/session randomizations
-    arp_pattern_length[arp_pattern] = length
+    params:set('arp_pattern_length_' .. arp_pattern, length)
     params:set('arp_div_index', div)
     -- params:set('arp_duration_index', div)
     -- Duration from min of the arp_div to +4 arp_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
@@ -353,8 +353,8 @@ function arp_generator(mode)
     -- Pretty fast arps here so no shifting octave down
     params:set('arp_octave', math.max(params:get('arp_octave'), 0))
 
-    -- Prefer longer and faster sequence    
-    arp_pattern_length[arp_pattern] = math.random(3,4) * 2 -- 6 (tuplet) or 8 length
+    -- Prefer longer and faster sequence
+    params:set('arp_pattern_length_' .. arp_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
     tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
     -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
@@ -383,7 +383,7 @@ function arp_generator(mode)
     params:set('arp_octave', math.max(params:get('arp_octave'), 0))
 
     -- Sequence length of 6(tuplet) or 8 steps
-    arp_pattern_length[arp_pattern] = math.random(3,4) * 2 -- 6 (tuplet) or 8 length
+    params:set('arp_pattern_length_' .. arp_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
     tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
     -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
@@ -435,7 +435,7 @@ function arp_generator(mode)
     params:set('arp_mode', 2)
     params:set('arp_pp_amp',35) --Turn down amp since a lot of notes can clip
     params:set('arp_duration_index',15)
-    arp_pattern_length[arp_pattern] = math.random(3,4) * 2
+    params:set('arp_pattern_length_' .. arp_pattern, math.random(3,4) * 2)
 
     -- Strum speed from 1/64T to 1/32T
     params:set('arp_div_index', math.random(1,5))
@@ -454,7 +454,7 @@ function arp_generator(mode)
     params:set('arp_mode', 2)
     params:set('arp_pp_amp',35) --Turn down amp since a lot of notes can clip
     params:set('arp_duration_index',15)
-    arp_pattern_length[arp_pattern] = math.random(3,4) * 2
+    params:set('arp_pattern_length_' .. arp_pattern, math.random(3,4) * 2)
 
     -- Strum speed from 1/64T to 1/32T
     params:set('arp_div_index', math.random(1,5))
@@ -511,7 +511,7 @@ function arp_generator(mode)
   -- table.insert(arp_algos['name'], arp_algo_name)
   -- table.insert(arp_algos['func'], function()
   
-  --   -- arp_pattern_length[arp_pattern] = math.random(3,4) * (percent_chance(30) and 2 or 1)
+  --   -- params:set('arp_pattern_length_' .. arp_pattern, math.random(3,4) * (percent_chance(30) and 2 or 1))
   --   -- local tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
   --   -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
@@ -539,7 +539,7 @@ function arp_generator(mode)
   table.insert(arp_algos['name'], arp_algo_name)
   table.insert(arp_algos['func'], function()  
   
-    -- arp_pattern_length[arp_pattern] = math.random(3,4) * (percent_chance(30) and 2 or 1)
+    -- params:set('arp_pattern_length_' .. arp_pattern, math.random(3,4) * (percent_chance(30) and 2 or 1))
     -- tuplet_shift = (arp_pattern_length[arp_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
     -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
@@ -561,7 +561,7 @@ function arp_generator(mode)
   
     -- 8 or 6(tuplet) length
     local length = math.random(3,4) * 2
-    arp_pattern_length[arp_pattern] = length
+    params:set('arp_pattern_length_' .. arp_pattern, length)
     local tuplet_shift = (length / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) arp pattern length
     
     -- 1/16 to 1/4 standard or tuplet
