@@ -123,7 +123,6 @@ If you'd like to learn more about exactly _how_ Dreamsequence works, the followi
 
 # Grid interface
 
-### Chord view
 ![dreamsequence](doc/grid_chord.svg)
 The Chord view is used to sequence chord patterns A-D. Since the arp and harmonizers operate on the active chord, this is typically where you'll begin composing.
 
@@ -144,7 +143,6 @@ The Chord view is used to sequence chord patterns A-D. Since the arp and harmoni
     - Holding the Chord+Arp view keys together enables K3 to generate both a new chord sequence and a new arp.
 
 ----------------------------------------------------------------------------------------------------------------------
-### Arp view
 ![dreamsequence](doc/grid_arp.svg)
 The Arp view is used to create an arpeggio or one-shot (strummed) pattern based on the currently-playing chord.
 
@@ -160,7 +158,6 @@ The Arp view is used to create an arpeggio or one-shot (strummed) pattern based 
     - Holding the Arp+Chord view keys together enables K3 to generate both a new chord sequence and a new arp.
 
 ----------------------------------------------------------------------------------------------------------------------
-### Arranger view
 ![dreamsequence](doc/grid_arranger.svg)
 The Arranger view is used to sequence chord patterns and enter the Events editor.
 
@@ -179,7 +176,6 @@ The Arranger view is used to sequence chord patterns and enter the Events editor
 - The last three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views. 
 
 ----------------------------------------------------------------------------------------------------------------------
-### Events view
 ![dreamsequence](doc/grid_events.svg)
 The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement.
 
