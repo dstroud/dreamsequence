@@ -149,8 +149,8 @@ function init()
   -- Generate subcategories lookup tables
   gen_event_tables()
   -- Derivatives:
-  -- event_subcategories: Unique, ordered event subcategories for each category. For generating subcategories
-  -- event_indices: key = conctat category_subcategory with first_index and last_index values
+  --  event_subcategories: Unique, ordered event subcategories for each category. For generating subcategories
+  --  event_indices: key = conctat category_subcategory with first_index and last_index values
 
 
   --------------------
@@ -230,8 +230,10 @@ function init()
   params:hide(params.lookup['event_op_limit_max'])
   
 
-  --CHORD PARAMS
-  params:add_group('chord', 'CHORD', 28)  
+  ------------------
+  -- CHORD PARAMS --
+  ------------------
+  params:add_group('chord', 'CHORD', 25)  
   
   params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
@@ -258,10 +260,10 @@ function init()
   params:add_number('chord_shift', 'Pattern shift', -14, 14, 0)
   params:set_action('chord_shift',function() pattern_shift_abs('chord_shift') end)
   
-  for i = 1, 4 do
-    params:add_number('chord_pattern_length_' .. i, 'Pattern length ' .. i, 1, 8, 4)
-  end
-  
+  -- will act on current pattern unlike numbered arp param
+  params:add_number('chord_pattern_length', 'Pattern length', 1, 8, 4)
+  params:set_action('chord_pattern_length', function() pattern_length('chord_pattern_length') end)
+
   --------------------  
   params:add_separator ('chord_engine', 'Engine')
   
@@ -300,7 +302,9 @@ function init()
   params:add_number('chord_disting_velocity','Velocity',0, 100, 50)
 
 
-  --ARP PARAMS
+  ------------------
+  -- ARP PARAMS --
+  ------------------
   params:add_group('arp', 'ARP', 28)  
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
@@ -318,8 +322,10 @@ function init()
   params:add_number('arp_shift', 'Pattern shift', -14, 14, 0)
   params:set_action('arp_shift',function() pattern_shift_abs('arp_shift') end)
   
+  -- numbered so we can operate on parallel arps down the road
   params:add_number('arp_pattern_length_1', 'Pattern length', 1, 8, 8)
-  
+  params:set_action('arp_pattern_length_1', function() pattern_length(1) end)
+
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   params:add_option("arp_mode", "Mode", {'Loop','One-shot'},1)    
@@ -339,7 +345,6 @@ function init()
   params:add_number('arp_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
   params:set_action("arp_midi_cc_1_val",function(val) send_cc('arp', 1, val) end)
 
-
   params:add_separator ('arp_jf', 'Just Friends')
   params:add_number('arp_jf_amp','Amp',0, 50, 10,function(param) return div_10(param:get()) end)
   
@@ -353,7 +358,9 @@ function init()
   params:add_number('arp_ad_skew','AD env. skew',0, 100, 0)
   
   
-  --MIDI PARAMS
+  ------------------
+  -- MIDI PARAMS --
+  ------------------
   params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 24)  
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
@@ -403,7 +410,9 @@ function init()
   params:add_number('midi_ad_skew','AD env. skew',0, 100, 0)
 
   
-  --CV/CROW PARAMS
+  ------------------
+  -- CV/CROW PARAMS --
+  ------------------
   params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)  
   -- Crow clock uses hybrid notation/PPQN
   params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
@@ -446,10 +455,10 @@ function init()
     params:set_action("crow_tr_env",function() update_menus() end)
   params:add_number('crow_ad_skew','AD env. skew',0, 100, 0)
   
-  -----------------------------
-  -- Init stuff
-  -----------------------------
   
+  -----------------------------
+  -- INIT STUFF
+  -----------------------------
   start = false
   transport_state = 'stopped'
   clock_start_method = 'start'
@@ -483,9 +492,8 @@ function init()
   selected_menu = menus[page_index][menu_index]
   transport_active = false
   chord_pattern_length = {4,4,4,4}
-  pattern = 1
+  set_chord_pattern(1)
   pattern_name = {'A','B','C','D'}
-  -- steps_remaining_in_pattern = chord_pattern_length[pattern]
   pattern_queue = false
   pattern_copy_performed = false
   arranger_seq_retrig = false
@@ -663,7 +671,7 @@ function init()
     arp_seq_position = 0
     chord_seq_position = 0
     arranger_seq_position = 0
-    pattern = arranger_seq_padded[1]
+    set_chord_pattern(arranger_seq_padded[1])
     if transport_state == 'paused' then
       transport_state = 'stopped' -- just flips to the stop icon so user knows they don't have to do this manually
     end  
@@ -960,6 +968,18 @@ function pattern_shift_abs(source)
       end
     end    
     current_shift_chord = offset  
+  end
+  grid_redraw()
+end
+
+
+-- param action for xxxx_pattern_length params
+function pattern_length(source)
+  -- print('setting pattern length via param action')
+  if source == 'chord_pattern_length' then
+    chord_pattern_length[pattern] = params:get(source)
+  else
+    arp_pattern_length[source] = params:get('arp_pattern_length_' .. source)
   end
   grid_redraw()
 end
@@ -1567,7 +1587,7 @@ function reset_arrangement() -- todo: Also have the chord readout updated (move 
   arranger_queue = nil
   arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
   arranger_seq_position = 0
-  if arranger_seq[1] > 0 then pattern = arranger_seq[1] end
+  if arranger_seq[1] > 0 then set_chord_pattern(arranger_seq[1]) end
   if params:string('arranger_enabled') == 'True' then arranger_active = true end
   reset_pattern()
 end
@@ -1617,7 +1637,7 @@ function advance_chord_seq()
       else
         -- changed from wrap to a check if incremented arranger_seq_position exceeds seq_length
         arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or (arranger_seq_position + 1 > arranger_seq_length) and 1 or arranger_seq_position + 1
-        pattern = arranger_seq_padded[arranger_seq_position]
+        set_chord_pattern(arranger_seq_padded[arranger_seq_position])
         arranger_queue = nil
       end
       
@@ -1632,7 +1652,7 @@ function advance_chord_seq()
   if arrangement_reset == false then
     if chord_seq_position >= chord_pattern_length[pattern] or arranger_seq_retrig then
       if pattern_queue then
-        pattern = pattern_queue
+        set_chord_pattern(pattern_queue)
         pattern_queue = false
       end
       chord_seq_position = 1
@@ -2648,7 +2668,7 @@ function g.key(x,y,z)
         
       -- set chord_pattern_length  
       elseif x == 15 then
-        chord_pattern_length[pattern] = y
+        params:set('chord_pattern_length', y)
         gen_dash('g.key chord_pattern_length')
 
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
@@ -2662,7 +2682,13 @@ function g.key(x,y,z)
           for i = 1,8 do
             chord_seq[y][i] = chord_seq[pattern_copy_source][i]
           end
-          chord_pattern_length[y] = chord_pattern_length[pattern_copy_source]
+          -- If we're pasting to the currently viewed pattern, do it via param so we update param + table.
+          if y == pattern then
+            params:set('chord_pattern_length', chord_pattern_length[pattern_copy_source])
+          -- Otherwise just update the table.
+          else
+            chord_pattern_length[y] = chord_pattern_length[pattern_copy_source]
+          end
         end
       end
       
@@ -2681,7 +2707,7 @@ function g.key(x,y,z)
           grid_dirty = true
         end
       elseif x == 15 then
-        arp_pattern_length[arp_pattern] = y
+        params:set('arp_pattern_length_' .. arp_pattern, y)
       end
     end
     
@@ -2737,7 +2763,7 @@ function g.key(x,y,z)
             print('Manual jump to queued pattern')
             
             pattern_queue = false
-            pattern = y
+            set_chord_pattern(y)
             arp_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
             chord_seq_position = 0
             reset_external_clock()

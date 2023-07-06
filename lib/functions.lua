@@ -204,7 +204,13 @@ function rotate_pattern(view, direction)
   --- UTILITY FUNCTIONS
   
   
-  function deepcopy(orig)
+  -- always use this to set chord current chord pattern so we can also silently update the param as well
+  function set_chord_pattern(y)
+    pattern = y
+    params:set('chord_pattern_length', chord_pattern_length[y], true) -- silent
+  end
+              
+              function deepcopy(orig)
     local orig_type = type(orig)
     local copy
     if orig_type == 'table' then
