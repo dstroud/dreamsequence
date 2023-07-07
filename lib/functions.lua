@@ -283,6 +283,33 @@ function rotate_pattern(view, direction)
   -------------------------
   -- UI FUNCTIONS
   -------------------------
+  
+  
+  -- index of list, count of items in list, #viewable, line height
+  -- function scroll_offset_simple(index, total, in_view, height)
+  function scroll_offset_locked(index, height, locked_row)
+    -- if total > in_view and index > locked_row then
+    if index > locked_row then
+    
+      -- return(math.ceil(((index - 1) * (total - in_view) * height / total)))
+      -- if index > 1 then 
+        return((index - locked_row) * height)
+      -- end
+    else
+      return(0)
+    end
+  end
+        
+        
+  function scrollbar(index, total, in_view, locked_row, screen_height)
+    local bar_size = in_view / total * screen_height
+    local increment = (screen_height - bar_size) / (total - locked_row)
+    index = math.max(index - locked_row, 0)
+    local offset = 12 + (index * increment)
+    return(offset)
+  end
+        
+        
   function delete_all_events_segment()
     key_counter = 4
     

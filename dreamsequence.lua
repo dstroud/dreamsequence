@@ -194,8 +194,8 @@ function init()
   params:add_option('chord_readout', 'Chords as', {'Name', 'Degree'}, 1)
   params:set('chord_readout', param_option_to_index('chord_readout', prefs.chord_readout) or 1)
 
-  params:add_option('autoload_pset', 'Autoload pset', {'False', 'True'}, 1)
-  params:set('autoload_pset', param_option_to_index('autoload_pset', prefs.autoload_pset) or 1)
+  params:add_option('default_pset', 'Default pset', {'False', 'True'}, 1)
+  params:set('default_pset', param_option_to_index('default_pset', prefs.default_pset) or 1)
 
   
   --ARRANGER PARAMS
@@ -714,7 +714,7 @@ function init()
       
       -- Overwrite these prefs
       params:set('chord_readout', param_option_to_index('chord_readout', prefs.chord_readout) or 1)
-      params:set('autoload_pset', param_option_to_index('autoload_pset', prefs.autoload_pset) or 1)
+      params:set('default_pset', param_option_to_index('default_pset', prefs.default_pset) or 1)
     end
   
   grid_redraw()
@@ -743,7 +743,7 @@ function init()
     prefs.timestamp = os.date()
     prefs.last_version = version
     prefs.chord_readout = params:string('chord_readout')
-    prefs.autoload_pset = params:string('autoload_pset')
+    prefs.default_pset = params:string('default_pset')
     
     tab.save(prefs, filepath .. "prefs.data")
     -- print('table >> write: ' .. filepath.."prefs.data")
@@ -751,7 +751,7 @@ function init()
 
 
   -- Optional: load most recent pset on init
-  if params:string('autoload_pset') == 'True' then
+  if params:string('default_pset') == 'True' then
     params:default()
   end
 
@@ -777,7 +777,7 @@ function update_menus()
 
   -- GLOBAL MENU 
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
-      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator', 'chord_readout', 'autoload_pset'}
+      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator', 'chord_readout', 'default_pset'}
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
@@ -3478,7 +3478,7 @@ function enc(n,d)
       else
         params:delta(selected_menu, d)
         -- todo p2 seems like there has to be a better way of distinguishing between pset-read initiated param actions and encoder initiated param actions but until I figure it out, we do this
-        if selected_menu == 'chord_readout' or selected_menu == 'autoload_pset' then
+        if selected_menu == 'chord_readout' or selected_menu == 'default_pset' then
           save_prefs()
         end
       end
@@ -3749,17 +3749,6 @@ function param_formatter(param)
 end
 
 
---index of list, count of items in list, #viewable, line height
-function scroll_offset(index, total, in_view, height)
-  if total > in_view and index > 1 then
-    --math.ceil might make jumps larger than necessary, but ensures nothing is cut off at the bottom of the menu
-    return(math.ceil(((index - 1) * (total - in_view) * height / total)))
-  else
-    return(0)
-  end
-end
-
-
 -- generates truncated flat tables at the chord step level for the arranger mini dashboard
 -- runs any time the arranger changes (generator, events, pattern changes, length changes, key pset load, arranger/pattern reset, event edits)
 function gen_dash(source)
@@ -3841,7 +3830,10 @@ function gen_dash(source)
 end
 
 
-  -- todo p2: this can be improved quite a bit by just having these custom screens be generated at the key/g.key level. Should be a fun refactor.
+--------------------------
+-- REDRAW
+-------------------------
+-- todo p1: this can be improved quite a bit by just having these custom screens be generated at the key/g.key level. Should be a fun refactor.
 function redraw()
   screen.clear()
   local dash_x = 94
@@ -3880,20 +3872,6 @@ function redraw()
       screen.line(128,54)
       screen.stroke()
       screen.level(3)      
-      
-      -- The following key options were moved to arranger grid buttons
-      -- screen.move(1,62)
-      -- if params:get('arranger_enabled') == 0 then
-      --   screen.text('(K2) ENABLE')
-      -- else
-      --   screen.text('(K2) DISABLE')
-      -- end
-      -- screen.move(128,62)
-      -- if params:get('playback') == 1 then
-      --   screen.text_right('(K3) ONE-SHOT')
-      -- else
-      --   screen.text_right('(K3) LOOP')
-      -- end
         
     elseif grid_view_name == 'Chord' then
       screen.level(15)
@@ -4030,8 +4008,8 @@ function redraw()
         --------------------------
         -- Scrolling events menu
         --------------------------
-        -- footer chops off some space so if it's more than 4 lines we report 3.5 "visible" lines
-        local menu_offset = scroll_offset(events_index, #events_menus, #events_menus <= 4 and 4 or 3.5, 10)
+        -- todo p2 this mixes events_index and menu_index. Redundant?
+        local menu_offset = scroll_offset_locked(events_index, 10, 2) -- index, height, locked_row
         line = 1
         for i = 1,#events_menus do
           local debug = false
@@ -4112,7 +4090,7 @@ function redraw()
           line = line + 1
         end
         
-        
+      
      -- Events editor sticky header
         screen.level(4)
         screen.rect(0,0,128,11)
@@ -4144,7 +4122,14 @@ function redraw()
         end
       end
     
-
+      -- scrollbar
+      screen.level(15)
+      local offset = scrollbar(events_index, #events_menus, 4, 2, 40) -- (index, total, in_view, locked_row, screen_height)
+      local bar_height = 4 / #events_menus * 40
+      screen.rect(127, offset, 1, bar_height)
+      screen.fill()
+        
+        
     -- SESSION VIEW (NON-EVENTS), not holding down Arranger segments g.keys  
     else
       ---------------------------
@@ -4296,7 +4281,8 @@ function redraw()
       --------------------------------------------
       -- Scrolling menus
       --------------------------------------------
-      local menu_offset = scroll_offset(menu_index,#menus[page_index], 5, 10)
+      -- todo p1 move calcs out of redraw
+      local menu_offset = scroll_offset_locked(menu_index, 10, 3) -- index, height, locked_row
       line = 1
       for i = 1,#menus[page_index] do
         screen.move(2, line * 10 + 8 - menu_offset)
@@ -4321,6 +4307,15 @@ function redraw()
         end
         line = line + 1
       end
+
+
+      -- scrollbar
+      screen.level(15)
+      local offset = scrollbar(menu_index, #menus[page_index], 5, 3, 52) -- (index, total, in_view, locked_row, screen_height)
+      local bar_height = 5 / #menus[page_index] * 52
+      screen.rect(91, offset, 1, bar_height)
+      screen.fill()
+      
       
       --Sticky header
       screen.level(menu_index == 0 and 15 or 4)
