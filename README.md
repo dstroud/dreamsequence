@@ -30,19 +30,13 @@ If you'd like to learn more about exactly _how_ Dreamsequence works, the rest of
 
 
 ### Grid-based chord sequencer
-- Create up to 4 chord patterns (A, B, C, D) by entering a pattern on Grid (or by using the procedural chord progression Generator).
+- The chord sequencer is the heart of Dreamsequence, always broadcasting an "active" chord that the rest of Dreamsequence uses to create sequences and harmonies.
+- The active chord can be sent directly to a destination (MIDI, Norns engine, i2c, etc...) for playback, or it can be muted.
+- Chord patterns are references to chord degrees (I-VII) across two octaves. If you're not a music theory nerd, this means that the available chords mostly sound nice together and we can change the mood of the song by simply switching to a different mode which will adjust all the chords on the fly.
+- 4 chord patterns (A, B, C, D) can be saved then switched between using Grid or the Arranger.
 
-- Chord patterns are referenced by chord degrees (I-VII) across two octaves. You can quickly and non-destructively change the mood of a composition by simply switching to a different mode or key which will adjust the chord output accordingly.
-
-- Chords can be sent to one of several destinations: 
-  - Norns sound engine
-  - MIDI
-  - Just Friends or Disting EX via Crow's i2c bus
-
-- The active chord is always sent to the arpeggiator and harmonizers where it will be used to restrict their output to match the chord, even if direct chord playback is disabled.
-
-### Grid-based arpeggiator (Arp)
-- Arpeggiate or strum the active chord by entering a pattern on Grid (or by using the procedural arp Generator). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
+### Grid-based phrase sequencer/arpeggiator
+- Arpeggiate, strum, or build a sequence based on the active chord by entering a pattern on Grid. The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
   
   | Grid col. | Triad Out| 7th Out  |
   |-----------|----------|----------|
