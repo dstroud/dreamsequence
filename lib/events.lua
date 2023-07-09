@@ -39,6 +39,8 @@ events_lookup = {										--
 {	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'arp_rotate', 	name= 'Pattern rotate', 	value_type= 'continuous', 				},
 {	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'arp_shift', 	name= 'Pattern shift', 	value_type= 'continuous', 				},
 {	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'shuffle_arp', 	name= 'Shuffle', 	value_type= 'trigger', 				},
+{	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_mode_combo_1', 	name= 'Mode', 	value_type= 'continuous', 				},
+{	category= 'Arp', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_1_shot_1', 	name= 'Fire 1-shot', 	value_type= 'continuous', 				},
 {	category= 'Arp', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'arp_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
 {	category= 'Arp', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'arp_chord_type', 	name= 'Chord type', 	value_type= 'continuous', 	formatter= 'chord_type', 			},
 {	category= 'Arp', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'arp_octave', 	name= 'Octave', 	value_type= 'continuous', 				},

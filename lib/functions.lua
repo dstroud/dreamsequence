@@ -249,6 +249,12 @@ function rotate_pattern(view, direction)
   end
   
   
+  -- passed string arg will be looked up in param's .options and set using index
+  function set_param_string(param, str)
+    params:set(param, param_option_to_index(param, str))
+  end  
+  
+  
   function spaces_to_underscores(str)
     local replacedStr = string.gsub(str, " ", "_")
     return replacedStr

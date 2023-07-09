@@ -28,7 +28,6 @@ norns.version.required = 230526
 function init()
   -----------------------------
   -- todo prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  -- saved with pset files to suss out issues in the future
   version = 'v1.1'
   -----------------------------
 
@@ -147,8 +146,8 @@ function init()
   midi_device = {} -- container for connected midi devices
   midi_device_names = {} -- container for their names
   refresh_midi_devices()
-
   
+  -- events init
   local events_lookup_names = {}
   local events_lookup_ids = {}
   for i = 1, #events_lookup do
@@ -156,7 +155,7 @@ function init()
     events_lookup_ids[i] = events_lookup[i].id
   end
   
-  -- big list of event_id, index
+  -- key = event_id, value = index
   events_lookup_index = tab.invert(events_lookup_ids)
   
   -- Used to derive the min and max indices for the selected event category (Global, Chord, Arp, etc...)
@@ -187,16 +186,21 @@ function init()
   
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
   params:set_action('chord_preload', function(x) chord_preload(x) end)     
-  
-  params:add_number('crow_pullup','Crow Pullup',0, 1, 1,function(param) return t_f_string(param:get()) end)
-  params:set_action("crow_pullup",function() crow_pullup() end)
-  
+
+  -- persistant pref
   params:add_option('chord_readout', 'Chords as', {'Name', 'Degree'}, 1)
+  params:set_save('chord_readout', false)
   params:set('chord_readout', param_option_to_index('chord_readout', prefs.chord_readout) or 1)
+  params:set_action('chord_readout', function() save_prefs() end)
 
+  -- persistant pref
   params:add_option('default_pset', 'Default pset', {'False', 'True'}, 1)
+  params:set_save('default_pset', false)
   params:set('default_pset', param_option_to_index('default_pset', prefs.default_pset) or 1)
+  params:set_action('default_pset', function() save_prefs() end)
 
+  params:add_number('crow_pullup', 'Crow Pullup', 0 , 1, 1, function(param) return t_f_string(param:get()) end)
+  params:set_action("crow_pullup", function() crow_pullup() end)
   
   --ARRANGER PARAMS
   params:add_group('arranger', 'ARRANGER', 2)
@@ -328,7 +332,7 @@ function init()
   ------------------
   -- ARP PARAMS --
   ------------------
-  params:add_group('arp', 'ARP', 28)  
+  params:add_group('arp', 'ARP', 31)
   params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('arp_div_index',function() set_div('arp') end)
@@ -348,11 +352,38 @@ function init()
   -- numbered so we can operate on parallel arps down the road
   params:add_number('arp_pattern_length_1', 'Pattern length', 1, 8, 8)
   params:set_action('arp_pattern_length_1', function() pattern_length(1) end)
-
+  
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
-  params:add_option("arp_mode", "Mode", {'Loop','One-shot'},1)    
+  
+  params:add_option("seq_mode_1", "Play", {'Loop', 'On step', 'On chord', 'One-shot'}, 1)    
     
+  params:add_option('seq_reset_1', 'Reset', {'On step', 'On chord', 'On Stop'}, 1)
+
+  local seq_modes = 
+    {
+    'Loop/step',
+    'Loop/chord',
+    'Loop/stop',
+    'Step/step',
+    'Step/chord',
+    'Step/stop',
+    'Chord/step',
+    'Chord/chord',
+    'Chord/stop',
+    '1-shot/step',
+    '1-shot/chord',
+    '1-shot/stop',
+    }
+  params:add_option("seq_mode_combo_1", "Mode", seq_modes, 1)
+  params:set_action("seq_mode_combo_1",function(val) set_seq_mode_1(val) end)
+  function set_seq_mode_1(val)
+    params:set('seq_mode_1', math.ceil(val/3))
+    params:set('seq_reset_1', (val - 1) % 3 + 1)
+  end
+  
+  params:add_option('seq_1_shot_1','Prime 1-shot', {'Off', 'On'})
+  
   params:add_separator ('arp_engine', 'Engine')
   params:add_number('arp_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -495,7 +526,7 @@ function init()
   transport_multi_stop()  
   arranger_active = false
   chord_seq_retrig = true
-  
+  play_arp = false
   screen_views = {'Session','Events'}
   screen_view_index = 1
   screen_view_name = screen_views[screen_view_index]
@@ -697,7 +728,14 @@ function init()
       set_chord_pattern(arranger_seq_padded[1])
       if transport_state == 'paused' then
         transport_state = 'stopped' -- just flips to the stop icon so user knows they don't have to do this manually
-      end  
+      end
+
+      if params:get('seq_reset_1') == 3 then
+        play_arp = true
+      else
+        play_arp = false
+      end
+    
       get_next_chord()
       chord_raw = next_chord
       chord_no = 0 -- wipe chord readout
@@ -734,20 +772,18 @@ function init()
   -------------
   -- Write prefs
   -------------
-  -- todo p3 this fires a bunch of times when all the source params bang at init. Pretty harmless.
   function save_prefs()
     local filepath = norns.state.data
-    -- os.execute("mkdir -p "..filepath)
-    -- Make table with version (for backward compatibility checks) and any useful system params
     local prefs = {}
     prefs.timestamp = os.date()
     prefs.last_version = version
     prefs.chord_readout = params:string('chord_readout')
     prefs.default_pset = params:string('default_pset')
-    
     tab.save(prefs, filepath .. "prefs.data")
-    -- print('table >> write: ' .. filepath.."prefs.data")
-  end 
+    if countdown_timer ~= nil then --  trick to keep this from junking up repl on init bang (x2 if pset loads)
+      print('table >> write: ' .. filepath.."prefs.data")
+    end
+  end
 
 
   -- Optional: load most recent pset on init
@@ -777,7 +813,7 @@ function update_menus()
 
   -- GLOBAL MENU 
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
-      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'crow_pullup', 'chord_generator', 'arp_generator', 'chord_readout', 'default_pset'}
+      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'arp_generator', 'chord_readout', 'default_pset'}
   
   -- CHORD MENU
   if params:string('chord_dest') == 'None' then
@@ -792,23 +828,23 @@ function update_menus()
     menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
-  -- ARP MENU
+  -- SEQ MENU
   if params:string('arp_dest') == 'None' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', }
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode',  'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env' }
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_tr_env' }
     else -- AD envelope
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_mode', 'arp_jf_amp'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_jf_amp'}
   elseif params:string('arp_dest') == 'Disting' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_mode', 'arp_disting_velocity'}    
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_disting_velocity'}    
   end
   
   -- MIDI HARMONIZER MENU
@@ -1475,7 +1511,6 @@ function sequence_clock(sync_val)
         else
           reset_pattern()
         end
-        
         transport_active = false
         reset_arrangement()
         transport_state = 'stopped'
@@ -1497,7 +1532,16 @@ function sequence_clock(sync_val)
       end
   
       if clock_step % arp_div == 0 then
-        if params:string('arp_mode') == 'Loop' or play_arp then
+        local seq_mode_1 = params:get('seq_mode_1')
+        if seq_mode_1 == 1 then -- loop
+          advance_arp_seq()
+          grid_dirty = true
+        elseif seq_mode_1 == 4 then  -- 1-shot
+          if params:get('seq_1_shot_1') == 2 then
+            advance_arp_seq()
+            grid_dirty = true
+          end
+        elseif play_arp then
           advance_arp_seq()
           grid_dirty = true      
         end
@@ -1599,12 +1643,15 @@ end
 function clock.transport.start(sync_value)
   -- little check for MIDI because user can technically start and stop as per usual and we don't want to restart coroutine
   if not (params:string('clock_source') == 'midi' and transport_active) then
-    print('Transport starting')
+    -- print('Transport starting')
+    local seq_mode_1 = params:get('seq_mode_1')
+    if seq_mode_1 == 1 then -- loop
+      play_arp = true
+    end
     start = true
     stop = false -- 2023-07-19 added so when arranger stops in 1-shot and then external clock stops, it doesn't get stuck
     transport_active = true
-    print ('transport set to active via transport.start')
-  
+
     -- Clock for chord/arp/arranger sequences
     sequence_clock_id = clock.run(sequence_clock, sync_value)
   
@@ -1668,7 +1715,8 @@ end
 
 function advance_chord_seq()
   chord_seq_retrig = true -- indicates when we're on a new chord seq step for CV harmonizer auto-rest logic
-  play_arp = true
+  local seq_mode_1 = params:get('seq_mode_1')
+  local seq_reset_1 = params:get('seq_reset_1')
   local arrangement_reset = false
 
   -- Advance arranger sequence if enabled
@@ -1721,7 +1769,22 @@ function advance_chord_seq()
     update_chord()
 
     -- Play the chord
-    if chord_seq[pattern][chord_seq_position] > 0 then play_chord(params:string('chord_dest'), params:get('chord_midi_ch')) end
+    if chord_seq[pattern][chord_seq_position] > 0 then
+      play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
+      if seq_reset_1 == 2 then
+        arp_seq_position = 0
+        play_arp = true
+      end
+      if seq_mode_1 == 3 then -- 'On chord'
+        play_arp = true
+      end
+    end
+    
+    if seq_reset_1 == 1 then
+      arp_seq_position = 0
+    end
+    
+    if seq_mode_1 == 2 then play_arp = true end -- 'On step'
     
     if chord_key_count == 0 then
       chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)
@@ -2031,19 +2094,16 @@ function advance_arp_seq()
     end
   end
   
-  if params:string('arp_mode') == 'One-shot' and arp_seq_position >= arp_pattern_length[arp_pattern] then
-     play_arp = false
-  else
+  if arp_seq_position >= arp_pattern_length[arp_pattern] then
+    local seq_mode_1 = params:string('seq_mode_1')
+    if seq_mode_1 ~= 'Loop' then
+      play_arp = false
+      if seq_mode_1 == 'One-shot' then -- only reset if we're currently in one-shot mode. Could go either way here.
+        params:set('seq_1_shot_1', 1)
+      end
+     end
   end   
 end
-
-
--- function crow_trigger() --Trigger in used to sample voltage from Crow IN 1
---     -- for crow v4.0.0 and earlier
---     -- todo p0 testing with/without 3 and 4
---     crow.send("input[1].query = function() stream_handler(1, input[1].volts) end") -- see below
---     crow.input[1].query() -- see https://github.com/monome/crow/pull/463
--- end
 
 
 function sample_crow(volts)
@@ -3477,10 +3537,6 @@ function enc(n,d)
         selected_menu = menus[page_index][menu_index]
       else
         params:delta(selected_menu, d)
-        -- todo p2 seems like there has to be a better way of distinguishing between pset-read initiated param actions and encoder initiated param actions but until I figure it out, we do this
-        if selected_menu == 'chord_readout' or selected_menu == 'default_pset' then
-          save_prefs()
-        end
       end
     end
   
@@ -4123,7 +4179,7 @@ function redraw()
       end
     
       -- scrollbar
-      screen.level(15)
+      screen.level(10)
       local offset = scrollbar(events_index, #events_menus, 4, 2, 40) -- (index, total, in_view, locked_row, screen_height)
       local bar_height = 4 / #events_menus * 40
       screen.rect(127, offset, 1, bar_height)
@@ -4310,7 +4366,7 @@ function redraw()
 
 
       -- scrollbar
-      screen.level(15)
+      screen.level(10)
       local offset = scrollbar(menu_index, #menus[page_index], 5, 3, 52) -- (index, total, in_view, locked_row, screen_height)
       local bar_height = 5 / #menus[page_index] * 52
       screen.rect(91, offset, 1, bar_height)
