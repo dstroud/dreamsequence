@@ -19,89 +19,55 @@ Optional:
 
 Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It can be a live performance tool, a compositional assistant, a generative sequencing playground, or all of these at once. Dreamsequence is fun all by itself but really opens up when you bring friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader by processing external data streams through its harmonizers.
 
-I find music theory to be pretty baffling so I've worked hard to make Dreamsequence intuitive for those of us who are musically inclined but not necessarily music nerds. Anyone should be able to get a song going in a few minutes without any prior knowlege. I've even built some simple algorithms to generate chord progressions and sequences at the push of a button, which turns out to be a really fun way to "shuffle the deck" before a session.
+I find music theory to be pretty baffling so I've worked hard to make Dreamsequence intuitive for those of us who are musically inclined but not necessarily music nerds. Anyone should be able to get a song going in a few minutes without any prior knowlege. I've even built some simple algorithms to generate chord progressions and sequences at the push of a button, which turns out to be a really fun way to shuffle the deck before a session.
 
-But Dreamsequence can also get as deep and complex as you're willing to delve. The Arranger and its event scheduling system allows you to create your own procedural layer for modulating every aspect of your patch- e.g. key changes, chord inversions, clock rates, sequence destinations, pattern transformations, sending triggers to your Eurorack, etc... Basically, if you've ever enjoyed creating a monster modular synth patch that may or may have become sentient at some point in the process, you'll definitely want to spend some time with Events.
+But Dreamsequence can also get as deep and complex as you're willing to go. The Arranger and its event scheduling system allows you to create your own procedural layer for modulating every aspect of your patch- e.g. key changes, chord inversions, clock rates, sequence destinations, pattern transformations, sending triggers to your Eurorack, etc... Basically, if you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point in the process, you'll definitely want to spend some time with Events.
 
-If you'd like to learn more about exactly _how_ Dreamsequence works, the rest of this overview will cover each of the functional components that make up Dreamsequence. If you're more of a skim-the-manual type, you can jump right to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
+If you'd like to learn more about exactly _how_ Dreamsequence works, the rest of this overview section will cover each of the functional components that make up Dreamsequence. But if you are ready to jump in and find your own way, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
 
-***NOTE: Dreamsequence 1.1 suppports saving/loading of your song through the system Parameters>>Pset menu. BEWARE: SAVES ARE DEFINITELY GOING TO BREAK AS FUTURE UPDATES COME OUT SO WRAP UP YOUR WORK BEFORE INSTALLING UPDATES. I'll try to give advance warning when this happens but it's unavoidable. Thanks for your understanding.***
-
+***NOTE: Dreamsequence 1.1 suppports saving/loading of your song through the system Parameters>>Pset menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but still recommend you wrap up any work before updating.***
 
 
 ### Grid-based chord sequencer
 - The chord sequencer is the heart of Dreamsequence, always broadcasting an "active" chord that the rest of Dreamsequence uses to create sequences and harmonies.
-- The active chord can be sent directly to a destination (MIDI, Norns engine, i2c, etc...) for playback, or it can be muted.
+- The active chord can be sent directly to a destination for playback (MIDI, Norns engine, i2c, etc...) or it can be muted.
 - Chord patterns are references to chord degrees (I-VII) across two octaves. If you're not a music theory nerd, this means that the available chords mostly sound nice together and we can change the mood of the song by simply switching to a different mode which will adjust all the chords on the fly.
 - 4 chord patterns (A, B, C, D) can be saved then switched between using Grid or the Arranger.
 
-### Grid-based phrase sequencer/arpeggiator
-- Arpeggiate, strum, or build a sequence based on the active chord by entering a pattern on Grid. The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
-  
-  | Grid col. | Triad Out| 7th Out  |
-  |-----------|----------|----------|
-  | 1         | C1       | C1       |
-  | 2         | E1       | E1       |
-  | 3         | G1       | G1       |
-  | 4         | C2       | B1       |
-  | 5         | E2       | C2       |
-  | 6         | G2       | E2       |
 
-- Arp can be sent to one of several destinations: 
-  - Norns sound engine
-  - MIDI
-  - CV via Crow outputs 1 (CV) and 2 (trigger or envelope)
-  - Just Friends or Disting EX via Crow's i2c bus
+### Grid-based phrase sequencer (formerly arpeggiator)
+- The phrase sequencer can operate as an arpeggiator, step sequencer, or any number of hybrids that modern science does not yet have terms for.
+- Three ways of setting notes are available:
+  - Play notes in active chord (arpeggiator style)
+  - Play notes in the selected mode (step sequencer style)
+  - Play notes in the selected mode but apply a diatonic transposition based on the active chord
+- 4 ways of starting the sequence are available, combined with 3 ways of forcing the sequence to reset, for a total of 12 sequence "modes" that reward experimentation. See the Norns interface section for more info.
+- Currently the sequence length is limited to 8 notes because only nerds make music with long sequences. Okay, it's mostly a UI limitation I need to think on some more. But you'll be surprised at what can be accomplished with some creativity.
+
+*Hint: play with mismatched chord step length and sequence step lengths, leaving spaces in your chord sequence, and adjusting sequence "Notes" and "Mode" settings (plus Events!).*
+
 
 ### MIDI harmonizer
-- Transform an incoming MIDI sequence to play notes from the active chord across a wide range of octaves.
-
-- +/- 1 change in incoming semitone relative to C1 results in a +/- 1 change in note selection from the active chord (across range of octaves). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
-
-  | Note In | Triad Out| 7th Out  |
-  |---------|----------|----------|
-  | C1      | C1       | C1       |
-  | C#/D♭1  | E1       | E1       |
-  | D1      | G1       | G1       |
-  | D#/E♭1  | C2       | B1       |
-  | E1      | E2       | C2       |
-  | F1      | G2       | E2       |
+- Transforms an incoming MIDI sequence to play notes using the same options as the phrase sequencer:
+  - Play notes in active chord (arpeggiator style)
+  - Play notes in the selected mode (step sequencer style)
+  - Play notes in the selected mode but apply a diatonic transposition based on the active chord
   
 - Typical use-cases might include:
   - Turning a synced step sequencer into a secondary arpeggio, melody, bassline, etc...
   - Improvising with a MIDI keyboard in a live performance (no dud notes!).
   - Using a looping MIDI clip from a synced DAW to generate more complex chord voicings and timings (e.g., swing).
 
-- MIDI Harmonizer can be sent to one of several destinations: 
-  - Norns sound engine
-  - MIDI
-  - CV via Crow outputs 1 (CV) and 2 (trigger or envelope)
-  - Just Friends or Disting EX via Crow's i2c bus
-
 ### CV harmonizer (requires Crow)
-- Transform incoming control voltage (CV) to play notes from the active chord across a wide range of octaves.
-
-- +/- 1/12v (1 semitone @ 1v/oct) change in incoming voltage results in a +/- 1 change in note selection from the active chord (across range of octaves). Example assuming the chord sequencer is playing Cmaj/7:
-
-  | Volts In| Triad Out| 7th Out  |
-  |---------|----------|----------|
-  | 0v      | C1       | C1       |
-  | 1/12v   | E1       | E1       |
-  | 2/12v   | G1       | G1       |
-  | 3/12v   | C2       | B1       |
-  | 4/12v   | E2       | C2       |
-  | 5/12v   | G2       | E2       |
+- A trigger recieved at Crow input 2 will sample the voltage at input 1 and use this to play a note using the same options as the phrase sequencer:
+  - Play notes in active chord (arpeggiator style)
+  - Play notes in the selected mode (step sequencer style)
+  - Play notes in the selected mode but apply a diatonic transposition based on the active chord
   
 - Typical use-cases might include:
-  - Using a synced Eurorack sequencer with modulations to create an evolving sequence.
-  - Turning LFOs, function generators, S&H modules, etc... into chord-quantized sequencers.
-  - Using trigger/clock/voltage sources to create complex (or totally desynced) sequence timing.
-
-- CV Harmonizer can be sent to one of several destinations: 
-  - Norns sound engine
-  - MIDI
-  - CV via Crow outputs 1 (CV) and 2 (trigger or envelope)
-  - Just Friends or Disting EX via Crow's i2c bus
+  - Using Dreamsequence with your eurorack sequencers to make them chord-aware. Reprocessed streams can be sent back out via Crow outputs 1-2 (or elsewhere).
+  - Turning LFOs, function generators, S&H modules, etc... into sequencers.
+  - Using trigger/clock/voltage sources for novel sequence timing.
 
 ### Arranger
 - Sequence playback of chord patterns (A, B, C, D) and schedule "Events" along the Arranger timeline.
@@ -337,8 +303,17 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
   - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
   - Disting: Disting EX Eurorack module requires Crow connected via i2c.
   
-- Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently.
-
+- Chord type: Selects between triads and 7th chords when the Notes menu is set to "Chord". Example assuming the chord sequencer is playing Cmaj/7:
+  
+  | Grid col. | Triad Out| 7th Out  |
+  |-----------|----------|----------|
+  | 1         | C1       | C1       |
+  | 2         | E1       | E1       |
+  | 3         | G1       | G1       |
+  | 4         | C2       | B1       |
+  | 5         | E2       | C2       |
+  | 6         | G2       | E2       |
+  
 - Octave: Shifts output from -2 to +4 octaves.
 
 - Mode: Loop will repeat the arp pattern indefinitely. One-shot will fire the arp pattern once per chord step (strum).
@@ -378,8 +353,17 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
   - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
   - Disting: Disting EX Eurorack module requires Crow connected via i2c.
   
-- Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently.
+- Chord type: Selects between triads and 7th chords when the Notes menu is set to "Chord". +/- 1 change in incoming semitone relative to C1 results in a +/- 1 change in note selection from the active chord (across range of octaves). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
 
+  | Note In | Triad Out| 7th Out  |
+  |---------|----------|----------|
+  | C1      | C1       | C1       |
+  | C#/D♭1  | E1       | E1       |
+  | D1      | G1       | G1       |
+  | D#/E♭1  | C2       | B1       |
+  | E1      | E2       | C2       |
+  | F1      | G2       | E2       |
+  
 - Octave: Shifts output from -2 to +4 octaves.
 
 - Duration (_Engine, Crow, MIDI_): Note duration relative to 1 measure. _Currently, Dreamsequence always uses this value regardless of how long the source note is sustained._
@@ -419,8 +403,17 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
   - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
   - Disting: Disting EX Eurorack module requires Crow connected via i2c.
   
-- Chord type: Selects between triads and 7th chords. Note that each sequence source can set this independently.
+- Chord type: Selects between triads and 7th chords when the Notes menu is set to "Chord". +/- 1/12v (1 semitone @ 1v/oct) change in incoming voltage results in a +/- 1 change in note selection from the active chord (across range of octaves). Example assuming the chord sequencer is playing Cmaj/7:
 
+  | Volts In| Triad Out| 7th Out  |
+  |---------|----------|----------|
+  | 0v      | C1       | C1       |
+  | 1/12v   | E1       | E1       |
+  | 2/12v   | G1       | G1       |
+  | 3/12v   | C2       | B1       |
+  | 4/12v   | E2       | C2       |
+  | 5/12v   | G2       | E2       |
+  
 - Octave: shifts output from -2 to +4 octaves.
 
 - Duration (_Engine, Crow, MIDI_): Note duration relative to 1 measure.
