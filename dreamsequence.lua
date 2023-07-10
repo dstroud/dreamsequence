@@ -82,15 +82,14 @@ function init()
     print('preinit_clock_source = ' .. preinit_clock_source)
     preinit_clock_crow_out = params:get('clock_crow_out')
     print('preinit_clock_crow_out = ' .. preinit_clock_crow_out)
-    
-      preinit_jf_mode = clock.run(
-    function()
-      clock.sleep(0.005) -- a small hold for usb round-trip
-      crow.ii.jf.get ('mode') -- will trigger the above .event function
-      -- Activate JF Synthesis mode here so it happens after the hold
-      crow.ii.jf.mode(1)
-    end
-  )
+    preinit_jf_mode = clock.run(
+      function()
+        clock.sleep(0.005) -- a small hold for usb round-trip
+        crow.ii.jf.get ('mode') -- will trigger the above .event function
+        -- Activate JF Synthesis mode here so it happens after the hold
+        crow.ii.jf.mode(1)
+      end
+    )
   
     -- If syncing to Crow clock, turn this off since we need to use Crow inputs for harmonizer. Revert in cleanup()
     if preinit_clock_source == 4 then params:set('clock_source',1) end
@@ -172,14 +171,61 @@ function init()
 
 
   --------------------
-  --PARAMS
+  -- PARAMS
   --------------------
+  
   params:add_separator ('DREAMSEQUENCE')
 
-  --GLOBAL PARAMS
+  ------------------
+  -- PREFERENCES PARAMS --
+  ------------------
+  -- Persistent settings saved to prefs.data and managed outside of .pset files
+
+  params:add_group('preferences', 'PREFERENCES', 3)
+
+  params:add_option('default_pset', 'Default pset', {'False', 'True'}, 1)
+  params:set_save('default_pset', false)
+  params:set('default_pset', param_option_to_index('default_pset', prefs.default_pset) or 1)
+  params:set_action('default_pset', function() save_prefs() end)
+  
+  params:add_option('chord_readout', 'Chords as', {'Name', 'Degree'}, 1)
+  params:set_save('chord_readout', false)
+  params:set('chord_readout', param_option_to_index('chord_readout', prefs.chord_readout) or 1)
+  params:set_action('chord_readout', function() save_prefs() end)
+  
+  params:add_number('crow_pullup', 'Crow pullup', 0 , 1, 1, function(param) return t_f_string(param:get()) end)
+  params:set_save('crow_pullup', false)
+  params:set_action("crow_pullup", function() crow_pullup() end)
+  
+  
+  ------------------
+  -- ARRANGER PARAMS --
+  ------------------
+  params:add_group('arranger', 'ARRANGER', 2)
+
+  params:add_number('arranger_enabled', 'Enabled', 0, 1, 0, function(param) return t_f_string(param:get()) end)
+  params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_active() end)
+  
+  params:add_option('playback', 'Playback', {'Loop','One-shot'}, 1)
+  params:set_action('playback', function() grid_redraw(); arranger_ending() end)
+  -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- todo
+  
+    
+  ------------------
+  -- GLOBAL PARAMS --
+  ------------------
   params:add_group('global', 'GLOBAL', 7)
+  
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end) -- post-bang action
+  
   params:add_number("transpose","Key",-12, 12, 0, function(param) return transpose_string(param:get()) end)
+  
+  -- Tempo and clock source appear in Global menu but are actually system parameters so aren't here
+  -- todo p2 would be nice to replicate these and have a version of clock_source that handles the crow clock situation...
+  
+  -- Crow clock uses hybrid notation/PPQN
+  params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
+  params:set_action('crow_clock_index',function() set_crow_clock() end)  
 
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
   params:set_action('dedupe_threshold', function() dedupe_threshold() end)
@@ -187,29 +233,10 @@ function init()
   params:add_number('chord_preload', 'Chord preload', 0, 10, div_to_index('1/64'), function(param) return divisions_string(param:get()) end)
   params:set_action('chord_preload', function(x) chord_preload(x) end)     
 
-  -- persistant pref
-  params:add_option('chord_readout', 'Chords as', {'Name', 'Degree'}, 1)
-  params:set_save('chord_readout', false)
-  params:set('chord_readout', param_option_to_index('chord_readout', prefs.chord_readout) or 1)
-  params:set_action('chord_readout', function() save_prefs() end)
+  -- figured better here since generators can touch things outside of the chord/seq space
+  params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
 
-  -- persistant pref
-  params:add_option('default_pset', 'Default pset', {'False', 'True'}, 1)
-  params:set_save('default_pset', false)
-  params:set('default_pset', param_option_to_index('default_pset', prefs.default_pset) or 1)
-  params:set_action('default_pset', function() save_prefs() end)
-
-  params:add_number('crow_pullup', 'Crow Pullup', 0 , 1, 1, function(param) return t_f_string(param:get()) end)
-  params:set_action("crow_pullup", function() crow_pullup() end)
-  
-  --ARRANGER PARAMS
-  params:add_group('arranger', 'ARRANGER', 2)
-  params:add_number('arranger_enabled', 'Enabled', 0, 1, 0, function(param) return t_f_string(param:get()) end)
-  params:set_action('arranger_enabled', function() grid_redraw(); update_arranger_active() end)
-  
-  params:add_option('playback', 'Playback', {'Loop','One-shot'}, 1)
-  params:set_action('playback', function() grid_redraw(); arranger_ending() end)
-  -- params:add_option('crow_assignment', 'Crow 4', {'Reset', 'On/high', 'V/pattern', 'Chord', 'Pattern'},1) -- todo
+  params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
 
 
   ------------------
@@ -260,9 +287,8 @@ function init()
   ------------------
   -- CHORD PARAMS --
   ------------------
-  params:add_group('chord', 'CHORD', 25)  
+  params:add_group('chord', 'CHORD', 24)  
   
-  params:add_option('chord_generator', 'C-gen', chord_algos['name'], 1)
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function() set_div('chord') end)
@@ -332,8 +358,8 @@ function init()
   ------------------
   -- ARP PARAMS --
   ------------------
-  params:add_group('arp', 'ARP', 31)
-  params:add_option('arp_generator', 'A-gen', arp_algos['name'], 1)
+  params:add_group('arp', 'ARP', 30)
+
   params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('arp_div_index',function() set_div('arp') end)
   
@@ -356,10 +382,14 @@ function init()
   params:add_number('arp_octave','Octave',-2, 4, 0)
   params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
   
-  params:add_option("seq_mode_1", "Play", {'Loop', 'On step', 'On chord', 'One-shot'}, 1)    
+  params:add_option("seq_mode_1", "Play", {'Loop', 'On step', 'On chord', 'One-shot'}, 1)
+  params:set_save('seq_mode_1', false)
+  params:hide(params.lookup['seq_mode_1'])
     
   params:add_option('seq_reset_1', 'Reset', {'On step', 'On chord', 'On Stop'}, 1)
-
+  params:set_save('seq_reset_1', false)
+  params:hide(params.lookup['seq_reset_1'])
+  
   local seq_modes = 
     {
     'Loop/step',
@@ -375,6 +405,7 @@ function init()
     '1-shot/chord',
     '1-shot/stop',
     }
+    
   params:add_option("seq_mode_combo_1", "Mode", seq_modes, 1)
   params:set_action("seq_mode_combo_1",function(val) set_seq_mode_1(val) end)
   function set_seq_mode_1(val)
@@ -382,8 +413,10 @@ function init()
     params:set('seq_reset_1', (val - 1) % 3 + 1)
   end
   
-  params:add_option('seq_1_shot_1','Prime 1-shot', {'Off', 'On'})
-  
+  -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
+  params:add_binary('seq_prime_1_shot_1','Prime 1-shot', 'trigger')
+  params:set_action("seq_prime_1_shot_1",function()  seq_1_shot_1 = true end)
+
   params:add_separator ('arp_engine', 'Engine')
   params:add_number('arp_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("arp_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -467,10 +500,7 @@ function init()
   ------------------
   -- CV/CROW PARAMS --
   ------------------
-  params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)  
-  -- Crow clock uses hybrid notation/PPQN
-  params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
-  params:set_action('crow_clock_index',function() set_crow_clock() end)
+  params:add_group('cv_harmonizer', 'CV HARMONIZER', 23)
   
   params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
   params:set_action("crow_dest",function() update_menus() end)
@@ -830,21 +860,21 @@ function update_menus()
   
   -- SEQ MENU
   if params:string('arp_dest') == 'None' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_tr_env' }
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'arp_tr_env' }
     else -- AD envelope
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
+      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_jf_amp'}
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'arp_jf_amp'}
   elseif params:string('arp_dest') == 'Disting' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'seq_mode_1', 'seq_reset_1', 'seq_1_shot_1', 'arp_disting_velocity'}    
+    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'arp_disting_velocity'}    
   end
   
   -- MIDI HARMONIZER MENU
@@ -1537,7 +1567,7 @@ function sequence_clock(sync_val)
           advance_arp_seq()
           grid_dirty = true
         elseif seq_mode_1 == 4 then  -- 1-shot
-          if params:get('seq_1_shot_1') == 2 then
+          if seq_1_shot_1 == true then
             advance_arp_seq()
             grid_dirty = true
           end
@@ -1866,7 +1896,11 @@ function do_events()
                 local rand = math.random(event_range[1], event_range[2])
                 -- print('Event randomization value ' .. event_name .. ' to ' .. rand)                
                 params:set(event_name, rand)
-              end  
+              end
+            -- IMPORTANT: CURRENTLY USING ADD_BINARY IN PLACE OF ADD_TRIGGER FOR PMAP SUPPORT. WILL LIKELY NEED ALTERNATE LOGIC FOR TRUE TRIGGER PARAM.
+            elseif operation == 'Trigger' then
+              params:set(event_name, 1)
+              params:set(event_name, 0)
             end
           else -- functions
             -- currently the only function ops are Trigger and Discreet. So we just need to have a check for Random. Will likely need to expand this later.
@@ -2099,7 +2133,7 @@ function advance_arp_seq()
     if seq_mode_1 ~= 'Loop' then
       play_arp = false
       if seq_mode_1 == 'One-shot' then -- only reset if we're currently in one-shot mode. Could go either way here.
-        params:set('seq_1_shot_1', 1)
+        seq_1_shot_1 = false
       end
      end
   end   
@@ -2202,7 +2236,6 @@ function to_midi(note, velocity, channel, duration, port)
   -- Check for duplicate notes and process according to dedupe_threshold setting
   for i = 1, #midi_note_history do
     if midi_note_history[i][2] == midi_note and midi_note_history[i][5] == port and midi_note_history[i][3] == channel then
-
       -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below which is not present in other destinations.
       
       midi_note_history[i][1] = math.max(duration, midi_note_history[i][1])
@@ -2339,10 +2372,13 @@ function to_disting(note, velocity, duration)
   
   -- Play note and insert new note-on record if appropriate
   if disting_play_note == true then
+    -- disting.note seems to be a little weird or at least doesn't respond like typical MIDI in the sense that it won't automatically do a note-off and retrigger on a new MIDI on message. This ends up blocking intentional repeat notes. So we'll roll our own note-off.
+    crow.ii.disting.note_off(disting_note)    
     -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
-      crow.ii.disting.note_pitch( disting_note, (disting_note-48)/12)
-      crow.ii.disting.note_velocity( disting_note, velocity/10)    
+    crow.ii.disting.note_pitch(disting_note, (disting_note-48)/12)
+    crow.ii.disting.note_velocity(disting_note, velocity/10)
   end
+  
   if disting_note_history_insert == true then
     table.insert(disting_note_history, {duration, disting_note,  note_on_time})
   end
