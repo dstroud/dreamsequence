@@ -17,44 +17,26 @@ Optional:
 
 # Overview
 
-Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It can be a live performance tool, a compositional assistant, a generative playground... or all of these at once. Dreamsequence is fun all by itself, but really opens up when you bring friends (anything that can send CV or MIDI notes to the harmonizers).
+Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It can be a live performance tool, a compositional assistant, a generative sequencing playground, or all of these at once. Dreamsequence is fun all by itself but really likes to jam with friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader by transforming external data streams through its harmonizers.
 
-And despite what my 10,000-word Homeric README might suggest, I've tried my best to keep Dreamsequence intuitive to use. I think anyone can pick it up and get a song going in a few minutes without any music theory knowlege. As you get deeper into making arrangements and experimenting with "events", you'll find that the experience can get more technical and crunchy, but all of that is optional.
+And despite what its 10,000-word Homeric README doc might suggest, the feedback so far is that it's intuitive to use. My goal has been for anyone to be able to pick it up and get a song going in a few minutes without any music theory knowlege. Actually- it has some simple algorhythms to generate chord progressions and sequences at the push of a button which is nice if you are feeling in a bit of a musical rut or just like to shuffle the deck before a session.
 
-Oh, there are also some algorithms for generating chord progressions and arpeggios. They aren't going to create anything you couldn't in a minute or two, but sometimes it's fun to have Dreamsequence shuffle the deck a few times before a session to get you out of a musical rut.
+On the other extreme, as you (optionally) get deeper into making arrangements and experimenting with "events", you'll find that the experience can get quite deep and scratch that insane-modular-patch-that-may-or-may-not-have-become-sentient itch.
 
-You’ll find that there are ample opportunities to get weird:
+If you'd like to learn more about exactly _how_ Dreamsequence works, the rest of this overview will cover each of the functional components that make up Dreamsequence. If you're more of a skim-the-manual type, you can jump right to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
 
-- Use the event scheduler to change dozens of parameters during song playback. Modulate to a different key or mode, transform your existing sequence, or algorithmically generate a new chord progression and arpeggio on the fly.
-  
-- Sync your eurorack gear via Crow then feed random CV and triggers into Dreamsequence to generate harmony from chaos.
-  
-- Use MIDI clips from a synced DAW to generate more complex chord voicings and rhythms. 
-  
-- Combine multiple sequences, sending them to one destination. Think chords with a bit of embellishment or a shifting polyrhythmic mono sequence.
-	
-- Run a MIDI keyboard into the harmonizer for a delightfully bizarre experience wherein nothing is as it should be but everything feels just right
-
-If you'd like to learn more about exactly _how_ Dreamsequence works, the following sections should sort you out. If you're more of a the skim-the-manual type, I'd suggest jumping right to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) part of this read-me handy for reference.
-
-NOTE: Dreamsequence 1.1 suppports saving/loading of parameters, patterns, arrangement, and events through the system Parameters>>Pset menu. Data is stored in /home/we/dust/data/dreamsequence/*pset no*. BEWARE: SAVES ARE DEFINITELY GOING TO BREAK AS FUTURE UPDATES COME OUT. More work is needed to restructure the existing data to be more future-proof and I figured I’d get *something* out in the meantime. Basically, this is good for saving your state between updates but isn’t a way to archive your songs. Thanks for your understanding.
+***NOTE: Dreamsequence 1.1 suppports saving/loading of your song through the system Parameters>>Pset menu. BEWARE: SAVES ARE DEFINITELY GOING TO BREAK AS FUTURE UPDATES COME OUT SO WRAP UP YOUR WORK BEFORE INSTALLING UPDATES. I'll try to give advance warning when this happens but it's unavoidable. Thanks for your understanding.***
 
 
 
 ### Grid-based chord sequencer
-- Create up to 4 chord patterns (A, B, C, D) by entering a pattern on Grid (or by using the procedural chord progression Generator).
+- The chord sequencer is the heart of Dreamsequence, always broadcasting an "active" chord that the rest of Dreamsequence uses to create sequences and harmonies.
+- The active chord can be sent directly to a destination (MIDI, Norns engine, i2c, etc...) for playback, or it can be muted.
+- Chord patterns are references to chord degrees (I-VII) across two octaves. If you're not a music theory nerd, this means that the available chords mostly sound nice together and we can change the mood of the song by simply switching to a different mode which will adjust all the chords on the fly.
+- 4 chord patterns (A, B, C, D) can be saved then switched between using Grid or the Arranger.
 
-- Chord patterns are referenced by chord degrees (I-VII) across two octaves. You can quickly and non-destructively change the mood of a composition by simply switching to a different mode or key which will adjust the chord output accordingly.
-
-- Chords can be sent to one of several destinations: 
-  - Norns sound engine
-  - MIDI
-  - Just Friends or Disting EX via Crow's i2c bus
-
-- The active chord is always sent to the arpeggiator and harmonizers where it will be used to restrict their output to match the chord, even if direct chord playback is disabled.
-
-### Grid-based arpeggiator (Arp)
-- Arpeggiate or strum the active chord by entering a pattern on Grid (or by using the procedural arp Generator). The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
+### Grid-based phrase sequencer/arpeggiator
+- Arpeggiate, strum, or build a sequence based on the active chord by entering a pattern on Grid. The "Chord Type" menu option allows selecting Triad or 7th chords. Example assuming the chord sequencer is playing Cmaj/7:
   
   | Grid col. | Triad Out| 7th Out  |
   |-----------|----------|----------|
