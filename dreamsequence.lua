@@ -358,29 +358,9 @@ function init()
   ------------------
   -- ARP PARAMS --
   ------------------
-  params:add_group('arp', 'ARP', 30)
+  params:add_group('arp', 'ARP', 31)
 
-  params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
-  params:set_action('arp_div_index',function() set_div('arp') end)
-  
-  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  params:set_action("arp_dest",function() update_menus() end)
-  
-  params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
-  params:set_action('arp_duration_index',function() set_duration('arp') end)
-  
-  params:add_number('arp_rotate', 'Pattern rotate', -8, 8, 0)
-  params:set_action('arp_rotate',function() pattern_rotate_abs('arp_rotate') end)
-  
-  params:add_number('arp_shift', 'Pattern shift', -14, 14, 0)
-  params:set_action('arp_shift',function() pattern_shift_abs('arp_shift') end)
-  
-  -- numbered so we can operate on parallel arps down the road
-  params:add_number('arp_pattern_length_1', 'Pattern length', 1, 8, 8)
-  params:set_action('arp_pattern_length_1', function() pattern_length(1) end)
-  
-  params:add_number('arp_octave','Octave',-2, 4, 0)
-  params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
+  params:add_option("seq_quant_1", "Notes", {'Chord', 'Mode+Transp.', 'Mode'}, 1)
   
   params:add_option("seq_mode_1", "Play", {'Loop', 'On step', 'On chord', 'One-shot'}, 1)
   params:set_save('seq_mode_1', false)
@@ -416,6 +396,28 @@ function init()
   -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
   params:add_binary('seq_prime_1_shot_1','Prime 1-shot', 'trigger')
   params:set_action("seq_prime_1_shot_1",function()  seq_1_shot_1 = true end)
+  
+  params:add_number('arp_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
+  params:set_action('arp_div_index',function() set_div('arp') end)
+  
+  params:add_option("arp_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  params:set_action("arp_dest",function() update_menus() end)
+  
+  params:add_number('arp_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
+  params:set_action('arp_duration_index',function() set_duration('arp') end)
+  
+  params:add_number('arp_rotate', 'Pattern rotate', -8, 8, 0)
+  params:set_action('arp_rotate',function() pattern_rotate_abs('arp_rotate') end)
+  
+  params:add_number('arp_shift', 'Pattern shift', -14, 14, 0)
+  params:set_action('arp_shift',function() pattern_shift_abs('arp_shift') end)
+  
+  -- numbered so we can operate on parallel arps down the road
+  params:add_number('arp_pattern_length_1', 'Pattern length', 1, 8, 8)
+  params:set_action('arp_pattern_length_1', function() pattern_length(1) end)
+  
+  params:add_number('arp_octave','Octave',-2, 4, 0)
+  params:add_number('arp_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
 
   params:add_separator ('arp_engine', 'Engine')
   params:add_number('arp_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
@@ -446,9 +448,12 @@ function init()
   
   
   ------------------
-  -- MIDI PARAMS --
+  -- MIDI HARMONIZER PARAMS --
   ------------------
-  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 24)  
+  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 25)  
+
+  params:add_option("midi_quant_1", "Notes", {'Chord', 'Mode+Transp.', 'Mode'}, 1)
+
   params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
     
@@ -498,10 +503,12 @@ function init()
 
   
   ------------------
-  -- CV/CROW PARAMS --
+  -- CV HARMONIZER PARAMS --
   ------------------
-  params:add_group('cv_harmonizer', 'CV HARMONIZER', 23)
+  params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)
   
+  params:add_option("crow_quant_1", "Notes", {'Chord', 'Mode+Transp.', 'Mode'}, 1)
+
   params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
   params:set_action("crow_dest",function() update_menus() end)
   
@@ -548,9 +555,9 @@ function init()
   clock_start_method = 'start'
   link_stop_source = nil
   global_clock_div = 48
-  -- print('START canceling timing_clock_id ' .. (sequence_clock_id or 0))
-  -- clock.cancel(timing_clock_id or 0) -- Cancel previous timing clock (if any) and...
   timing_clock_id = clock.run(timing_clock) --Start a new timing clock to handle note-off
+
+  build_scale()
 
   -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
@@ -648,8 +655,10 @@ function init()
   current_rotation_arp = 0
   chord_seq_position = 0
   chord_raw = {}
+  current_chord_x = 0
   current_chord_o = 0
   current_chord_c = 1
+  next_chord_x = 0
   next_chord_o = 0
   next_chord_c = 1  
   arp_pattern_length = {8,8,8,8}
@@ -766,6 +775,7 @@ function init()
         play_arp = false
       end
     
+      build_scale() -- Have to run manually because mode bang comes after all of this for some reason. todo p2 look into this for the billionth time. There is some reason for it.
       get_next_chord()
       chord_raw = next_chord
       chord_no = 0 -- wipe chord readout
@@ -823,8 +833,8 @@ function init()
 
   params:bang()
   
-  -- Some actions need to be added post-bang
-  params:set_action('mode', function() update_chord_action() end)
+  -- Some actions need to be added post-bang. I forget why but something to do with setting the chord readout?
+  params:set_action('mode', function() build_scale(); update_chord_action() end)
   
   countdown_timer = metro.init()
   countdown_timer.event = countdown -- call the 'countdown' function below,
@@ -860,63 +870,63 @@ function update_menus()
   
   -- SEQ MENU
   if params:string('arp_dest') == 'None' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1'}
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1','arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index'}
   elseif params:string('arp_dest') == 'Engine' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_pp_amp', 'arp_pp_cutoff', 'arp_pp_tracking','arp_pp_gain', 'arp_pp_pw'}
   elseif params:string('arp_dest') == 'MIDI' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_midi_out_port', 'arp_midi_ch', 'arp_midi_velocity', 'arp_midi_cc_1_val'}
   elseif params:string('arp_dest') == 'Crow' then
     if params:string('arp_tr_env') == 'Trigger' then
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'arp_tr_env' }
+      menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_tr_env' }
     else -- AD envelope
-      menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
+      menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_tr_env', 'arp_duration_index', 'arp_ad_skew',}
     end
   elseif params:string('arp_dest') == 'ii-JF' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index','seq_mode_combo_1', 'arp_jf_amp'}
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_jf_amp'}
   elseif params:string('arp_dest') == 'Disting' then
-    menus[3] = {'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index','seq_mode_combo_1', 'arp_disting_velocity'}    
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'arp_dest', 'arp_chord_type', 'arp_rotate',  'arp_shift', 'arp_octave', 'arp_div_index', 'arp_duration_index', 'arp_disting_velocity'}    
   end
   
   -- MIDI HARMONIZER MENU
   if params:string('midi_dest') == 'None' then
-    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave'}
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index','midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index','midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_cc_1_val'}
     else
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[4] = {'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env'}
+      menus[4] = {'midi_quant_1', 'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env'}
     else -- AD envelope
-      menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
+      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
     end
   elseif params:string('midi_dest') == 'ii-JF' then
-    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
  elseif params:string('midi_dest') == 'Disting' then
-    menus[4] = {'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
   end
   
   -- CV HARMONIZER MENU
   if params:string('crow_dest') == 'None' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
+      menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
     else -- AD envelope
-      menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
+      menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
     end
   elseif params:string('crow_dest') == 'ii-JF' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
   elseif params:string('crow_dest') == 'Disting' then
-    menus[5] = {'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_disting_velocity'}    
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_disting_velocity'}    
   end  
 end
 
@@ -1045,7 +1055,15 @@ end
 -- end
 
 
---todo p3 move and can simplify by arg concats (rename pattern to chord_pattern)
+-- todo p3 move with other musicutil functions
+function build_scale()
+  print('build_scale ' .. params:string('mode'))
+  notes_nums = musicutil.generate_scale_of_length(0, params:get('mode'), 28) -- builds scale for quantization. 14 steps + diatonic transposition offset
+  -- todo p2 also should do something similiar with chords. Just write them all to a table
+  -- notes_freq = musicutil.note_nums_to_freqs(notes_nums) -- converts note numbers to an array of frequencies
+end
+  
+  --todo p3 move and can simplify by arg concats (rename pattern to chord_pattern)
 function pattern_rotate_abs(source)
   local new_rotation_val = params:get(source)
   if source == 'arp_rotate' then
@@ -1950,7 +1968,7 @@ end
 function update_chord()
 -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
 -- Mode is always updated in case no chord has been set but user has changed Mode param.
--- todo p3 efficiency test on this vs if/then
+  current_chord_x = chord_seq[pattern][chord_seq_position] > 0 and chord_seq[pattern][chord_seq_position] or current_chord_x
   current_chord_o = chord_seq[pattern][chord_seq_position] > 0 and (chord_seq[pattern][chord_seq_position] > 7 and 1 or 0) or current_chord_o
   current_chord_c = chord_seq[pattern][chord_seq_position] > 0 and util.wrap(chord_seq[pattern][chord_seq_position], 1, 7) or current_chord_c
   chord_raw = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
@@ -2076,6 +2094,7 @@ function get_next_chord()
     -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
     -- Mode is always updated in case no chord has been set but user has changed Mode param.
     -- todo p3 efficiency test vs if/then
+      next_chord_x = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and chord_seq[pre_pattern][pre_chord_seq_position] or next_chord_x
       next_chord_o = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and (chord_seq[pre_pattern][pre_chord_seq_position] > 7 and 1 or 0) or next_chord_o
       next_chord_c = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and util.wrap(chord_seq[pre_pattern][pre_chord_seq_position], 1, 7) or next_chord_c
       next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
@@ -2083,23 +2102,27 @@ function get_next_chord()
   end
 end
 
-    
--- Used for CV/MIDI harmonizers to quantize per upcoming chord.
-function pre_quantize_note(note_num, source)
+
+function quantize_note_1(note_num, source, pre) -- chord mapping
   local chord_length = params:get(source..'_chord_type') -- Move upstream?
   local source_octave = params:get(source..'_octave') -- Move upstream?
-  local quantized_note = next_chord[util.wrap(note_num, 1, chord_length)]
+  local quantized_note = pre == true and next_chord[util.wrap(note_num, 1, chord_length)] or chord_raw[util.wrap(note_num, 1, chord_length)]
   local quantized_octave = math.floor((note_num - 1) / chord_length)
   return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
 end
 
-
-function quantize_note(note_num, source)
-  local chord_length = params:get(source..'_chord_type') -- Move upstream?
+function quantize_note_2(note_num, source, pre)  -- mode mapping + diatonic transposition
   local source_octave = params:get(source..'_octave') -- Move upstream?
-  local quantized_note = chord_raw[util.wrap(note_num, 1, chord_length)]
-  local quantized_octave = math.floor((note_num - 1) / chord_length)
-  return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
+  local diatonic_transpose = (pre == true and next_chord_x or current_chord_x) -1
+  local quantized_note = notes_nums[note_num + diatonic_transpose]
+  return(quantized_note + (source_octave * 12) + params:get('transpose'))
+end
+
+
+function quantize_note_3(note_num, source) -- mode mapping
+  local source_octave = params:get(source..'_octave') -- Move upstream?
+  local quantized_note = notes_nums[note_num]
+  return(quantized_note + (source_octave * 12) + params:get('transpose'))
 end
 
 
@@ -2111,8 +2134,11 @@ function advance_arp_seq()
   end
 
   if arp_seq[arp_pattern][arp_seq_position] > 0 then
+    
     local destination = params:string('arp_dest')
-    local note = quantize_note(arp_seq[arp_pattern][arp_seq_position], 'arp')
+    
+    local note = _G['quantize_note_' .. params:get('seq_quant_1')](arp_seq[arp_pattern][arp_seq_position], 'arp')
+    
     if destination == 'Engine' then
       to_engine('arp', note)
     elseif destination == 'MIDI' then
@@ -2140,9 +2166,9 @@ function advance_arp_seq()
 end
 
 
+-- cv harmonizer input
 function sample_crow(volts)
-  local note = params:get('chord_preload') == 0 and quantize_note(round(volts * 12, 0) + 1, 'crow') or pre_quantize_note(round(volts * 12, 0) + 1, 'crow')
-  
+  local note = _G['quantize_note_' .. params:get('crow_quant_1')](round(volts * 12, 0) + 1, 'crow', params:get('chord_preload') ~= 0) 
   -- Blocks duplicate notes within a chord step so rests can be added to simple CV sources
   if chord_seq_retrig == true
   or params:get('do_crow_auto_rest') == 0 
@@ -2173,7 +2199,8 @@ end
 midi_event = function(data)
   local d = midi.to_msg(data)
   if d.type == "note_on" then
-    local note = params:get('chord_preload') == 0 and quantize_note(d.note - 35, 'midi') or pre_quantize_note(d.note - 35, 'midi')
+
+    local note = _G['quantize_note_' .. params:get('midi_quant_1')](d.note - 35, 'midi', params:get('chord_preload') ~= 0) 
     local destination = params:string('midi_dest')
     if destination == 'Engine' then
       to_engine('midi', note)
