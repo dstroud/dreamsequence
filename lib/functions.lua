@@ -5,22 +5,22 @@
 -- Rotate looping portion of pattern
 function rotate_pattern(view, direction)
     if view == 'Chord' then
-      local length = chord_pattern_length[pattern]
+      local length = chord_pattern_length[chord_pattern]
       local temp_chord_seq = {}
       for i = 1, length do
-        temp_chord_seq[i] = chord_seq[pattern][i]
+        temp_chord_seq[i] = chord_seq[chord_pattern][i]
       end
       for i = 1, length do
-        chord_seq[pattern][i] = temp_chord_seq[util.wrap(i - direction,1,length)]
+        chord_seq[chord_pattern][i] = temp_chord_seq[util.wrap(i - direction,1,length)]
       end
-    elseif view == 'Arp' then
-      local length = arp_pattern_length[arp_pattern]
-      local temp_arp_seq = {}
+    elseif view == 'Seq' then
+      local length = seq_pattern_length[seq_pattern]
+      local temp_seq_seq = {}
       for i = 1, length do
-        temp_arp_seq[i] = arp_seq[arp_pattern][i]
+        temp_seq_seq[i] = seq_seq[seq_pattern][i]
       end
       for i = 1, length do
-        arp_seq[arp_pattern][i] = temp_arp_seq[util.wrap(i - direction,1,length)]
+        seq_seq[seq_pattern][i] = temp_seq_seq[util.wrap(i - direction,1,length)]
       end
     end
   end
@@ -75,7 +75,7 @@ function rotate_pattern(view, direction)
     -- Event menu param options swapping functions
   ------------------------------------------------------------------------------------------------
   
-  -- -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...) + subcategory
+  -- -- Fetches the min and max index for the selected event category (Global, Chord, Seq, etc...) + subcategory
   -- -- Also called when K3 opens events menu and when recalling a populated event slot
   -- function set_selected_event_indices()
   --   local event_category = params:string('event_category')
@@ -142,34 +142,34 @@ function rotate_pattern(view, direction)
   -- end
   
   
-  -- Variation on the standard generators that will just run the algos and reset arp (but not chord pattern seq position or arranger)
+  -- Variation on the standard generators that will just run the algos and reset seq (but not chord pattern seq position or arranger)
   function event_gen()
     generator()
-    arp_seq_position = 0
+    seq_seq_position = 0
   end    
   
   
   function event_chord_gen()
     chord_generator_lite()
-    arp_seq_position = 0
+    seq_seq_position = 0
   end   
   
   
-  function event_arp_gen()
-    arp_generator('run')
-    arp_seq_position = 0
+  function event_seq_gen()
+    seq_generator('run')
+    seq_seq_position = 0
   end    
   
   
-  function shuffle_arp()
-    local shuffled_arp_seq = shuffle(arp_seq[arp_pattern])
-    arp_seq[arp_pattern] = shuffled_arp_seq
+  function shuffle_seq()
+    local shuffled_seq_seq = shuffle(seq_seq[seq_pattern])
+    seq_seq[seq_pattern] = shuffled_seq_seq
   end
         
             
-  -- -- Passes along 'Arp' var so we can have a specific event for just arp
-  -- function rotate_arp(direction)
-  --   rotate_pattern('Arp', direction)
+  -- -- Passes along 'Seq' var so we can have a specific event for just seq
+  -- function rotate_seq(direction)
+  --   rotate_pattern('Seq', direction)
   -- end
   
   
@@ -184,14 +184,14 @@ function rotate_pattern(view, direction)
   function transpose_pattern(view, direction)
     if view == 'Chord' then
       for y = 1,8 do
-        if chord_seq[pattern][y] ~= 0 then
-          chord_seq[pattern][y] = util.wrap(chord_seq[pattern][y] + direction, 1, 14)
+        if chord_seq[chord_pattern][y] ~= 0 then
+          chord_seq[chord_pattern][y] = util.wrap(chord_seq[chord_pattern][y] + direction, 1, 14)
         end
       end
-    elseif view == 'Arp' then
+    elseif view == 'Seq' then
       for y = 1,8 do
-        if arp_seq[arp_pattern][y] ~= 0 then
-          arp_seq[arp_pattern][y] = util.wrap(arp_seq[arp_pattern][y] + direction, 1, 14)
+        if seq_seq[seq_pattern][y] ~= 0 then
+          seq_seq[seq_pattern][y] = util.wrap(seq_seq[seq_pattern][y] + direction, 1, 14)
         end
       end
     end  
@@ -206,7 +206,7 @@ function rotate_pattern(view, direction)
   
   -- always use this to set the current chord pattern so we can also silently update the param as well
   function set_chord_pattern(y)
-    pattern = y
+    chord_pattern = y
     params:set('chord_pattern_length', chord_pattern_length[y], true) -- silent
   end
   
@@ -243,7 +243,7 @@ function rotate_pattern(view, direction)
   
   
   -- converts the string value of an 'add_options' param into a value index # suitable for params:set
-  -- args: param id and string value         eg 'event_category', 'Arp' == 3
+  -- args: param id and string value         eg 'event_category', 'Seq' == 3
   function param_option_to_index(param, str)
     return(tab.key(params.params[params.lookup[param]].options, str))
   end
