@@ -8,7 +8,7 @@ end
 
 function generator()
   params:set('chord_octave', math.random(-1,0))
-  params:set('seq_octave', math.random(-1,1))
+  params:set('seq_octave_1', math.random(-1,1))
     
   --SEQUENCE RANDOMIZATION
   params:set('transpose', math.random(-6,6))
@@ -22,8 +22,7 @@ function generator()
   
   params:set('mode', math.random(1, 9)) -- Currently this is called each time c-gen runs, but might change this
   params:set('seq_mode_combo_1', 3) -- not really the best option but this is what the OG algos were built around
-  -- params:set('seq_quant_1', 1)
-  params:set('seq_quant_1', math.random(1, 2))
+  params:set('seq_note_map_1', math.random(1, 2))
 
   --ENGINE BASED RANDOMIZATIONS
   -- This kinda sucks and only works for PolyPerc. Need to rethink this approach. 
@@ -46,7 +45,7 @@ end
 -- Why does this exist? I don't remember.
 function chord_generator_lite()
   params:set('chord_octave', math.random(-1,0))
-  -- params:set('seq_octave', math.random(-1,1))
+  -- params:set('seq_octave_1', math.random(-1,1))
     
   --SEQUENCE RANDOMIZATION
   params:set('transpose', math.random(-6,6))
@@ -299,7 +298,7 @@ function seq_generator(mode)
   -- local length = math.random(3,4) * (percent_chance(70) and 2 or 1)
   -- local tuplet_shift = (length / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
 
-  -- Clock tempo is used to determine good seq_div_index
+  -- Clock tempo is used to determine good seq_div_index_1
   -- m*x+b: change b to set relative div
   -- local base_div_index = math.min(math.max(util.round(0.05 * params:get('clock_tempo') + 2),2),5)
   -- local base_div_index = math.min(math.max(util.round((.2/3 * params:get('clock_tempo') - 2)) * (percent_chance(70) and 2 or 1),3),12)
@@ -321,8 +320,8 @@ function seq_generator(mode)
   --   local div =  math.random(5,6) * 2 - tuplet_shift
   -- end
     
-  -- 50% chance of the seq quantizer including 7th notes
-  local seq_quant_1 = math.random(1, 2) --percent_chance(50) and 1 or 2
+  -- 50% chance of the seq note map including 7th notes
+  local seq_note_map_1 = math.random(1, 2) --percent_chance(50) and 1 or 2
 
   -- Engine randomizations
   local gain = math.random(0,350)
@@ -352,18 +351,18 @@ function seq_generator(mode)
   if mode == 'run' then
     -- Pattern/session randomizations
     params:set('seq_pattern_length_' .. active_seq_pattern, length)
-    params:set('seq_div_index', div)
-    -- params:set('seq_duration_index', div)
+    params:set('seq_div_index_1', div)
+    -- params:set('seq_duration_index_1', div)
     -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-    params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
-    params:set('seq_quant_1', seq_quant_1)
+    params:set('seq_duration_index_1',math.max(math.random(params:get('seq_div_index_1'), params:get('seq_div_index_1') + 4), 5))
+    params:set('seq_note_map_1', seq_note_map_1)
     params:set('seq_mode_combo_1', 3) -- not really the best option but this is what the OG algos were built around
-    -- params:set('seq_quant_1', 1)
+    -- params:set('seq_note_map_1', 1)
   
     -- Engine randomizations
-    params:set('seq_pp_amp', 70)
-    params:set('seq_pp_gain', gain)
-    params:set('seq_pp_pw', pw)
+    params:set('seq_pp_amp_1', 70)
+    params:set('seq_pp_gain_1', gain)
+    params:set('seq_pp_pw_1', pw)
   end 
     
   -- Table containing seq algos. This runs at init as well.
@@ -380,17 +379,17 @@ function seq_generator(mode)
   table.insert(seq_algos['func'], function()  
 
     -- Pretty fast seqs here so no shifting octave down
-    params:set('seq_octave', math.max(params:get('seq_octave'), 0))
+    params:set('seq_octave_1', math.max(params:get('seq_octave_1'), 0))
 
     -- Prefer longer and faster sequence
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
     tuplet_shift = (seq_pattern_length[active_seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
-    params:set('seq_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
+    params:set('seq_div_index_1', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
     
     -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-    params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
+    params:set('seq_duration_index_1',math.max(math.random(params:get('seq_div_index_1'), params:get('seq_div_index_1') + 4), 5))
 
     local peak = math.random(2, seq_pattern_length[active_seq_pattern] - 1)
     for i = 1, peak do
@@ -409,17 +408,17 @@ function seq_generator(mode)
   table.insert(seq_algos['func'], function()  
  
     -- Pretty fast seqs here so no shifting octave down
-    params:set('seq_octave', math.max(params:get('seq_octave'), 0))
+    params:set('seq_octave_1', math.max(params:get('seq_octave_1'), 0))
 
     -- Sequence length of 6(tuplet) or 8 steps
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
     tuplet_shift = (seq_pattern_length[active_seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
-    params:set('seq_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
+    params:set('seq_div_index_1', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
     
     -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-    params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
+    params:set('seq_duration_index_1',math.max(math.random(params:get('seq_div_index_1'), params:get('seq_div_index_1') + 4), 5))
 
     local peak = math.random(2, seq_pattern_length[active_seq_pattern] - 1)
     for i = 1, peak do
@@ -460,14 +459,14 @@ function seq_generator(mode)
   local seq_algo_name = 'Strum up'
   table.insert(seq_algos['name'], seq_algo_name)
   table.insert(seq_algos['func'], function()  
-    params:set('seq_octave', math.random(0,1))
+    params:set('seq_octave_1', math.random(0,1))
     params:set('seq_mode_combo_1', 8) -- chord/chord
-    params:set('seq_pp_amp',35) --Turn down amp since a lot of notes can clip
-    params:set('seq_duration_index',15)
+    params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
+    params:set('seq_duration_index_1',15)
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
 
     -- Strum speed from 1/64T to 1/32T
-    params:set('seq_div_index', math.random(1,5))
+    params:set('seq_div_index_1', math.random(1,5))
     
     for i = 1, seq_pattern_length[active_seq_pattern] do
       seq_pattern[1][i] = seq_min - 1 + i
@@ -479,14 +478,14 @@ function seq_generator(mode)
   local seq_algo_name = 'Strum down'
   table.insert(seq_algos['name'], seq_algo_name)
   table.insert(seq_algos['func'], function()  
-    params:set('seq_octave', math.random(0,1))
+    params:set('seq_octave_1', math.random(0,1))
     params:set('seq_mode_combo_1', 8)
-    params:set('seq_pp_amp',35) --Turn down amp since a lot of notes can clip
-    params:set('seq_duration_index',15)
+    params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
+    params:set('seq_duration_index_1',15)
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
 
     -- Strum speed from 1/64T to 1/32T
-    params:set('seq_div_index', math.random(1,5))
+    params:set('seq_div_index_1', math.random(1,5))
     
     for i = 1, seq_pattern_length[active_seq_pattern] do
       seq_pattern[1][i] = seq_max - 1 - i
@@ -545,17 +544,17 @@ function seq_generator(mode)
     
   --   -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
   --   -- if params:get('clock_tempo') < 80 then
-  --   --   params:set('seq_div_index', math.random(2,3) * 2 - tuplet_shift)
+  --   --   params:set('seq_div_index_1', math.random(2,3) * 2 - tuplet_shift)
   --   -- elseif params:get('clock_tempo') < 100 then
-  --   --   params:set('seq_div_index', math.random(3,4) * 2 - tuplet_shift)
+  --   --   params:set('seq_div_index_1', math.random(3,4) * 2 - tuplet_shift)
   --   -- elseif params:get('clock_tempo') < 120 then
-  --   --   params:set('seq_div_index', math.random(4,5) * 2 - tuplet_shift)
+  --   --   params:set('seq_div_index_1', math.random(4,5) * 2 - tuplet_shift)
   --   -- else
-  --   --   params:set('seq_div_index', math.random(5,6) * 2 - tuplet_shift)
+  --   --   params:set('seq_div_index_1', math.random(5,6) * 2 - tuplet_shift)
   --   -- end
     
   --   -- -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-  --   -- params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
+  --   -- params:set('seq_duration_index_1',math.max(math.random(params:get('seq_div_index_1'), params:get('seq_div_index_1') + 4), 5))
     
   --   for i = 1, seq_pattern_length[active_seq_pattern] do
   --     seq_pattern[1][i] = seq_min - 1 + i
@@ -572,10 +571,10 @@ function seq_generator(mode)
     -- tuplet_shift = (seq_pattern_length[active_seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
-    -- params:set('seq_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
+    -- params:set('seq_div_index_1', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
     
     -- -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
-    -- params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
+    -- params:set('seq_duration_index_1',math.max(math.random(params:get('seq_div_index_1'), params:get('seq_div_index_1') + 4), 5))
     
     for i = 1, seq_pattern_length[active_seq_pattern] do
       seq_pattern[1][i] = seq_max + 1 - i
@@ -594,9 +593,9 @@ function seq_generator(mode)
     local tuplet_shift = (length / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- 1/16 to 1/4 standard or tuplet
-    params:set('seq_div_index', (math.random(3,5) * 2) - tuplet_shift)
+    params:set('seq_div_index_1', (math.random(3,5) * 2) - tuplet_shift)
     -- Whole note duration seems nice here?
-    params:set('seq_duration_index', div_to_index('1'))
+    params:set('seq_duration_index_1', div_to_index('1'))
   
     -- Lines originate from the first/last 7 notes on the grid. Can overlap.
     local seq_min = math.random(1,7)
