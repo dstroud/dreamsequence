@@ -1,340 +1,104 @@
---------------------------------------------
--- PATTERN TRANSFORMATIONS --
---------------------------------------------
-
--- Rotate looping portion of pattern
-function rotate_pattern(view, direction)
-  if view == 'Chord' then
-    local length = chord_pattern_length[pattern]
-    local temp_chord_seq = {}
-    for i = 1, length do
-      temp_chord_seq[i] = chord_seq[pattern][i]
-    end
-    for i = 1, length do
-      chord_seq[pattern][i] = temp_chord_seq[util.wrap(i - direction,1,length)]
-    end
-  elseif view == 'Arp' then
-    local length = arp_pattern_length[arp_pattern]
-    local temp_arp_seq = {}
-    for i = 1, length do
-      temp_arp_seq[i] = arp_seq[arp_pattern][i]
-    end
-    for i = 1, length do
-      arp_seq[arp_pattern][i] = temp_arp_seq[util.wrap(i - direction,1,length)]
-    end
-  end
-end
-
-
-------------------------------------------------------
--- EVENT-SPECIFIC FUNCTIONS --
-------------------------------------------------------
--- init functions
-
-function gen_event_tables()
-  event_subcategories = {}
-  event_indices = {}
-
-  for i, entry in ipairs(events_lookup) do
-    local category = entry.category
-    local subCategory = entry.subcategory
-
-    -- Generate event_subcategories table
-    if not event_subcategories[category] then
-      event_subcategories[category] = {}
-    end
-
-    -- Check if the subcategory already exists in the table
-    local exists = false
-    for _, value in ipairs(event_subcategories[category]) do
-      if value == subCategory then
-         exists = true
-        break
-      end
-    end
-
-    -- Add the subcategory to the table if it doesn't exist
-    if not exists then
-       table.insert(event_subcategories[category], subCategory)
-    end
-
-    -- Generate event_indices
-    local combination = category .. "_" .. subCategory
-    if not event_indices[combination] then
-      event_indices[combination] = {first_index = i, last_index = i}
-    else
-      event_indices[combination].last_index = i
-    end
-  end
-
-end
-
-
-
-------------------------------------------------------------------------------------------------
-  -- Event menu param options swapping functions
-------------------------------------------------------------------------------------------------
-
--- -- Fetches the min and max index for the selected event category (Global, Chord, Arp, etc...) + subcategory
--- -- Also called when K3 opens events menu and when recalling a populated event slot
--- function set_selected_event_indices()
---   local event_category = params:string('event_category')
-  
---   update_event_subcategory_options('set_selected_event_indices')
---   -- at this point there is a chance that the current subcategory index exceeds what was just set. need to reset but not every time or we can never actually change the subcategory value. Feels like we need to pull out all this and keep this function for just what it says on the tin: indices.
---   -- params:set('event_subcategory', 1) -- set to index 1 because existing index may exceed #table
-
---   -- print('post- subcategory_options update')
---   local subcategory = params:string('event_subcategory')
---   print('subcategory index == ' .. params:get('event_subcategory'))
---   print('subcategory = ' .. (subcategory or 'nil'))
---   event_category_min_index = event_indices[event_category .. '_' .. subcategory].first_index
---   event_category_max_index = event_indices[event_category .. '_' .. subcategory].last_index
-  
---   --wag if this should be here because I think this also needs to fire when changing event_name but let's try
---   -- loads event_operations param with new options based on the currently-active event_type
---   update_event_operation_options('set_selected_event_indices')
--- end
-
-
--- function get_options(param)
---   local options = params.params[params.lookup[param]].options
---   return (options)
--- end
-
-
--- function update_event_subcategory_options(source)
---   swap_param_options('event_subcategory', event_subcategories[params:string('event_category')])
---   -- print(' post-options set subcategory string = ' .. params:string('event_subcategory'))
---   print('update_event_subcategory_options called by ' .. (source or 'nil'))
---   -- print('printing from update_event_operation_options:')
---   -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
--- end
-
--- function update_event_operation_options(source)
---   print('update_event_operation_options called by ' .. (source or 'nil'))
---   swap_param_options('event_operation', _G['event_operation_options_' .. events_lookup[params:get('event_name')].value_type])
---   -- print('printing from update_event_operation_options:')
---   -- print('>>loaded ' .. events_lookup[params:get('event_name')].name .. ' ' .. events_lookup[params:get('event_name')].value_type .. ' options')
--- end
-  
--------------------------------------- 
--- functions called by scheduled events
-----------------------------------------
-
--- --for queuing pset load in-advance
--- function load_pset()
---   pset_load_source = 'load_event'
---   pset_queue = params:get('load_pset')
--- end
-
-
--- --for queuing pset load in-advance
--- function splice_pset()
---   pset_load_source = 'splice_event'
---   pset_queue = params:get('splice_pset')
--- end
-
-
--- function save_pset()
---   params:write(params:get('save_pset'), 'ds ' ..os.date())
---   -- local filepath = norns.state.data.."/"..number.."/"
--- end
-
-
--- Variation on the standard generators that will just run the algos and reset arp (but not chord pattern seq position or arranger)
-function event_gen()
-  generator()
-  arp_seq_position = 0
-end    
-
-
-function event_chord_gen()
-  chord_generator_lite()
-  arp_seq_position = 0
-end   
-
-
-function event_arp_gen()
-  arp_generator('run')
-  arp_seq_position = 0
-end    
-
-
-function shuffle_arp()
-  local shuffled_arp_seq = shuffle(arp_seq[arp_pattern])
-  arp_seq[arp_pattern] = shuffled_arp_seq
-end
-      
-          
--- -- Passes along 'Arp' var so we can have a specific event for just arp
--- function rotate_arp(direction)
---   rotate_pattern('Arp', direction)
--- end
-
-
--- Event Crow trigger out
-function crow_event_trigger()
-  crow.output[4].action = 'pulse(.001,10,1)' -- (time,level,polarity)
-  crow.output[4]()
-end
-
-
--- "Transposes" pattern if you can call it that
-function transpose_pattern(view, direction)
-  if view == 'Chord' then
-    for y = 1,8 do
-      if chord_seq[pattern][y] ~= 0 then
-        chord_seq[pattern][y] = util.wrap(chord_seq[pattern][y] + direction, 1, 14)
-      end
-    end
-  elseif view == 'Arp' then
-    for y = 1,8 do
-      if arp_seq[arp_pattern][y] ~= 0 then
-        arp_seq[arp_pattern][y] = util.wrap(arp_seq[arp_pattern][y] + direction, 1, 14)
-      end
-    end
-  end  
-end   
-
--- END OF EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------
-
-
-
---- UTILITY FUNCTIONS
-
-
--- always use this to set the current chord pattern so we can also silently update the param as well
-function set_chord_pattern(y)
-  pattern = y
-  params:set('chord_pattern_length', chord_pattern_length[y], true) -- silent
-end
-
-
-function deepcopy(orig)
-  local orig_type = type(orig)
-  local copy
-  if orig_type == 'table' then
-    copy = {}
-    for orig_key, orig_value in next, orig, nil do
-      copy[deepcopy(orig_key)] = deepcopy(orig_value)
-    end
-    setmetatable(copy, deepcopy(getmetatable(orig)))
-  else -- number, string, boolean, etc
-    copy = orig
-  end
-  return copy
-end
-
-
--- equal probability of returning the inverse of arg
-function cointoss_inverse(val)
-  return(val * (math.random(2) == 1 and -1 or 1))
-end
-
-
--- function to swap options table on an existing param and reset count
-function swap_param_options(param, table)
-  params:lookup_param(param).options = table
-  -- print('setting ' .. param .. ' options to :')
-  -- tab.print(table)
-  params:lookup_param(param).count = #table   -- existing index may exceed this so it needs to be set afterwards by whatever called (not every time)
-end
-
-
--- converts the string value of an 'add_options' param into a value index # suitable for params:set
--- args: param id and string value         eg 'event_category', 'Arp' == 3
-function param_option_to_index(param, str)
-  return(tab.key(params.params[params.lookup[param]].options, str))
-end
-
-
--- passed string arg will be looked up in param's .options and set using index
-function set_param_string(param, str)
-  params:set(param, param_option_to_index(param, str))
-end  
-
-
-function spaces_to_underscores(str)
-  local replacedStr = string.gsub(str, " ", "_")
-  return replacedStr
-end
-
-
--- text_extents sucks so I gotta make some adjustments
--- spaces should count as 3 and </> count as 3
-function text_width(str)
-  local extents = screen.text_extents(str) -- raw count that ain't great
-  
-  local symbols = "<>"
-  local pattern = "[" .. symbols:gsub("[<>]", "%%%0") .. "]" -- character class to identify < and >
-  local extents = extents - (select(2, string.gsub(str, pattern, ""))) -- subtract 1 for each < and >
-
-  local count = select(2, string.gsub(str, pattern, ""))
-  local extents = extents + (string.len(string.gsub(str, "[^%s]", "")) * 3) -- spaces count as 3 pixels
-  
-  return extents
-end
-
-
--- param action to send cc out as encoder is turned
-function send_cc(source, cc_no, val)
-  if val > -1 then
-    local channel = params:get(source .. '_midi_ch')
-    local port = params:get(source .. '_midi_out_port')
-    midi_device[port]:cc(cc_no, val, channel)
-  end
-end
-
--------------------------
--- UI FUNCTIONS
--------------------------
-
-
--- index of list, count of items in list, #viewable, line height
--- function scroll_offset_simple(index, total, in_view, height)
-function scroll_offset_locked(index, height, locked_row)
-  -- if total > in_view and index > locked_row then
-  if index > locked_row then
-  
-    -- return(math.ceil(((index - 1) * (total - in_view) * height / total)))
-    -- if index > 1 then 
-      return((index - locked_row) * height)
-    -- end
-  else
-    return(0)
-  end
-end
-      
-      
-function scrollbar(index, total, in_view, locked_row, screen_height)
-  local bar_size = in_view / total * screen_height
-  local increment = (screen_height - bar_size) / (total - locked_row)
-  index = math.max(index - locked_row, 0)
-  local offset = 12 + (index * increment)
-  return(offset)
-end
-      
-      
-function delete_all_events_segment()
-  key_counter = 4
-  
-  while event_k2 == true do
-    key_counter = key_counter - 1
-    redraw()
-    if key_counter == 0 then
-      print('Deleting all events in segment ' .. event_edit_pattern)
-      for step = 1,8 do
-        events[event_edit_pattern][step] = {}
-      end
-      events[event_edit_pattern].populated = 0
-      grid_redraw()
-      key_counter = 4
-      break
-    end
-    clock.sleep(.2)
-  end
-  key_counter = 4
-  --todo p3 should probably have a 'Deleted message appear until key up'
-  redraw()
-end
+events_lookup = {										--
+										
+-- Global										
+{	category= 'Global', 	subcategory= 'Mood', 	event_type= 'param', 	id= 'mode', 	name= 'Mode', 	value_type= 'continuous', 	formatter= 'mode_index_to_name', 			},
+{	category= 'Global', 	subcategory= 'Mood', 	event_type= 'param', 	id= 'transpose', 	name= 'Key', 	value_type= 'continuous', 	formatter= 'transpose_string', 			},
+{	category= 'Global', 	subcategory= 'Mood', 	event_type= 'param', 	id= 'clock_tempo', 	name= 'Tempo', 	value_type= 'continuous', 				},
+{	category= 'Global', 	subcategory= 'Crow out 3', 	event_type= 'param', 	id= 'crow_clock_index', 	name= 'Crow clock', 	value_type= 'continuous', 	formatter= 'crow_clock_string', 			},
+{	category= 'Global', 	subcategory= 'Crow out 4', 	event_type= 'function', 	id= 'crow_event_trigger', 	name= 'CV4 trigger out', 	value_type= 'trigger', 				},
+{	category= 'Global', 	subcategory= 'Generator', 	event_type= 'param', 	id= 'chord_generator', 	name= 'Chord algo', 	value_type= 'continuous', 				},
+{	category= 'Global', 	subcategory= 'Generator', 	event_type= 'param', 	id= 'seq_generator', 	name= 'Seq algo', 	value_type= 'continuous', 				},
+{	category= 'Global', 	subcategory= 'Generator', 	event_type= 'function', 	id= 'event_chord_gen', 	name= 'Chord gen', 	value_type= 'trigger', 				},
+{	category= 'Global', 	subcategory= 'Generator', 	event_type= 'function', 	id= 'event_seq_gen', 	name= 'Seq gen', 	value_type= 'trigger', 				},
+{	category= 'Global', 	subcategory= 'Generator', 	event_type= 'function', 	id= 'event_gen', 	name= 'C+S gen', 	value_type= 'trigger', 				},
+										
+-- Chord										
+{	category= 'Chord', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'chord_pattern_length', 	name= 'Pattern length', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'chord_shift', 	name= 'Pattern shift', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'continuous', 	formatter= 'chord_type', 			},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_spread', 	name= 'Spread', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_inversion', 	name= 'Inversion', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_div_index', 	name= 'Step length', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_duration_index', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
+{	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_cutoff', 	name= 'Cutoff', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_tracking', 	name= 'Fltr tracking', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_gain', 	name= 'Gain', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_pw', 	name= 'PW', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Chord', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'chord_midi_out_port', 	name= 'Out port', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'chord_midi_ch', 	name= 'Channel', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'chord_midi_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'chord_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
+{	category= 'Chord', 	subcategory= 'JF', 	event_type= 'param', 	id= 'chord_jf_amp', 	name= 'Amp', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'chord_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+										
+-- Seq										
+{	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_pattern_length_1', 	name= 'Pattern length', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_rotate', 	name= 'Pattern rotate', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_shift', 	name= 'Pattern shift', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'shuffle_seq', 	name= 'Shuffle', 	value_type= 'trigger', 				},
+{	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_mode_combo_1', 	name= 'Mode', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_prime_1_shot_1', 	name= 'Prime 1-shot', 	value_type= 'trigger', 				},
+{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_chord_type', 	name= 'Chord type', 	value_type= 'continuous', 	formatter= 'chord_type', 			},
+{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_div_index', 	name= 'Step length', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
+{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_duration_index', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
+{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_mode', 	name= 'Mode', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'seq_pp_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Seq', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'seq_pp_cutoff', 	name= 'Cutoff', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'seq_pp_tracking', 	name= 'Fltr tracking', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Seq', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'seq_pp_gain', 	name= 'Gain', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'seq_pp_pw', 	name= 'PW', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Seq', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'seq_midi_out_port', 	name= 'Out port', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'seq_midi_ch', 	name= 'Channel', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'seq_midi_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'seq_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
+{	category= 'Seq', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'seq_tr_env', 	name= 'Output', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'seq_ad_skew', 	name= 'AD Skew', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'JF', 	event_type= 'param', 	id= 'seq_jf_amp', 	name= 'Amp', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'seq_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+										
+-- MIDI harmonizer										
+{	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_chord_type', 	name= 'Chord type', 	value_type= 'continuous', 	formatter= 'chord_type', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_duration_index', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'midi_pp_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'midi_pp_cutoff', 	name= 'Cutoff', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'midi_pp_tracking', 	name= 'Fltr tracking', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'midi_pp_gain', 	name= 'Gain', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'midi_pp_pw', 	name= 'PW', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'midi_in_port', 	name= 'In port', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'midi_midi_out_port', 	name= 'Out port', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'midi_midi_ch', 	name= 'Channel', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'do_midi_velocity_passthru', 	name= 'Pass velocity', 	value_type= 'continuous', 	formatter= 't_f_string', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'midi_midi_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'midi_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'midi_tr_env', 	name= 'Output', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'midi_ad_skew', 	name= 'AD Skew', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'JF', 	event_type= 'param', 	id= 'midi_jf_amp', 	name= 'Amp', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'midi_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+										
+-- CV harmonizer										
+{	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_chord_type', 	name= 'Chord type', 	value_type= 'continuous', 	formatter= 'chord_type', 			},
+{	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_duration_index', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
+{	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'do_crow_auto_rest', 	name= 'Auto-rest', 	value_type= 'continuous', 	formatter= 't_f_string', 			},
+{	category= 'CV harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'crow_pp_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'CV harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'crow_pp_cutoff', 	name= 'Cutoff', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'crow_pp_tracking', 	name= 'Fltr tracking', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'CV harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'crow_pp_gain', 	name= 'Gain', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'crow_pp_pw', 	name= 'PW', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'CV harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'crow_midi_out_port', 	name= 'Out port', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'crow_midi_ch', 	name= 'Channel', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'crow_midi_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'crow_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
+{	category= 'CV harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'crow_tr_env', 	name= 'Output', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'crow_ad_skew', 	name= 'AD Skew', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'JF', 	event_type= 'param', 	id= 'crow_jf_amp', 	name= 'Amp', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'crow_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 				},
+}										-- end

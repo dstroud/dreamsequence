@@ -14,7 +14,7 @@ function generator()
   params:set('transpose', math.random(-6,6))
   
   -- 7ths are still kinda risky and might be better left to the seq section
-  params:set('chord_type', percent_chance(20) and 4 or 3)
+  params:set('chord_type', percent_chance(50) and 4 or 3)
 
   if params:get('clock_source') == 1 then 
     params:set('clock_tempo', math.random(50,140))
@@ -22,7 +22,8 @@ function generator()
   
   params:set('mode', math.random(1, 9)) -- Currently this is called each time c-gen runs, but might change this
   params:set('seq_mode_combo_1', 3) -- not really the best option but this is what the OG algos were built around
-  params:set('seq_quant_1', 1)
+  -- params:set('seq_quant_1', 1)
+  params:set('seq_quant_1', math.random(1, 2))
 
   --ENGINE BASED RANDOMIZATIONS
   -- This kinda sucks and only works for PolyPerc. Need to rethink this approach. 
@@ -51,7 +52,7 @@ function chord_generator_lite()
   params:set('transpose', math.random(-6,6))
   
   -- 7ths are still kinda risky and might be better left to the seq section
-  params:set('chord_type', percent_chance(20) and 4 or 3)
+  params:set('chord_type', percent_chance(50) and 4 or 3)
 
   if params:get('clock_source') == 1 then 
     params:set('clock_tempo', math.random(50,140))
@@ -140,9 +141,9 @@ function chord_generator(mode)
     end
     
     octave_split_up()
-    for i = 1, chord_pattern_length[chord_pattern] do
+    for i = 1, chord_pattern_length[active_chord_pattern] do
       local x = progression[i]
-      chord_seq[chord_pattern][i] = x
+      chord_pattern[active_chord_pattern][i] = x
     end
     
     -- IDK may as well mix it up
@@ -207,9 +208,9 @@ function chord_generator(mode)
     end
       
     params:set('chord_pattern_length', 4)
-    for i = 1, chord_pattern_length[chord_pattern] do
+    for i = 1, chord_pattern_length[active_chord_pattern] do
       local x = progression[i]
-      chord_seq[chord_pattern][i] = x
+      chord_pattern[active_chord_pattern][i] = x
     end
     
     -- IDK may as well mix it up
@@ -240,22 +241,22 @@ function chord_generator(mode)
     progression[1] = progression[1] + ((progression[2] - progression[1] > 3) and 7 or 0)
   
     local x = progression[1]
-    chord_seq[chord_pattern][1] = x
+    chord_pattern[active_chord_pattern][1] = x
     local x = progression[2]
-    chord_seq[chord_pattern][5] = x
+    chord_pattern[active_chord_pattern][5] = x
     
     local position = 8 -- math.random(7, 8)
       
     -- Check if diminished/aug passing chord back to first step is possible. If so, some probability of doing this because it sounds fancii.
     if (progression[1] < 14) and mode_chord_types[util.wrap(progression[1], 1, 7) + 1] == 'dim' and math.random() <.25 then
-      chord_seq[chord_pattern][4] = x
-      chord_seq[chord_pattern][8] = x
+      chord_pattern[active_chord_pattern][4] = x
+      chord_pattern[active_chord_pattern][8] = x
       local x = progression[1] + 1
-      chord_seq[chord_pattern][position] = x
+      chord_pattern[active_chord_pattern][position] = x
     elseif (progression[1] >1) and mode_chord_types[util.wrap(progression[1], 1, 7) - 1] == 'aug'  and math.random() <.25 then
       -- local position = 8
       local x = progression[1] - 1
-      chord_seq[chord_pattern][position] = x
+      chord_pattern[active_chord_pattern][position] = x
     else
     -- Chance of adding a safe transition chord or two in the mix
       local octave_1 = pick_octave(progression[1], progression[3]) 
@@ -264,15 +265,15 @@ function chord_generator(mode)
       local x_2 = octave_2 + progression[4]
       local option = math.random()
       if option < .2 then                     -- passing chord on step 4
-        chord_seq[chord_pattern][4] = x_1
+        chord_pattern[active_chord_pattern][4] = x_1
       elseif option < .4 then                 -- passing chord on step 8
-        chord_seq[chord_pattern][8] = x_1
+        chord_pattern[active_chord_pattern][8] = x_1
       elseif option < .6 then                 -- same passing chord on steps 4 and 8 (cheesy but kinda nice sometimes)
-        chord_seq[chord_pattern][4] = x_1
-        chord_seq[chord_pattern][8] = x_1
+        chord_pattern[active_chord_pattern][4] = x_1
+        chord_pattern[active_chord_pattern][8] = x_1
       elseif option < .8 then                 -- different passing chords on steps 4 and 8
-        chord_seq[chord_pattern][4] = x_1
-        chord_seq[chord_pattern][8] = x_2        
+        chord_pattern[active_chord_pattern][4] = x_1
+        chord_pattern[active_chord_pattern][8] = x_2        
       end
       
     end
@@ -320,8 +321,8 @@ function seq_generator(mode)
   --   local div =  math.random(5,6) * 2 - tuplet_shift
   -- end
     
-  -- 30% chance of the seq quantizer including 7th notes
-  local chord_type = percent_chance(30) and 4 or 3
+  -- 50% chance of the seq quantizer including 7th notes
+  local seq_quant_1 = math.random(1, 2) --percent_chance(50) and 1 or 2
 
   -- Engine randomizations
   local gain = math.random(0,350)
@@ -350,14 +351,14 @@ function seq_generator(mode)
   -- This step is omitted when running init (used to populate algo table for menus)
   if mode == 'run' then
     -- Pattern/session randomizations
-    params:set('seq_pattern_length_' .. seq_pattern, length)
+    params:set('seq_pattern_length_' .. active_seq_pattern, length)
     params:set('seq_div_index', div)
     -- params:set('seq_duration_index', div)
     -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
-    params:set('seq_chord_type', chord_type)
+    params:set('seq_quant_1', seq_quant_1)
     params:set('seq_mode_combo_1', 3) -- not really the best option but this is what the OG algos were built around
-    params:set('seq_quant_1', 1)
+    -- params:set('seq_quant_1', 1)
   
     -- Engine randomizations
     params:set('seq_pp_amp', 70)
@@ -382,8 +383,8 @@ function seq_generator(mode)
     params:set('seq_octave', math.max(params:get('seq_octave'), 0))
 
     -- Prefer longer and faster sequence
-    params:set('seq_pattern_length_' .. seq_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
-    tuplet_shift = (seq_pattern_length[seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
+    params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
+    tuplet_shift = (seq_pattern_length[active_seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
     params:set('seq_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
@@ -391,12 +392,12 @@ function seq_generator(mode)
     -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
 
-    local peak = math.random(2, seq_pattern_length[seq_pattern] - 1)
+    local peak = math.random(2, seq_pattern_length[active_seq_pattern] - 1)
     for i = 1, peak do
-      seq_seq[1][i] = seq_min - 1 + i
+      seq_pattern[1][i] = seq_min - 1 + i
     end
-    for i = 1, seq_pattern_length[seq_pattern] - peak do
-      seq_seq[1][i + peak] = seq_seq[1][peak] - i
+    for i = 1, seq_pattern_length[active_seq_pattern] - peak do
+      seq_pattern[1][i + peak] = seq_pattern[1][peak] - i
     end
     
     seq_check_bounds() -- confirmed issues
@@ -411,8 +412,8 @@ function seq_generator(mode)
     params:set('seq_octave', math.max(params:get('seq_octave'), 0))
 
     -- Sequence length of 6(tuplet) or 8 steps
-    params:set('seq_pattern_length_' .. seq_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
-    tuplet_shift = (seq_pattern_length[seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
+    params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2) -- 6 (tuplet) or 8 length
+    tuplet_shift = (seq_pattern_length[active_seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
     params:set('seq_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
@@ -420,12 +421,12 @@ function seq_generator(mode)
     -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
 
-    local peak = math.random(2, seq_pattern_length[seq_pattern] - 1)
+    local peak = math.random(2, seq_pattern_length[active_seq_pattern] - 1)
     for i = 1, peak do
-      seq_seq[1][i] = seq_max - 1 - i
+      seq_pattern[1][i] = seq_max - 1 - i
     end
-    for i = 1, seq_pattern_length[seq_pattern] - peak do
-      seq_seq[1][i + peak] = seq_seq[1][peak] + i
+    for i = 1, seq_pattern_length[active_seq_pattern] - peak do
+      seq_pattern[1][i + peak] = seq_pattern[1][peak] + i
     end  
     
     seq_check_bounds() -- confirmed issues
@@ -437,7 +438,7 @@ function seq_generator(mode)
   table.insert(seq_algos['func'], function()
     
     for i = 1, #er_table do
-      seq_seq[1][i] = er_table[i] and seq_root or 0
+      seq_pattern[1][i] = er_table[i] and seq_root or 0
     end
     rotate_pattern('Seq', math.random(0,percent_chance(50) and 7 or 0))
   
@@ -449,7 +450,7 @@ function seq_generator(mode)
   table.insert(seq_algos['func'], function()
     
     for i = 1, #er_table do
-      seq_seq[1][i] = er_table[i] and seq_root or seq_offset
+      seq_pattern[1][i] = er_table[i] and seq_root or seq_offset
     end
     rotate_pattern('Seq', math.random(0,percent_chance(50) and 7 or 0))
   
@@ -459,17 +460,17 @@ function seq_generator(mode)
   local seq_algo_name = 'Strum up'
   table.insert(seq_algos['name'], seq_algo_name)
   table.insert(seq_algos['func'], function()  
-    params:set('seq_octave', math.random(0,2))
+    params:set('seq_octave', math.random(0,1))
     params:set('seq_mode_combo_1', 8) -- chord/chord
     params:set('seq_pp_amp',35) --Turn down amp since a lot of notes can clip
     params:set('seq_duration_index',15)
-    params:set('seq_pattern_length_' .. seq_pattern, math.random(3,4) * 2)
+    params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
 
     -- Strum speed from 1/64T to 1/32T
     params:set('seq_div_index', math.random(1,5))
     
-    for i = 1, seq_pattern_length[seq_pattern] do
-      seq_seq[1][i] = seq_min - 1 + i
+    for i = 1, seq_pattern_length[active_seq_pattern] do
+      seq_pattern[1][i] = seq_min - 1 + i
     end
     
   end)
@@ -478,17 +479,17 @@ function seq_generator(mode)
   local seq_algo_name = 'Strum down'
   table.insert(seq_algos['name'], seq_algo_name)
   table.insert(seq_algos['func'], function()  
-    params:set('seq_octave', math.random(0,2))
+    params:set('seq_octave', math.random(0,1))
     params:set('seq_mode_combo_1', 8)
     params:set('seq_pp_amp',35) --Turn down amp since a lot of notes can clip
     params:set('seq_duration_index',15)
-    params:set('seq_pattern_length_' .. seq_pattern, math.random(3,4) * 2)
+    params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
 
     -- Strum speed from 1/64T to 1/32T
     params:set('seq_div_index', math.random(1,5))
     
-    for i = 1, seq_pattern_length[seq_pattern] do
-      seq_seq[1][i] = seq_max - 1 - i
+    for i = 1, seq_pattern_length[active_seq_pattern] do
+      seq_pattern[1][i] = seq_max - 1 - i
     end
     
   end)
@@ -501,18 +502,18 @@ function seq_generator(mode)
   --   local note_shift = 0
   --   if seq_root - er_note_on_count < 1 then
   --     for i = 1, #er_table do
-  --       seq_seq[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --       seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
   --       note_shift = note_shift + (er_table[i] and 1 or 0)
   --     end
   --   elseif seq_root + er_note_on_count > 14 then
   --     for i = 1, #er_table do
-  --       seq_seq[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --       seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
   --       note_shift = note_shift - (er_table[i] and 1 or 0)
   --     end
   --   else
   --     local direction = (seq_root + math.random() > .5 and 1 or -1)
   --     for i = 1, #er_table do    -- I don't think this is firing?
-  --       seq_seq[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --       seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
   --       note_shift = note_shift + (er_table[i] and direction or 0)
   --     end
   --   end
@@ -527,7 +528,7 @@ function seq_generator(mode)
 
   --   local note_shift = 0
   --   for i = 1, #er_table do
-  --     seq_seq[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --     seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
   --     direction = math.random() > .5 and 1 or -1
   --     note_shift = note_shift + (er_table[i] and direction or 0)
   --   end
@@ -539,8 +540,8 @@ function seq_generator(mode)
   -- table.insert(seq_algos['name'], seq_algo_name)
   -- table.insert(seq_algos['func'], function()
   
-  --   -- params:set('seq_pattern_length_' .. seq_pattern, math.random(3,4) * (percent_chance(30) and 2 or 1))
-  --   -- local tuplet_shift = (seq_pattern_length[seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
+  --   -- params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * (percent_chance(30) and 2 or 1))
+  --   -- local tuplet_shift = (seq_pattern_length[active_seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
   --   -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
   --   -- if params:get('clock_tempo') < 80 then
@@ -556,8 +557,8 @@ function seq_generator(mode)
   --   -- -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
   --   -- params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
     
-  --   for i = 1, seq_pattern_length[seq_pattern] do
-  --     seq_seq[1][i] = seq_min - 1 + i
+  --   for i = 1, seq_pattern_length[active_seq_pattern] do
+  --     seq_pattern[1][i] = seq_min - 1 + i
   --   end
     
   -- end)
@@ -567,8 +568,8 @@ function seq_generator(mode)
   table.insert(seq_algos['name'], seq_algo_name)
   table.insert(seq_algos['func'], function()  
   
-    -- params:set('seq_pattern_length_' .. seq_pattern, math.random(3,4) * (percent_chance(30) and 2 or 1))
-    -- tuplet_shift = (seq_pattern_length[seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
+    -- params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * (percent_chance(30) and 2 or 1))
+    -- tuplet_shift = (seq_pattern_length[active_seq_pattern] / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- -- 1/16T - 1/8 if >= 85bpm, 1/32T - 1/16 if under 85bpm
     -- params:set('seq_div_index', (math.random(3,4) * 2) - tuplet_shift - (params:get('clock_tempo') < 85 and 2 or 0))
@@ -576,8 +577,8 @@ function seq_generator(mode)
     -- -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     -- params:set('seq_duration_index',math.max(math.random(params:get('seq_div_index'), params:get('seq_div_index') + 4), 5))
     
-    for i = 1, seq_pattern_length[seq_pattern] do
-      seq_seq[1][i] = seq_max + 1 - i
+    for i = 1, seq_pattern_length[active_seq_pattern] do
+      seq_pattern[1][i] = seq_max + 1 - i
     end
     
   end)
@@ -589,7 +590,7 @@ function seq_generator(mode)
   
     -- 8 or 6(tuplet) length
     local length = math.random(3,4) * 2
-    params:set('seq_pattern_length_' .. seq_pattern, length)
+    params:set('seq_pattern_length_' .. active_seq_pattern, length)
     local tuplet_shift = (length / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
     
     -- 1/16 to 1/4 standard or tuplet
@@ -603,12 +604,12 @@ function seq_generator(mode)
     
     local x = math.random(1,2)
     for i = 1, length/2  do
-      seq_seq[1][i*2 - 1] = seq_min - 1 + i * x
+      seq_pattern[1][i*2 - 1] = seq_min - 1 + i * x
     end
   
     local x = math.random(1,2)
     for i = 1, length/2  do
-      seq_seq[1][i*2 - 1 + 1] = seq_max + 1 - i * x
+      seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * x
     end
 
     seq_check_repeats()
@@ -616,18 +617,18 @@ function seq_generator(mode)
     -- local x1 = math.random(1,2)
     -- local x2 = math.random(1,2)
     -- for i = 1, length / 2 do
-    --   seq_seq[1][i*2 - 1] = seq_min - 1 + i * x1
-    --   if seq_seq[1][i*2 - 1] == seq_seq[1][i*2 - 2] then
+    --   seq_pattern[1][i*2 - 1] = seq_min - 1 + i * x1
+    --   if seq_pattern[1][i*2 - 1] == seq_pattern[1][i*2 - 2] then
     --     print('dual seq repeat')
-    --     seq_seq[1] = {0,0,0,0,0,0}
+    --     seq_pattern[1] = {0,0,0,0,0,0}
     --     load(seq_algos['func'][seq_algo])
     --     break
     --   end
       
-    --   seq_seq[1][i*2 - 1 + 1] = seq_max + 1 - i * 2
-    --   if seq_seq[1][i*2 - 1 + 1] == seq_seq[1][i*2 - 1] then
+    --   seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * 2
+    --   if seq_pattern[1][i*2 - 1 + 1] == seq_pattern[1][i*2 - 1] then
     --     print('dual seq repeat')
-    --     seq_seq[1] = {}
+    --     seq_pattern[1] = {}
     --     load(seq_algos['func'][seq_algo])
     --     break
     --   end
@@ -641,9 +642,9 @@ function seq_generator(mode)
     -- while pass == false do
     --   local x = math.random(1,2)
     --   for i = 1, length/2  do
-    --     seq_seq[1][i*2 - 1 + 1] = seq_max + 1 - i * x
-    --     -- pass = seq_seq[1][i + 1] == seq_seq[1] and false or true
-    --     if seq_seq[1][i*2 - 1 + 1] == seq_seq[1][i*2 - 1] then
+    --     seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * x
+    --     -- pass = seq_pattern[1][i + 1] == seq_pattern[1] and false or true
+    --     if seq_pattern[1][i*2 - 1 + 1] == seq_pattern[1][i*2 - 1] then
     --       print('failed')
     --       pass = false
     --     else
@@ -653,15 +654,15 @@ function seq_generator(mode)
     --   end
     -- end
     
-    -- if seq_max + 1 - i * x == seq_seq[1][i*2 - 1]
+    -- if seq_max + 1 - i * x == seq_pattern[1][i*2 - 1]
     
-    -- tab.print(seq_seq[1])
+    -- tab.print(seq_pattern[1])
     
-    -- if seq_seq[1][1] < 7 then
+    -- if seq_pattern[1][1] < 7 then
     --   print('reroll')
     --   local x = math.random(1,2)
     --     for i = 1, length/2  do
-    --       seq_seq[1][i*2 - 1 + 1] = seq_max + 1 - i * x
+    --       seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * x
     --     end
     -- end
 
@@ -674,11 +675,11 @@ function seq_generator(mode)
   -- table.insert(seq_algos['func'], function()  
     
   --   for i = 1, length do
-  --     seq_seq[1][i] = math.random(1,7) + random_note_offset
+  --     seq_pattern[1][i] = math.random(1,7) + random_note_offset
   --   end
   --   if percent_chance(60) then --add some rests to the seq
   --     for i = 1, length do
-  --       seq_seq[1][i] = er_table[i] and seq_seq[1][i] or 0
+  --       seq_pattern[1][i] = er_table[i] and seq_pattern[1][i] or 0
   --     end
   --   end
   
@@ -691,7 +692,7 @@ function seq_generator(mode)
   if mode == 'run' then
     -- Clear pattern.
     for i = 1,8 do
-      seq_seq[1][i] = 0
+      seq_pattern[1][i] = 0
     end
     
   -- seq_generator index 1 is reserved for Randomize, otherwise fire the selected algo.
@@ -709,9 +710,9 @@ function build_mode_chord_types()
     mode_chord_types = {}
     safe_chord_degrees = {}    
     for i = 1,7 do
-      local chord_type = get_chord_name(2, params:get('mode'), musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][i])
+      local chord_type = get_chord_name(2, params:get('mode'), MusicUtil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][i])
       mode_chord_types[i] = chord_type
-      if chord_type == 'maj' or chord_type == 'min' then table.insert(safe_chord_degrees, i) end
+      if chord_type == 'maj' or chord_type == 'min' then table.insert(safe_chord_degrees, i) end  --todo p0 what about 7ths here?
     end
     -- print('--------')
     -- print('mode ' .. params:get('mode') .. ' chord types')    
@@ -745,9 +746,9 @@ end
 -- don't hate the player- hate. the. game.
 function seq_check_bounds()   
   error_check = false
-  local length = seq_pattern_length[seq_pattern]
+  local length = seq_pattern_length[active_seq_pattern]
   for i = 2, length do
-    if seq_seq[1][i] < 0 or seq_seq[1][i] > 14 then
+    if seq_pattern[1][i] < 0 or seq_pattern[1][i] > 14 then
       error_check = true
       print('off-grid note on row ' .. i)
       break
@@ -755,7 +756,7 @@ function seq_check_bounds()
   end
   if error_check then
     print('clearing')
-    clear_seq(seq_pattern)
+    clear_seq(active_seq_pattern)
     print('rerolling')
     load(seq_algos['func'][seq_algo])
   end
@@ -766,9 +767,9 @@ end
 -- if found, wipe pattern and rerun algo
 function seq_check_repeats()   
   error_check = false
-  local length = seq_pattern_length[seq_pattern]
+  local length = seq_pattern_length[active_seq_pattern]
   for i = 2, length do
-    if seq_seq[1][i] == seq_seq[1][i - 1] then
+    if seq_pattern[1][i] == seq_pattern[1][i - 1] then
       error_check = true
       -- print('repeat on row ' .. i)
       break
@@ -776,7 +777,7 @@ function seq_check_repeats()
   end
   if error_check then
     -- print('clearing')
-    clear_seq(seq_pattern)
+    clear_seq(active_seq_pattern)
     -- print('rerolling')
     load(seq_algos['func'][seq_algo])
   end
@@ -786,16 +787,16 @@ end
 -- insert spaces between pattern and halves step length.
 function double_space()
   for i = 8, 3, -1 do
-    chord_seq[chord_pattern][i] = (i % 2 == 0) and chord_seq[chord_pattern][i / 2] or 0
+    chord_pattern[active_chord_pattern][i] = (i % 2 == 0) and chord_pattern[active_chord_pattern][i / 2] or 0
   end
-  chord_seq[chord_pattern][2] = 0 -- lol ok
+  chord_pattern[active_chord_pattern][2] = 0 -- lol ok
   params:set('chord_div_index', math.max(params:get('chord_div_index') - 3, 1))
 end
 
 
 function clear_seq()
-  for i = 1, seq_pattern_length[chord_pattern] do
-    seq_seq[1][i] = 0
+  for i = 1, seq_pattern_length[active_chord_pattern] do
+    seq_pattern[1][i] = 0
   end
 end
 
@@ -806,7 +807,7 @@ function pick_octave(x1, x2)
 end                
 
 
-function sketchy_chord(chord)
-  return(mode_chord_types[chord] == 'dim' or mode_chord_types[chord] == 'aug')
-end
+-- function sketchy_chord(chord)
+--   return(mode_chord_types[chord] == 'dim' or mode_chord_types[chord] == 'aug')
+-- end
 -----------------------------------------------------------------

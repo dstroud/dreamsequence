@@ -1,9 +1,12 @@
 -- ships with norns
 ER = require("er")
-musicutil = require("musicutil")
+-- musicutil = require("musicutil")
 engine.name = "PolyPerc"
 
 local lib = "dreamsequence/lib/"
+
+-- @dewb's updated musicutil with some modified chord names I've added
+include(lib .. "musicutil_ds")
 
 -- divisions for clock modulo and durations
 include(lib .. "divisions")

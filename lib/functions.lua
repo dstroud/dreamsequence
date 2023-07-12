@@ -5,22 +5,22 @@
 -- Rotate looping portion of pattern
 function rotate_pattern(view, direction)
     if view == 'Chord' then
-      local length = chord_pattern_length[chord_pattern]
-      local temp_chord_seq = {}
+      local length = chord_pattern_length[active_chord_pattern]
+      local temp_chord_pattern = {}
       for i = 1, length do
-        temp_chord_seq[i] = chord_seq[chord_pattern][i]
+        temp_chord_pattern[i] = chord_pattern[active_chord_pattern][i]
       end
       for i = 1, length do
-        chord_seq[chord_pattern][i] = temp_chord_seq[util.wrap(i - direction,1,length)]
+        chord_pattern[active_chord_pattern][i] = temp_chord_pattern[util.wrap(i - direction,1,length)]
       end
     elseif view == 'Seq' then
-      local length = seq_pattern_length[seq_pattern]
-      local temp_seq_seq = {}
+      local length = seq_pattern_length[active_seq_pattern]
+      local temp_seq_pattern = {}
       for i = 1, length do
-        temp_seq_seq[i] = seq_seq[seq_pattern][i]
+        temp_seq_pattern[i] = seq_pattern[active_seq_pattern][i]
       end
       for i = 1, length do
-        seq_seq[seq_pattern][i] = temp_seq_seq[util.wrap(i - direction,1,length)]
+        seq_pattern[active_seq_pattern][i] = temp_seq_pattern[util.wrap(i - direction,1,length)]
       end
     end
   end
@@ -145,25 +145,25 @@ function rotate_pattern(view, direction)
   -- Variation on the standard generators that will just run the algos and reset seq (but not chord pattern seq position or arranger)
   function event_gen()
     generator()
-    seq_seq_position = 0
+    seq_pattern_position = 0
   end    
   
   
   function event_chord_gen()
     chord_generator_lite()
-    seq_seq_position = 0
+    seq_pattern_position = 0
   end   
   
   
   function event_seq_gen()
     seq_generator('run')
-    seq_seq_position = 0
+    seq_pattern_position = 0
   end    
   
   
   function shuffle_seq()
-    local shuffled_seq_seq = shuffle(seq_seq[seq_pattern])
-    seq_seq[seq_pattern] = shuffled_seq_seq
+    local shuffled_seq_pattern = shuffle(seq_pattern[active_seq_pattern])
+    seq_pattern[active_seq_pattern] = shuffled_seq_pattern
   end
         
             
@@ -184,14 +184,14 @@ function rotate_pattern(view, direction)
   function transpose_pattern(view, direction)
     if view == 'Chord' then
       for y = 1,8 do
-        if chord_seq[chord_pattern][y] ~= 0 then
-          chord_seq[chord_pattern][y] = util.wrap(chord_seq[chord_pattern][y] + direction, 1, 14)
+        if chord_pattern[active_chord_pattern][y] ~= 0 then
+          chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + direction, 1, 14)
         end
       end
     elseif view == 'Seq' then
       for y = 1,8 do
-        if seq_seq[seq_pattern][y] ~= 0 then
-          seq_seq[seq_pattern][y] = util.wrap(seq_seq[seq_pattern][y] + direction, 1, 14)
+        if seq_pattern[active_seq_pattern][y] ~= 0 then
+          seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + direction, 1, 14)
         end
       end
     end  
@@ -206,7 +206,7 @@ function rotate_pattern(view, direction)
   
   -- always use this to set the current chord pattern so we can also silently update the param as well
   function set_chord_pattern(y)
-    chord_pattern = y
+    active_chord_pattern = y
     params:set('chord_pattern_length', chord_pattern_length[y], true) -- silent
   end
   

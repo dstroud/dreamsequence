@@ -293,7 +293,7 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function() set_div('chord') end)
   
-  params:add_option('chord_dest', 'Destination', {'None', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
+  params:add_option('chord_dest', 'Destination', {'Mute', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
   params:set_action("chord_dest",function() update_menus() end)
   
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
@@ -360,7 +360,7 @@ function init()
   ------------------
   params:add_group('seq', 'SEQ', 31)
 
-  params:add_option("seq_quant_1", "Notes", {'Chord', 'Mode+Transp.', 'Mode'}, 1)
+  params:add_option("seq_quant_1", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
   
   params:add_option("seq_start_mode_1", "Play", {'Loop', 'On step', 'On chord', 'One-shot'}, 1)
   params:set_save('seq_start_mode_1', false)
@@ -400,7 +400,7 @@ function init()
   params:add_number('seq_div_index', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_div_index',function() set_div('seq') end)
   
-  params:add_option("seq_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  params:add_option("seq_dest", "Destination", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
   params:set_action("seq_dest",function() update_menus() end)
   
   params:add_number('seq_duration_index', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
@@ -417,7 +417,6 @@ function init()
   params:set_action('seq_pattern_length_1', function() pattern_length(1) end)
   
   params:add_number('seq_octave','Octave',-2, 4, 0)
-  params:add_number('seq_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)
 
   params:add_separator ('seq_engine', 'Engine')
   params:add_number('seq_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
@@ -452,9 +451,9 @@ function init()
   ------------------
   params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 25)  
 
-  params:add_option("midi_quant_1", "Notes", {'Chord', 'Mode+Transp.', 'Mode'}, 1)
+  params:add_option("midi_quant_1", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
-  params:add_option("midi_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  params:add_option("midi_dest", "Destination", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
     params:set_action("midi_dest",function() update_menus() end)
     
   params:add_number('midi_in_port', 'Port in',1,#midi.vports,1)
@@ -470,8 +469,7 @@ function init()
   params:add_number('midi_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
     params:set_action('midi_duration_index',function() set_duration('midi') end)
   params:add_number('midi_octave','Octave',-2, 4, 0)
-  params:add_number('midi_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)  
-  
+
   params:add_separator ('midi_harmonizer_engine', 'Engine')
   params:add_number('midi_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   params:add_control("midi_pp_cutoff","Cutoff",controlspec.new(50,5000,'exp',0,700,'hz'))
@@ -507,16 +505,15 @@ function init()
   ------------------
   params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)
   
-  params:add_option("crow_quant_1", "Notes", {'Chord', 'Mode+Transp.', 'Mode'}, 1)
+  params:add_option("crow_quant_1", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
-  params:add_option("crow_dest", "Destination", {'None', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  params:add_option("crow_dest", "Destination", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
   params:set_action("crow_dest",function() update_menus() end)
   
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
   params:set_action('crow_duration_index',function() set_duration('crow') end)
   
   params:add_number('crow_octave','Octave',-2, 4, 0)
-  params:add_number('crow_chord_type','Chord type',3, 4, 3,function(param) return chord_type(param:get()) end)    
 
   params:add_separator ('cv_harmonizer_engine', 'Engine')
   params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
@@ -562,7 +559,7 @@ function init()
   -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
   arranger_active = false
-  chord_seq_retrig = true
+  chord_pattern_retrig = true
   play_seq = false
   screen_views = {'Session','Events'}
   screen_view_index = 1
@@ -587,24 +584,24 @@ function init()
   pattern_name = {'A','B','C','D'}
   pattern_queue = false
   pattern_copy_performed = false
-  arranger_seq_retrig = false
-  max_arranger_seq_length = 64 --(64 arranger segments * 8 chord step * 16 event slots = 8192 events... yikes)
-  -- Raw arranger_seq which can contain nils although we're moving away from this I think
-  arranger_seq = {}
-  for segment = 1, max_arranger_seq_length do
-    arranger_seq[segment] = 0
+  arranger_retrig = false
+  max_arranger_length = 64 --(64 arranger segments * 8 chord step * 16 event slots = 8192 events... yikes)
+  -- Raw arranger which can contain nils although we're moving away from this I think
+  arranger = {}
+  for segment = 1, max_arranger_length do
+    arranger[segment] = 0
   end
-  arranger_seq[1] = 1 -- setting this so new users aren't confused about the pattern padding
-  -- Version of arranger_seq which generates chord patterns for held segments
-  arranger_seq_padded = {}
-  arranger_seq_position = 0
-  arranger_seq_length = 1
+  arranger[1] = 1 -- setting this so new users aren't confused about the pattern padding
+  -- Version of arranger which generates chord patterns for held segments
+  arranger_padded = {}
+  arranger_position = 0
+  arranger_length = 1
   arranger_grid_offset = 0 -- offset allows us to scroll the arranger grid view beyond 16 segments
-  gen_arranger_seq_padded()
+  gen_arranger_padded()
   d_cuml = 0
   interaction = nil
   events = {}
-  for segment = 1, max_arranger_seq_length do
+  for segment = 1, max_arranger_length do
     events[segment] = {}
     for step = 1,8 do
       events[segment][step] = {}
@@ -642,18 +639,18 @@ function init()
   keys = {}
   key_count = 0
   -- global_clock_div = 48
-  chord_seq = {{},{},{},{}}
-  seq_seq = {{},{},{},{}}
+  chord_pattern = {{},{},{},{}}
+  seq_pattern = {{},{},{},{}}
   for p = 1,4 do
     for i = 1,8 do
-      chord_seq[p][i] = 0
-      seq_seq[p][i] = 0
+      chord_pattern[p][i] = 0
+      seq_pattern[p][i] = 0
     end
   end
   current_shift_seq = 0
   current_shift_chord = 0
   current_rotation_seq = 0
-  chord_seq_position = 0
+  chord_pattern_position = 0
   chord_raw = {}
   current_chord_x = 0
   current_chord_o = 0
@@ -662,9 +659,9 @@ function init()
   next_chord_o = 0
   next_chord_c = 1  
   seq_pattern_length = {8,8,8,8}
-  seq_pattern = 1
-  seq_seq_position = 0
-  seq_seq_note = 8
+  active_seq_pattern = 1
+  seq_pattern_position = 0
+  seq_pattern_note = 8
   midi_note_history = {}
   engine_note_history = {}
   crow_note_history = {}
@@ -686,7 +683,7 @@ function init()
   -- params:hide(params.lookup['save_pset'])  
     
   -- table names we want pset  callbacks to act on
-  pset_lookup = {'arranger_seq', 'events', 'chord_seq', 'chord_pattern_length', 'seq_seq', 'seq_pattern_length', 'misc'}
+  pset_lookup = {'arranger', 'events', 'chord_pattern', 'chord_pattern_length', 'seq_pattern', 'seq_pattern_length', 'misc'}
   
   
   -----------------------------
@@ -756,15 +753,15 @@ function init()
       if params:get('clock_source') == 'internal' then 
         reset_clock()
       else
-        gen_arranger_seq_padded()
+        gen_arranger_padded()
       end
       arranger_queue = nil
       arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
       pattern_queue = false
-      seq_seq_position = 0
-      chord_seq_position = 0
-      arranger_seq_position = 0
-      set_chord_pattern(arranger_seq_padded[1])
+      seq_pattern_position = 0
+      chord_pattern_position = 0
+      arranger_position = 0
+      set_chord_pattern(arranger_padded[1])
       if transport_state == 'paused' then
         transport_state = 'stopped' -- just flips to the stop icon so user knows they don't have to do this manually
       end
@@ -856,7 +853,7 @@ function update_menus()
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
-  if params:string('chord_dest') == 'None' then
+  if params:string('chord_dest') == 'Mute' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index'}
   elseif params:string('chord_dest') == 'Engine' then
     menus[2] = {'chord_dest', 'chord_type', 'chord_shift', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
@@ -869,64 +866,64 @@ function update_menus()
   end
   
   -- SEQ MENU
-  if params:string('seq_dest') == 'None' then
-    menus[3] = {'seq_quant_1', 'seq_mode_combo_1','seq_dest', 'seq_chord_type', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index'}
+  if params:string('seq_dest') == 'Mute' then
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1','seq_dest', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index'}
   elseif params:string('seq_dest') == 'Engine' then
-    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_chord_type', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_duration_index', 'seq_pp_amp', 'seq_pp_cutoff', 'seq_pp_tracking','seq_pp_gain', 'seq_pp_pw'}
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_duration_index', 'seq_pp_amp', 'seq_pp_cutoff', 'seq_pp_tracking','seq_pp_gain', 'seq_pp_pw'}
   elseif params:string('seq_dest') == 'MIDI' then
-    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_chord_type', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_duration_index', 'seq_midi_out_port', 'seq_midi_ch', 'seq_midi_velocity', 'seq_midi_cc_1_val'}
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_duration_index', 'seq_midi_out_port', 'seq_midi_ch', 'seq_midi_velocity', 'seq_midi_cc_1_val'}
   elseif params:string('seq_dest') == 'Crow' then
     if params:string('seq_tr_env') == 'Trigger' then
-      menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_chord_type', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_tr_env' }
+      menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_tr_env' }
     else -- AD envelope
-      menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_chord_type', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_tr_env', 'seq_duration_index', 'seq_ad_skew',}
+      menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_tr_env', 'seq_duration_index', 'seq_ad_skew',}
     end
   elseif params:string('seq_dest') == 'ii-JF' then
-    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_chord_type', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_jf_amp'}
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_jf_amp'}
   elseif params:string('seq_dest') == 'Disting' then
-    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_chord_type', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_duration_index', 'seq_disting_velocity'}    
+    menus[3] = {'seq_quant_1', 'seq_mode_combo_1', 'seq_dest', 'seq_rotate',  'seq_shift', 'seq_octave', 'seq_div_index', 'seq_duration_index', 'seq_disting_velocity'}    
   end
   
   -- MIDI HARMONIZER MENU
-  if params:string('midi_dest') == 'None' then
-    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave'}
+  if params:string('midi_dest') == 'Mute' then
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave'}
   elseif params:string('midi_dest') == 'Engine' then
-    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_dest') == 'MIDI' then
     if params:get('do_midi_velocity_passthru') == 1 then
-      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index','midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave', 'midi_duration_index','midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_cc_1_val'}
     else
-      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave', 'midi_duration_index', 'midi_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'do_midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
     end
   elseif params:string('midi_dest') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[4] = {'midi_quant_1', 'midi_dest','midi_chord_type', 'midi_octave', 'midi_tr_env'}
+      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave', 'midi_tr_env'}
     else -- AD envelope
-      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
+      menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
     end
   elseif params:string('midi_dest') == 'ii-JF' then
-    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_jf_amp'}
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave', 'midi_jf_amp'}
  elseif params:string('midi_dest') == 'Disting' then
-    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_chord_type', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
+    menus[4] = {'midi_quant_1', 'midi_dest', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
   end
   
   -- CV HARMONIZER MENU
-  if params:string('crow_dest') == 'None' then
-    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest'}
+  if params:string('crow_dest') == 'Mute' then
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_octave', 'do_crow_auto_rest'}
   elseif params:string('crow_dest') == 'Engine' then
-    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
   elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
   elseif params:string('crow_dest') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
+      menus[5] = {'crow_quant_1', 'crow_dest', 'crow_octave', 'do_crow_auto_rest', 'crow_tr_env', }
     else -- AD envelope
-      menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
+      menus[5] = {'crow_quant_1', 'crow_dest', 'crow_octave', 'do_crow_auto_rest','crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
     end
   elseif params:string('crow_dest') == 'ii-JF' then
-    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_octave', 'do_crow_auto_rest', 'crow_jf_amp'}
   elseif params:string('crow_dest') == 'Disting' then
-    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_chord_type', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_disting_velocity'}    
+    menus[5] = {'crow_quant_1', 'crow_dest', 'crow_octave', 'crow_duration_index', 'do_crow_auto_rest', 'crow_disting_velocity'}    
   end  
 end
 
@@ -1055,28 +1052,28 @@ end
 -- end
 
 
--- todo p3 move with other musicutil functions
+-- todo p3 move with other MusicUtil functions
 function build_scale()
   -- print('build_scale ' .. params:string('mode'))
   -- builds scale for quantization. 14 steps + diatonic transposition offset
-  notes_nums = musicutil.generate_scale_of_length(0, params:get('mode'), 28)
+  notes_nums = MusicUtil.generate_scale_of_length(0, params:get('mode'), 28)
   -- todo p2 might generate freqs for engine and use for chords too?
-  -- notes_freq = musicutil.note_nums_to_freqs(notes_nums) -- converts note numbers to an array of frequencies
+  -- notes_freq = MusicUtil.note_nums_to_freqs(notes_nums) -- converts note numbers to an array of frequencies
 end
   
-  --todo p3 move and can simplify by arg concats (rename pattern to chord_pattern)
+  --todo p3 move and can simplify by arg concats (rename pattern to active_chord_pattern)
 function pattern_rotate_abs(source)
   local new_rotation_val = params:get(source)
   if source == 'seq_rotate' then
     local offset = new_rotation_val or 0 - current_rotation_seq or 0 -- I actually have no idea why this requires the or 0 WTF??
-    local length = seq_pattern_length[seq_pattern]
-    local temp_seq_seq = {}
+    local length = seq_pattern_length[active_seq_pattern]
+    local temp_seq_pattern = {}
     for i = 1, length do
-      temp_seq_seq[i] = seq_seq[seq_pattern][i]
+      temp_seq_pattern[i] = seq_pattern[active_seq_pattern][i]
     end
     
     for i = 1, length do
-      seq_seq[seq_pattern][i] = temp_seq_seq[util.wrap(i - (offset - current_rotation_seq), 1, length)]
+      seq_pattern[active_seq_pattern][i] = temp_seq_pattern[util.wrap(i - (offset - current_rotation_seq), 1, length)]
     end
     
     current_rotation_seq = offset
@@ -1086,22 +1083,22 @@ function pattern_rotate_abs(source)
 end
 
 
---todo p3 move and can simplify by arg concats (rename pattern to chord_pattern)
+--todo p3 move and can simplify by arg concats (rename pattern to active_chord_pattern)
 function pattern_shift_abs(source)
   local new_shift_val = params:get(source)
   if source == 'seq_shift' then
     local offset = new_shift_val or 0 - current_shift_seq or 0 -- I actually have no idea why this requires the or 0 WTF??
     for y = 1,8 do
-      if seq_seq[seq_pattern][y] ~= 0 then
-        seq_seq[seq_pattern][y] = util.wrap(seq_seq[seq_pattern][y] + offset - current_shift_seq, 1, 14)
+      if seq_pattern[active_seq_pattern][y] ~= 0 then
+        seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + offset - current_shift_seq, 1, 14)
       end
     end    
     current_shift_seq = offset
   elseif source == 'chord_shift' then
     local offset = new_shift_val or 0 - current_shift_chord or 0 -- I actually have no idea why this requires the or 0 WTF??
     for y = 1,8 do
-      if chord_seq[chord_pattern][y] ~= 0 then
-        chord_seq[chord_pattern][y] = util.wrap(chord_seq[chord_pattern][y] + offset - current_shift_chord, 1, 14)
+      if chord_pattern[active_chord_pattern][y] ~= 0 then
+        chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + offset - current_shift_chord, 1, 14)
       end
     end    
     current_shift_chord = offset  
@@ -1114,7 +1111,7 @@ end
 function pattern_length(source)
   -- print('setting pattern length via param action')
   if source == 'chord_pattern_length' then
-    chord_pattern_length[chord_pattern] = params:get(source)
+    chord_pattern_length[active_chord_pattern] = params:get(source)
   else
     seq_pattern_length[source] = params:get('seq_pattern_length_' .. source)
   end
@@ -1240,6 +1237,7 @@ function duration_sec(dur_mod)
   return(dur_mod/global_clock_div * clock.get_beat_sec())
 end
 
+
 -- todo p2 why is this firing every time grid view keys are pressed? Menu redraw inefficiency
 function param_id_to_name(id)
   -- print('param_id_to_name id = ' .. (id or 'nil'))
@@ -1248,7 +1246,7 @@ end
 
 
 function mode_index_to_name(index)
-  return(musicutil.SCALES[index].name)
+  return(MusicUtil.SCALES[index].name)
 end
   
   
@@ -1319,7 +1317,7 @@ end
 
 function clear_chord_pattern()
   for i = 1, 8 do
-    chord_seq[chord_pattern][i] = 0
+    chord_pattern[active_chord_pattern][i] = 0
   end
 end
 
@@ -1342,8 +1340,8 @@ end
 
 -- Pads out arranger where it has 0 val segments
 -- Called when selecting/deselecting Arranger segments, changing Arranger lenth via key or enc (insert/delete), switching patterns manually
-function gen_arranger_seq_padded()
-  arranger_seq_padded = {}
+function gen_arranger_padded()
+  arranger_padded = {}
   
   -- First identify the first and last populated segments
   first_populated_segment = 0
@@ -1351,60 +1349,64 @@ function gen_arranger_seq_padded()
   patt = nil
 
   -- -- todo: profile this vs the 2x pass and break
-  -- for k, v in pairs(arranger_seq) do -- no longer need to do in pairs because there are no nils
-  --   if arranger_seq[k] > 0 then
+  -- for k, v in pairs(arranger) do -- no longer need to do in pairs because there are no nils
+  --   if arranger[k] > 0 then
   --     if first_populated_segment == 0 then first_populated_segment = k end
   --     last_populated_segment = math.max(last_populated_segment,k)
   --   end
   -- end
 
-  for i = 1, max_arranger_seq_length do
-    if arranger_seq[i] > 0 then
+  for i = 1, max_arranger_length do
+    if arranger[i] > 0 then
       first_populated_segment = i
       break
     end
   end  
 
-  for i = max_arranger_seq_length, 1, -1 do
-    if arranger_seq[i] > 0 then
+  for i = max_arranger_length, 1, -1 do
+    if arranger[i] > 0 then
       last_populated_segment = i
       -- print('last_populated_segment = ' .. last_populated_segment)
       break
     end
   end    
 
-  arranger_seq_length = math.max(last_populated_segment,1)
+  arranger_length = math.max(last_populated_segment,1)
   
-  -- Run this as a second loop since the above needs to iterate through all segments to update vars and set arranger_seq_length
-  for i = 1, arranger_seq_length do
+  -- Run this as a second loop since the above needs to iterate through all segments to update vars and set arranger_length
+  for i = 1, arranger_length do
     -- First, let's handle any zeroed segments at the beginning of the sequence. Since the Arranger can be looped, we use the last populated segment where possible, then fall back on the current Pattern. Otherwise we would have a situation where the initial pattern potentially changes upon looping which is not very intuitive.
     if i < (first_populated_segment) then
-      arranger_seq_padded[i] = arranger_seq[last_populated_segment] or chord_pattern
+      arranger_padded[i] = arranger[last_populated_segment] or active_chord_pattern
     -- From this point on, we log the current segment's pattern so it can be used to propagate the pattern, then set this on the current step.
-    elseif (arranger_seq[i] or 0) > 0 then
-      patt = arranger_seq[i]
-      arranger_seq_padded[i] = patt
+    elseif (arranger[i] or 0) > 0 then
+      patt = arranger[i]
+      arranger_padded[i] = patt
     else
-      arranger_seq_padded[i] = (patt or chord_pattern)
+      arranger_padded[i] = (patt or active_chord_pattern)
     end
   end
-  gen_dash('gen_arranger_seq_padded')
+  gen_dash('gen_arranger_padded')
 end
 
 
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
--- Could probably gain some efficiency by just writing all this to a table
--- @treturn chord_type
 function get_chord_name(root_num, scale_type, roman_chord_type)
 
   local rct = roman_chord_type or "I"
 
-  -- treat extended ascii degree symbols as asterisks
+  -- lua does not correctly process utf8 in set character classes, so...
+  -- treat degree symbols as asterisks
   rct = string.gsub(rct, "\u{B0}", "*")
   rct = string.gsub(rct, "\u{BA}", "*")
+  -- treat upper and lowercase o-stroke as @
+  rct = string.gsub(rct, "\u{D8}", "@")
+  rct = string.gsub(rct, "\u{F8}", "@")
+  -- treat natural sign as &
+  rct = string.gsub(rct, "\u{266E}", "&")
 
   local degree_string, augdim_string, added_string, bass_string, inv_string =
-    string.match(rct, "([ivxIVX]+)([+*]?)([0-9]*)-?([0-9]?)([bcdefg]?)")
+    string.match(rct, "([ivxIVX]+)([+*@&M]?)([0-9]*)-?([0-9]?)([bcdefg]?)")
 
   local d = string.lower(degree_string)
   local is_major = degree_string ~= d
@@ -1412,72 +1414,90 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
   local is_diminished = augdim_string == "*"
   local is_seventh = added_string == "7"
 
+  local is_half_diminished = augdim_string == "@" and is_seventh
+  local is_major_seventh = augdim_string == "M" and is_seventh
+  local is_minormajor_seventh = augdim_string == "&" and is_seventh
+
   local chord_type = nil
+  
+  -- todo p0 just shortening triad strings for now but this needs to be revisited when we flip the switch back on 7ths
   if is_major then
     if is_augmented then
       if is_seventh then
-        chord_type = "aug7"
+        chord_type = "Augmented Major 7"
       else
         chord_type = "aug"
       end
     elseif is_diminished then
       if is_seventh then
-        chord_type = "dim7"
+        chord_type = "Diminished 7"
       else
         chord_type = "dim"
       end
+    elseif is_half_diminished then
+      chord_type = "Half Diminished 7"
+    elseif is_minormajor_seventh then
+      chord_type = "Minor Major 7"
+    elseif is_major_seventh then
+      chord_type = "Major 7"
+    elseif is_seventh then
+      chord_type = "Dominant 7"
     elseif added_string == "6" then
       if bass_string == "9" then
-        chord_type = "maj69"
+        chord_type = "Major 69"
       else
-        chord_type = "maj6"
+        chord_type = "Major 6"
       end
-    elseif is_seventh then
-      chord_type = "maj7"
     elseif added_string == "9" then
-      chord_type = "maj9"
+      chord_type = "Major 9"
     elseif added_string == "11" then
-      chord_type = "maj11"
+      chord_type = "Major 11"
     elseif added_string == "13" then
-      chord_type = "maj13"
+      chord_type = "Major 13"
     else
       chord_type = "maj"
     end
   else -- minor
     if is_augmented then
       if is_seventh then
-        chord_type = "aug7"
+        chord_type = "Augmented 7"
       else
         chord_type = "aug"
       end
     elseif is_diminished then
       if is_seventh then
-        chord_type = "dim7"
+        chord_type = "Diminished 7"
       else
         chord_type = "dim"
       end
+    elseif is_half_diminished then
+      chord_type = "Half Diminished 7"
+    elseif is_minormajor_seventh then
+      chord_type = "Minor Major 7"
+    elseif is_major_seventh then
+      chord_type = "Major 7" -- this overrides the lowercase roman degree
+    elseif is_seventh then
+      chord_type = "Minor 7"
     elseif added_string == "6" then
       if bass_string == "9" then
-        chord_type = "min69"
+        chord_type = "Minor 69"
       else
-        chord_type = "min6"
+        chord_type = "Minor 6"
       end
-    elseif is_seventh then
-      chord_type = "min7"
     elseif added_string == "9" then
-      chord_type = "min9"
+      chord_type = "Minor 9"
     elseif added_string == "11" then
-      chord_type = "min11"
+      chord_type = "Minor 11"
     elseif added_string == "13" then
-      chord_type = "min13"
+      chord_type = "Minor 13"
     else
       chord_type = "min"
     end
   end
   return(chord_type)
 end
-
-
+  
+  
  -- Clock to control sequence events including chord pre-load, chord/seq sequence, and crow clock out
 function sequence_clock(sync_val)
   transport_state = 'starting'
@@ -1568,14 +1588,14 @@ function sequence_clock(sync_val)
     end -- of stop handling
     
     
-    -- ADVANCE SUB CLOCKS: advance_chord_seq(), advance_seq_seq(), Crow pulses
+    -- ADVANCE SUB CLOCKS: advance_chord_pattern(), advance_seq_pattern(), Crow pulses
     if transport_active then -- check again
       if (clock_step + chord_preload_tics) % chord_div == 0 then
         get_next_chord()
       end
     
       if clock_step % chord_div == 0 then
-        advance_chord_seq()
+        advance_chord_pattern()
         grid_dirty = true
         redraw() -- To update chord readout
       end
@@ -1583,15 +1603,15 @@ function sequence_clock(sync_val)
       if clock_step % seq_div == 0 then
         local seq_start_mode_1 = params:get('seq_start_mode_1')
         if seq_start_mode_1 == 1 then -- loop
-          advance_seq_seq()
+          advance_seq_pattern()
           grid_dirty = true
         elseif seq_start_mode_1 == 4 then  -- 1-shot
           if seq_1_shot_1 == true then
-            advance_seq_seq()
+            advance_seq_pattern()
             grid_dirty = true
           end
         elseif play_seq then
-          advance_seq_seq()
+          advance_seq_pattern()
           grid_dirty = true      
         end
       end
@@ -1622,7 +1642,7 @@ end
 
 function calc_seconds_remaining()
   if arranger_active then
-    percent_step_elapsed = arranger_seq_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
+    percent_step_elapsed = arranger_position == 0 and 0 or (math.max(clock_step,0) % chord_div / (chord_div-1))
     seconds_remaining = chord_steps_to_seconds(steps_remaining_in_arrangement - (percent_step_elapsed or 0))
   else
     seconds_remaining = chord_steps_to_seconds(steps_remaining_in_arrangement - steps_remaining_in_active_pattern or 0)
@@ -1716,12 +1736,12 @@ function clock.transport.stop()
 end
 
 
-function reset_pattern() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
+function reset_pattern() -- todo: Also have the chord readout updated (move from advance_chord_pattern to a function)
   transport_state = 'stopped'
   print(transport_state)
   pattern_queue = false
-  seq_seq_position = 0
-  chord_seq_position = 0
+  seq_pattern_position = 0
+  chord_pattern_position = 0
   reset_clock()
   get_next_chord()
   chord_raw = next_chord
@@ -1731,11 +1751,11 @@ function reset_pattern() -- todo: Also have the chord readout updated (move from
 end
 
 
-function reset_arrangement() -- todo: Also have the chord readout updated (move from advance_chord_seq to a function)
+function reset_arrangement() -- todo: Also have the chord readout updated (move from advance_chord_pattern to a function)
   arranger_queue = nil
   arranger_one_shot_last_pattern = false -- Added to prevent 1-pattern arrangements from auto stopping.
-  arranger_seq_position = 0
-  if arranger_seq[1] > 0 then set_chord_pattern(arranger_seq[1]) end
+  arranger_position = 0
+  if arranger[1] > 0 then set_chord_pattern(arranger[1]) end
   if params:string('arranger_enabled') == 'True' then arranger_active = true end
   reset_pattern()
 end
@@ -1744,7 +1764,7 @@ end
 function reset_clock()
   clock_step = -1
   -- Immediately update this so if Arranger is zeroed we can use the current-set pattern (even if paused)
-  gen_arranger_seq_padded()
+  gen_arranger_padded()
 end
 
 
@@ -1762,8 +1782,8 @@ function reset_external_clock()
 end
 
 
-function advance_chord_seq()
-  chord_seq_retrig = true -- indicates when we're on a new chord seq step for CV harmonizer auto-rest logic
+function advance_chord_pattern()
+  chord_pattern_retrig = true -- indicates when we're on a new chord seq step for CV harmonizer auto-rest logic
   local seq_start_mode_1 = params:get('seq_start_mode_1')
   local seq_reset_mode_1 = params:get('seq_reset_mode_1')
   local arrangement_reset = false
@@ -1772,8 +1792,8 @@ function advance_chord_seq()
   if params:string('arranger_enabled') == 'True' then
 
     -- If it's post-reset or at the end of chord sequence
-    -- TODO: Really need a global var for when in a reset state (arranger_seq_position == 0 and chord_seq_position == 0)
-    if (arranger_seq_position == 0 and chord_seq_position == 0) or chord_seq_position >= chord_pattern_length[chord_pattern] then
+    -- TODO: Really need a global var for when in a reset state (arranger_position == 0 and chord_pattern_position == 0)
+    if (arranger_position == 0 and chord_pattern_position == 0) or chord_pattern_position >= chord_pattern_length[active_chord_pattern] then
       
       -- This variable is only set when the 'arranger_enabled' param is 'True' and we're moving into a new Arranger segment (or after reset)
       arranger_active = true
@@ -1784,14 +1804,14 @@ function advance_chord_seq()
         reset_arrangement()
         stop = true
       else
-        -- changed from wrap to a check if incremented arranger_seq_position exceeds seq_length
-        arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or (arranger_seq_position + 1 > arranger_seq_length) and 1 or arranger_seq_position + 1
-        set_chord_pattern(arranger_seq_padded[arranger_seq_position])
+        -- changed from wrap to a check if incremented arranger_position exceeds seq_length
+        arranger_position = arranger_padded[arranger_queue] ~= nil and arranger_queue or (arranger_position + 1 > arranger_length) and 1 or arranger_position + 1
+        set_chord_pattern(arranger_padded[arranger_position])
         arranger_queue = nil
       end
       
       -- Indicates arranger has moved to new pattern.
-      arranger_seq_retrig = true
+      arranger_retrig = true
     end
     -- Flag if arranger is on the last pattern of a 1-shot sequence
     arranger_ending()
@@ -1799,29 +1819,29 @@ function advance_chord_seq()
   
   -- If arrangement was not just reset, update chord position. 
   if arrangement_reset == false then
-    if chord_seq_position >= chord_pattern_length[chord_pattern] or arranger_seq_retrig then
+    if chord_pattern_position >= chord_pattern_length[active_chord_pattern] or arranger_retrig then
       if pattern_queue then
         set_chord_pattern(pattern_queue)
         pattern_queue = false
       end
-      chord_seq_position = 1
-      arranger_seq_retrig = false
+      chord_pattern_position = 1
+      arranger_retrig = false
     else  
-      chord_seq_position = util.wrap(chord_seq_position + 1, 1, chord_pattern_length[chord_pattern])
+      chord_pattern_position = util.wrap(chord_pattern_position + 1, 1, chord_pattern_length[active_chord_pattern])
     end
 
     if arranger_active then
       do_events()
-      gen_dash('advance_chord_seq')
+      gen_dash('advance_chord_pattern')
     end
     
     update_chord()
 
     -- Play the chord
-    if chord_seq[chord_pattern][chord_seq_position] > 0 then
+    if chord_pattern[active_chord_pattern][chord_pattern_position] > 0 then
       play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
       if seq_reset_mode_1 == 2 then
-        seq_seq_position = 0
+        seq_pattern_position = 0
         play_seq = true
       end
       if seq_start_mode_1 == 3 then -- 'On chord'
@@ -1830,13 +1850,15 @@ function advance_chord_seq()
     end
     
     if seq_reset_mode_1 == 1 then
-      seq_seq_position = 0
+      seq_pattern_position = 0
     end
     
     if seq_start_mode_1 == 2 then play_seq = true end -- 'On step'
     
     if chord_key_count == 0 then
-      chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0)
+      -- chord_no = current_chord_c + (params:get('chord_type') == 4 and 7 or 0) -- used for chord readout, distinguishing between triad and 7ths
+      -- todo p0 temporarily setting chord readout to only show triad until new glyphs are added and we have time to review. Technically this is fine since triad or 7th is defined per voice.
+      chord_no = current_chord_c -- used for chord readout, distinguishing between triad and 7ths
       gen_chord_readout()
     end
 
@@ -1845,7 +1867,7 @@ end
 
 
 function arranger_ending()
-  arranger_one_shot_last_pattern = arranger_seq_position >= arranger_seq_length and params:string('playback') == 'One-shot'
+  arranger_one_shot_last_pattern = arranger_position >= arranger_length and params:string('playback') == 'One-shot'
 end
 
 
@@ -1855,7 +1877,7 @@ function update_arranger_active()
   if params:string('arranger_enabled') == 'False' then 
     arranger_active = false
   elseif params:string('arranger_enabled') == 'True' then
-    if chord_seq_position == 0 then arranger_active = true end
+    if chord_pattern_position == 0 then arranger_active = true end
     pattern_queue = false
   end
   gen_dash('update_arranger_active')
@@ -1863,18 +1885,18 @@ end
 
 
 function do_events()
-  if arranger_seq_position == 0 then
-    print('arranger_seq_position = 0')
+  if arranger_position == 0 then
+    print('arranger_position = 0')
   end
   
-  if chord_seq_position == 0 then
-    print('chord_seq_position = 0')
+  if chord_pattern_position == 0 then
+    print('chord_pattern_position = 0')
   end  
   
-  if events[arranger_seq_position] ~= nil then
-    if events[arranger_seq_position][chord_seq_position].populated or 0 > 0 then
+  if events[arranger_position] ~= nil then
+    if events[arranger_position][chord_pattern_position].populated or 0 > 0 then
       for i = 1, 16 do
-        local event_path = events[arranger_seq_position][chord_seq_position][i]
+        local event_path = events[arranger_position][chord_pattern_position][i]
         if event_path ~= nil and math.random() <= event_path.probability / 100 then
           local event_type = event_path.event_type
           local event_name = event_path.id
@@ -1958,10 +1980,11 @@ end
 -- todo p2: More thoughtful display of either sharps or flats depending on mode and key
 function gen_chord_readout()
   if chord_no > 0 then
-    local chord_degree = musicutil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]
-    local chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
-    local modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- transpose root?
-    chord_readout = params:string('chord_readout') == 'Degree' and chord_degree or chord_name .. modifier
+    local chord_degree = MusicUtil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]  -- Adding 7 to index returns 7th variants
+    local chord_name = MusicUtil.NOTE_NAMES[util.wrap((MusicUtil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
+    local modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- modified to only do triad readout for now.
+    -- print('chord modifier = ' .. modifier)
+    chord_readout = params:string('chord_readout') == 'Degree' and chord_degree or chord_name .. modifier -- todo p0 WRONG!!
   end
 end  
 
@@ -1969,10 +1992,10 @@ end
 function update_chord()
 -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
 -- Mode is always updated in case no chord has been set but user has changed Mode param.
-  current_chord_x = chord_seq[chord_pattern][chord_seq_position] > 0 and chord_seq[chord_pattern][chord_seq_position] or current_chord_x
-  current_chord_o = chord_seq[chord_pattern][chord_seq_position] > 0 and (chord_seq[chord_pattern][chord_seq_position] > 7 and 1 or 0) or current_chord_o
-  current_chord_c = chord_seq[chord_pattern][chord_seq_position] > 0 and util.wrap(chord_seq[chord_pattern][chord_seq_position], 1, 7) or current_chord_c
-  chord_raw = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  current_chord_x = chord_pattern[active_chord_pattern][chord_pattern_position] > 0 and chord_pattern[active_chord_pattern][chord_pattern_position] or current_chord_x
+  current_chord_o = chord_pattern[active_chord_pattern][chord_pattern_position] > 0 and (chord_pattern[active_chord_pattern][chord_pattern_position] > 7 and 1 or 0) or current_chord_o
+  current_chord_c = chord_pattern[active_chord_pattern][chord_pattern_position] > 0 and util.wrap(chord_pattern[active_chord_pattern][chord_pattern_position], 1, 7) or current_chord_c
+  chord_raw = MusicUtil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
   -- chord transformations
   invert_chord()
   spread_chord()  
@@ -2008,8 +2031,8 @@ end
 
 -- This triggers when mode param changes and allows seq and harmonizers to pick up the new mode immediately. Doesn't affect the chords and doesn't need chord transformations since the chord advancement will overwrite
 function update_chord_action()
-  chord_raw = musicutil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
-  next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
+  chord_raw = MusicUtil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  next_chord = MusicUtil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
 end
 
 
@@ -2049,70 +2072,80 @@ end
 -- Pre-load upcoming chord to address race condition around quantize_note() events occurring before chord change
 function get_next_chord()
   local pre_arrangement_reset = false
-  local pre_arranger_seq_position = arranger_seq_position
-  local pre_arranger_seq_retrig = arranger_seq_retrig
-  local pre_chord_seq_position = chord_seq_position
+  local pre_arranger_position = arranger_position
+  local pre_arranger_retrig = arranger_retrig
+  local pre_chord_pattern_position = chord_pattern_position
   local pre_pattern_queue = pattern_queue
-        pre_pattern = chord_pattern
+        pre_pattern = active_chord_pattern
 
   -- Move arranger sequence if enabled
   if params:get('arranger_enabled') == 1 then
 
     -- If it's post-reset or at the end of chord sequence
-    if (pre_arranger_seq_position == 0 and pre_chord_seq_position == 0) or pre_chord_seq_position >= chord_pattern_length[pre_pattern] then
+    if (pre_arranger_position == 0 and pre_chord_pattern_position == 0) or pre_chord_pattern_position >= chord_pattern_length[pre_pattern] then
       
       -- Check if it's the last pattern in the arrangement.
       if arranger_one_shot_last_pattern then -- Reset arrangement and block chord seq advance/play
         pre_arrangement_reset = true
       else
-        pre_arranger_seq_position = arranger_seq_padded[arranger_queue] ~= nil and arranger_queue or util.wrap(pre_arranger_seq_position + 1, 1, arranger_seq_length)
-        pre_pattern = arranger_seq_padded[pre_arranger_seq_position]
+        pre_arranger_position = arranger_padded[arranger_queue] ~= nil and arranger_queue or util.wrap(pre_arranger_position + 1, 1, arranger_length)
+        pre_pattern = arranger_padded[pre_arranger_position]
         
       end
       
       -- Indicates arranger has moved to new pattern.
-      pre_arranger_seq_retrig = true
+      pre_arranger_retrig = true
     end
     
   end
   
   -- If arrangement was not just reset, update chord position. 
   if pre_arrangement_reset == false then
-    if pre_chord_seq_position >= chord_pattern_length[pre_pattern] or pre_arranger_seq_retrig then
+    if pre_chord_pattern_position >= chord_pattern_length[pre_pattern] or pre_arranger_retrig then
       if pre_pattern_queue then
         pre_pattern = pre_pattern_queue
         pre_pattern_queue = false
       end
-      pre_chord_seq_position = 1
-      pre_arranger_seq_retrig = false
+      pre_chord_pattern_position = 1
+      pre_arranger_retrig = false
     else  
-      pre_chord_seq_position = util.wrap(pre_chord_seq_position + 1, 1, chord_pattern_length[pre_pattern])
+      pre_chord_pattern_position = util.wrap(pre_chord_pattern_position + 1, 1, chord_pattern_length[pre_pattern])
     end
     
-    -- Arranger automation step. todo: examine impact of running some events here rather than in advance_chord_seq
+    -- Arranger automation step. todo: examine impact of running some events here rather than in advance_chord_pattern
     -- Could be important for anything that changes patterns but might also be weird for grid redraw
 
     -- Update the chord. Only updates the octave and chord # if the Grid pattern has something, otherwise it keeps playing the existing chord. 
     -- Mode is always updated in case no chord has been set but user has changed Mode param.
     -- todo p3 efficiency test vs if/then
-      next_chord_x = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and chord_seq[pre_pattern][pre_chord_seq_position] or next_chord_x
-      next_chord_o = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and (chord_seq[pre_pattern][pre_chord_seq_position] > 7 and 1 or 0) or next_chord_o
-      next_chord_c = chord_seq[pre_pattern][pre_chord_seq_position] > 0 and util.wrap(chord_seq[pre_pattern][pre_chord_seq_position], 1, 7) or next_chord_c
-      next_chord = musicutil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
+      next_chord_x = chord_pattern[pre_pattern][pre_chord_pattern_position] > 0 and chord_pattern[pre_pattern][pre_chord_pattern_position] or next_chord_x
+      next_chord_o = chord_pattern[pre_pattern][pre_chord_pattern_position] > 0 and (chord_pattern[pre_pattern][pre_chord_pattern_position] > 7 and 1 or 0) or next_chord_o
+      next_chord_c = chord_pattern[pre_pattern][pre_chord_pattern_position] > 0 and util.wrap(chord_pattern[pre_pattern][pre_chord_pattern_position], 1, 7) or next_chord_c
+      next_chord = MusicUtil.generate_chord_scale_degree(next_chord_o * 12, params:get('mode'), next_chord_c, true)
     
   end
 end
 
 
-function quantize_note_1(note_num, source, pre) -- chord mapping
-  local chord_length = params:get(source..'_chord_type') -- Move upstream?
+function quantize_note_1(note_num, source, pre) -- triad chord mapping
+  local chord_length = 3
   local source_octave = params:get(source..'_octave') -- Move upstream?
   local quantized_note = pre == true and next_chord[util.wrap(note_num, 1, chord_length)] or chord_raw[util.wrap(note_num, 1, chord_length)]
   local quantized_octave = math.floor((note_num - 1) / chord_length)
   return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
 end
 
-function quantize_note_2(note_num, source, pre)  -- mode mapping + diatonic transposition
+
+function quantize_note_2(note_num, source, pre) -- 7th chord mapping
+  local chord_length = 4
+  local source_octave = params:get(source..'_octave') -- Move upstream?
+  local quantized_note = pre == true and next_chord[util.wrap(note_num, 1, chord_length)] or chord_raw[util.wrap(note_num, 1, chord_length)]
+  local quantized_octave = math.floor((note_num - 1) / chord_length)
+  return(quantized_note + ((source_octave + quantized_octave) * 12) + params:get('transpose'))
+end
+
+
+function quantize_note_3(note_num, source, pre)  -- mode mapping + diatonic transposition
   local source_octave = params:get(source..'_octave') -- Move upstream?
   local diatonic_transpose = (pre == true and next_chord_x or current_chord_x) -1
   local quantized_note = notes_nums[note_num + diatonic_transpose]
@@ -2120,25 +2153,25 @@ function quantize_note_2(note_num, source, pre)  -- mode mapping + diatonic tran
 end
 
 
-function quantize_note_3(note_num, source) -- mode mapping
+function quantize_note_4(note_num, source) -- mode mapping
   local source_octave = params:get(source..'_octave') -- Move upstream?
   local quantized_note = notes_nums[note_num]
   return(quantized_note + (source_octave * 12) + params:get('transpose'))
 end
 
 
-function advance_seq_seq()
-  if seq_seq_position > seq_pattern_length[seq_pattern] or arranger_seq_retrig == true then
-    seq_seq_position = 1
+function advance_seq_pattern()
+  if seq_pattern_position > seq_pattern_length[active_seq_pattern] or arranger_retrig == true then
+    seq_pattern_position = 1
   else  
-    seq_seq_position = util.wrap(seq_seq_position + 1, 1, seq_pattern_length[seq_pattern])
+    seq_pattern_position = util.wrap(seq_pattern_position + 1, 1, seq_pattern_length[active_seq_pattern])
   end
 
-  if seq_seq[seq_pattern][seq_seq_position] > 0 then
+  if seq_pattern[active_seq_pattern][seq_pattern_position] > 0 then
     
     local destination = params:string('seq_dest')
     
-    local note = _G['quantize_note_' .. params:get('seq_quant_1')](seq_seq[seq_pattern][seq_seq_position], 'seq')
+    local note = _G['quantize_note_' .. params:get('seq_quant_1')](seq_pattern[active_seq_pattern][seq_pattern_position], 'seq')
     
     if destination == 'Engine' then
       to_engine('seq', note)
@@ -2155,7 +2188,7 @@ function advance_seq_seq()
     end
   end
   
-  if seq_seq_position >= seq_pattern_length[seq_pattern] then
+  if seq_pattern_position >= seq_pattern_length[active_seq_pattern] then
     local seq_start_mode_1 = params:string('seq_start_mode_1')
     if seq_start_mode_1 ~= 'Loop' then
       play_seq = false
@@ -2171,7 +2204,7 @@ end
 function sample_crow(volts)
   local note = _G['quantize_note_' .. params:get('crow_quant_1')](round(volts * 12, 0) + 1, 'crow', params:get('chord_preload') ~= 0) 
   -- Blocks duplicate notes within a chord step so rests can be added to simple CV sources
-  if chord_seq_retrig == true
+  if chord_pattern_retrig == true
   or params:get('do_crow_auto_rest') == 0 
   or (params:get('do_crow_auto_rest') == 1 and (prev_note ~= note)) then
     -- Play the note
@@ -2192,7 +2225,7 @@ function sample_crow(volts)
   end
   
   prev_note = note
-  chord_seq_retrig = false -- Resets at chord advance
+  chord_pattern_retrig = false -- Resets at chord advance
 end
 
 
@@ -2237,7 +2270,7 @@ function to_engine(source, note)
   
   if engine_play_note == true then
     -- PolyPerc crashes if sent >24000 hz!!!
-    note_hz = math.min(musicutil.note_num_to_freq(note + 36), 24000)
+    note_hz = math.min(MusicUtil.note_num_to_freq(note + 36), 24000)
     engine.amp(params:get(source..'_pp_amp') / 100)
     engine.cutoff(note_hz * params:get(source..'_pp_tracking') *.01 + params:get(source..'_pp_cutoff'))
     engine.release(duration_sec(_G[source .. '_duration']))
@@ -2422,7 +2455,7 @@ function grid_redraw()
   -- Draw grid with 16 event lanes (columns) for each step in the selected pattern 
     for x = 1, 16 do -- event lanes
       for y = 1,8 do -- pattern steps
-        g:led(x, y, (events[event_edit_pattern][y][x] ~= nil and 7 or (y > (chord_pattern_length[arranger_seq_padded[event_edit_pattern]] or 0) and 0 or 2)))
+        g:led(x, y, (events[event_edit_pattern][y][x] ~= nil and 7 or (y > (chord_pattern_length[arranger_padded[event_edit_pattern]] or 0) and 0 or 2)))
         if y == event_edit_step and x == event_edit_lane then
           g:led(x, y, 15)
         end  
@@ -2447,7 +2480,7 @@ function grid_redraw()
       ----------------------------------------------------------------------------
       if arranger_loop_key_count > 0 or arranger_pattern_key_count > 0 then
         x_draw_shift = 0
-        local within_seq = event_edit_pattern <= arranger_seq_length -- some weird stuff needs to be handled if user is shifting events past the end of the pattern length
+        local in_bounds = event_edit_pattern <= arranger_length -- some weird stuff needs to be handled if user is shifting events past the end of the pattern length
         if d_cuml >= 0 then -- Shifting arranger pattern to the right and opening up this many segments between event_edit_pattern and event_edit_pattern + d_cuml
    
         ------------------------------------------------
@@ -2461,9 +2494,9 @@ function grid_redraw()
             local x_offset = x + arranger_grid_offset -- Grid x + the offset for whatever page or E1 shift is happening
 
             for y = 1,4 do
-              g:led(x, y, x_offset == arranger_seq_position and 6                                               -- playhead
+              g:led(x, y, x_offset == arranger_position and 6                                               -- playhead
                 or x_offset == arranger_queue and 4                                                             -- queued
-                or x_offset <= (arranger_seq_length + (within_seq and d_cuml or 0)) and 2                       -- seq length
+                or x_offset <= (arranger_length + (in_bounds and d_cuml or 0)) and 2                       -- seq length
                 or 0)
             end
             
@@ -2471,28 +2504,28 @@ function grid_redraw()
             if x_offset >= event_edit_pattern + d_cuml then
               local x_offset = x_offset - d_cuml
               for y = 1,4 do -- patterns
-                if within_seq then
-                  if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
+                if in_bounds then
+                  if y == arranger_padded[x_offset] then g:led(x, y, x_offset == arranger_position and 9 or 7) end -- dim padded segments
                 end
-                if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
+                if y == arranger[x_offset] then g:led(x, y, 15) end -- regular segments
               end
-              g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
+              g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_length and 3 or 7) -- events
               
             elseif x_offset < event_edit_pattern then
               for y = 1,4 do -- patterns
-                if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
-                if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
+                if y == arranger_padded[x_offset] then g:led(x, y, x_offset == arranger_position and 9 or 7) end -- dim padded segments
+                if y == arranger[x_offset] then g:led(x, y, 15) end -- regular segments
               end
               -- if x == 3 then print('2') end
-              g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
+              g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_length and 3 or 7) -- events
               
             else
-              -- no need to do anything with patterns if extending beyond arranger_seq_length
+              -- no need to do anything with patterns if extending beyond arranger_length
               -- can still move around events beyond
-              if within_seq then
-                local pattern_padded = arranger_seq_padded[math.max(event_edit_pattern - 1, 1)]
+              if in_bounds then
+                local pattern_padded = arranger_padded[math.max(event_edit_pattern - 1, 1)]
                 for y = 1,4 do -- patterns
-                  if y == pattern_padded then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end
+                  if y == pattern_padded then g:led(x, y, x_offset == arranger_position and 9 or 7) end
                 end
                 g:led(x, 5, 7)
               else
@@ -2513,18 +2546,18 @@ function grid_redraw()
             local x_offset = x + arranger_grid_offset -- Grid x + the offset for whatever page or E1 shift is happening
             
             -- draw playhead, arranger_queue, adjusted sequence length, blanks
-            if within_seq then
+            if in_bounds then
               for y = 1,4 do 
-                g:led(x, y, x_offset == arranger_seq_position and 6                                             -- playhead
+                g:led(x, y, x_offset == arranger_position and 6                                             -- playhead
                   or x_offset == arranger_queue and 4                                                           -- queued
-                  or x_offset <= (arranger_seq_length + d_cuml) and 2                                           -- seq length
+                  or x_offset <= (arranger_length + d_cuml) and 2                                           -- seq length
                   or 0)                                    
               end
             else
               for y = 1,4 do
-                g:led(x, y, x_offset == arranger_seq_position and 6                                             -- playhead
+                g:led(x, y, x_offset == arranger_position and 6                                             -- playhead
                   or x_offset == arranger_queue and 4                                                           -- queued
-                  or x_offset <= arranger_seq_length and x_offset < (d_cuml + event_edit_pattern) and 2         -- seq length
+                  or x_offset <= arranger_length and x_offset < (d_cuml + event_edit_pattern) and 2         -- seq length
                   or 0)
               end              
             end  
@@ -2532,10 +2565,10 @@ function grid_redraw()
             -- Redefine x_offset only for group #1: patterns that need to be shifted left. Group 2 will be handled as usual
             local x_offset = (x_offset >= event_edit_pattern + d_cuml) and (x_offset - d_cuml) or x_offset
             for y = 1,4 do -- patterns
-              if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end -- dim padded segments
-              if y == arranger_seq[x_offset] then g:led(x, y, 15) end -- regular segments
+              if y == arranger_padded[x_offset] then g:led(x, y, x_offset == arranger_position and 9 or 7) end -- dim padded segments
+              if y == arranger[x_offset] then g:led(x, y, 15) end -- regular segments
             end
-            g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7) -- events
+            g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_length and 3 or 7) -- events
           end -- of drawing for negative d_cuml shift              
         end
       
@@ -2543,12 +2576,12 @@ function grid_redraw()
         for x = 1, 16 do
           local x_offset = x + arranger_grid_offset
           for y = 1,4 do
-            g:led(x,y, x_offset == arranger_seq_position and 6 or x_offset == arranger_queue and 4 or x_offset <= arranger_seq_length and 2 or 0)
-            if y == arranger_seq_padded[x_offset] then g:led(x, y, x_offset == arranger_seq_position and 9 or 7) end
-            if y == arranger_seq[x_offset] then g:led(x, y, 15) end
+            g:led(x,y, x_offset == arranger_position and 6 or x_offset == arranger_queue and 4 or x_offset <= arranger_length and 2 or 0)
+            if y == arranger_padded[x_offset] then g:led(x, y, x_offset == arranger_position and 9 or 7) end
+            if y == arranger[x_offset] then g:led(x, y, 15) end
           end
           -- Events strip
-          g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_seq_length and 3 or 7)
+          g:led(x, 5, (events[x_offset] ~= nil and events[x_offset].populated or 0) > 0 and 15 or x_offset > arranger_length and 3 or 7)
         end
       end
   
@@ -2584,47 +2617,47 @@ function grid_redraw()
       
     elseif grid_view_name == 'Chord' then
       if params:string('arranger_enabled') == 'True' and arranger_one_shot_last_pattern == false then
-        next_pattern_indicator = arranger_seq_padded[util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)]
+        next_pattern_indicator = arranger_padded[util.wrap(arranger_position + 1, 1, arranger_length)]
       else
-        next_pattern_indicator = pattern_queue or chord_pattern
+        next_pattern_indicator = pattern_queue or active_chord_pattern
       end
       
       -- chord pattern selector leds
       for i = 1,4 do
         g:led(16, i, i == next_pattern_indicator and 7 or pattern_keys[i] and 7 or 3) 
-        if i == chord_pattern then
+        if i == active_chord_pattern then
           g:led(16, i, 15)
         end
       end
       
       g:led(16, 7, 15)                                                  -- grid view selector
       
-      if chord_seq_position > 0 then                                    -- fix for Midigrid
+      if chord_pattern_position > 0 then                                    -- fix for Midigrid
         for i = 1, 14 do                                                -- chord seq playhead
-          g:led(i, chord_seq_position, 3)
+          g:led(i, chord_pattern_position, 3)
         end
       end
       
       for i = 1, 8 do
-        g:led(15, i, chord_pattern_length[chord_pattern] < i and 4 or 15)     -- set pattern_length LEDs
-        if chord_seq[chord_pattern][i] > 0 then                               -- muted steps
-          g:led(chord_seq[chord_pattern][i], i, 15)                           -- set LEDs for chord sequence
+        g:led(15, i, chord_pattern_length[active_chord_pattern] < i and 4 or 15)     -- set pattern_length LEDs
+        if chord_pattern[active_chord_pattern][i] > 0 then                               -- muted steps
+          g:led(chord_pattern[active_chord_pattern][i], i, 15)                           -- set LEDs for chord sequence
         end
       end
       
     elseif grid_view_name == 'Seq' then
       g:led(16,8,15)
       
-      if seq_seq_position > 0 then                                        -- fix for Midigrid
+      if seq_pattern_position > 0 then                                        -- fix for Midigrid
         for i = 1,14 do                                                   -- seq seq playhead
-          g:led(i, seq_seq_position, 3)
+          g:led(i, seq_pattern_position, 3)
         end
       end
       
       for i = 1,8 do
-        g:led(15, i, seq_pattern_length[seq_pattern] < i and 4 or 15)   --set pattern_length LEDs
-        if seq_seq[seq_pattern][i] > 0 then                             -- muted steps
-          g:led(seq_seq[seq_pattern][i], i, 15)                         --set LEDs for seq sequence
+        g:led(15, i, seq_pattern_length[active_seq_pattern] < i and 4 or 15)   --set pattern_length LEDs
+        if seq_pattern[active_seq_pattern][i] > 0 then                             -- muted steps
+          g:led(seq_pattern[active_seq_pattern][i], i, 15)                         --set LEDs for seq sequence
         end
       end
     end
@@ -2774,12 +2807,12 @@ function g.key(x,y,z)
           -- todo same as below. simplify
           -----------------------------------
           -- apply changes to chord pattern
-          if y == arranger_seq[x_offset] then
-            arranger_seq[x_offset] = 0
+          if y == arranger[x_offset] then
+            arranger[x_offset] = 0
           else
-            arranger_seq[x_offset] = y
+            arranger[x_offset] = y
           end
-          gen_arranger_seq_padded()
+          gen_arranger_padded()
             
           -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
           events[x_offset] = deepcopy(events[event_edit_pattern])
@@ -2796,12 +2829,12 @@ function g.key(x,y,z)
           -- todo same as above. simplify
           -----------------------------------
           -- apply changes to chord pattern
-          if y == arranger_seq[x_offset] then
-            arranger_seq[x_offset] = 0
+          if y == arranger[x_offset] then
+            arranger[x_offset] = 0
           else
-            arranger_seq[x_offset] = y
+            arranger[x_offset] = y
           end
-          gen_arranger_seq_padded()
+          gen_arranger_padded()
         
           events[x_offset] = deepcopy(events[event_edit_pattern])
           print('Copy+paste events from segment ' .. event_edit_pattern .. ' to segment ' .. x)
@@ -2834,10 +2867,10 @@ function g.key(x,y,z)
     elseif grid_view_name == 'Chord' then
       if x < 15 then
         chord_key_count = chord_key_count + 1
-        if x == chord_seq[chord_pattern][y] then
-          chord_seq[chord_pattern][y] = 0
+        if x == chord_pattern[active_chord_pattern][y] then
+          chord_pattern[active_chord_pattern][y] = 0
         else
-          chord_seq[chord_pattern][y] = x
+          chord_pattern[active_chord_pattern][y] = x
         end
         chord_no = util.wrap(x,1,7) + (params:get('chord_type') == 4 and 7 or 0) -- or 0
         gen_chord_readout()
@@ -2856,10 +2889,10 @@ function g.key(x,y,z)
           print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
           pattern_copy_performed = true
           for i = 1,8 do
-            chord_seq[y][i] = chord_seq[pattern_copy_source][i]
+            chord_pattern[y][i] = chord_pattern[pattern_copy_source][i]
           end
-          -- If we're pasting to the currently viewed chord_pattern, do it via param so we update param + table.
-          if y == chord_pattern then
+          -- If we're pasting to the currently viewed active_chord_pattern, do it via param so we update param + table.
+          if y == active_chord_pattern then
             params:set('chord_pattern_length', chord_pattern_length[pattern_copy_source])
           -- Otherwise just update the table.
           else
@@ -2876,14 +2909,14 @@ function g.key(x,y,z)
     -- SEQ KEYS
     elseif grid_view_name == 'Seq' then
       if x < 15 then
-        if x == seq_seq[seq_pattern][y] then
-          seq_seq[seq_pattern][y] = 0
+        if x == seq_pattern[active_seq_pattern][y] then
+          seq_pattern[active_seq_pattern][y] = 0
         else
-          seq_seq[seq_pattern][y] = x
+          seq_pattern[active_seq_pattern][y] = x
           grid_dirty = true
         end
       elseif x == 15 then
-        params:set('seq_pattern_length_' .. seq_pattern, y)
+        params:set('seq_pattern_length_' .. active_seq_pattern, y)
       end
     end
     
@@ -2924,13 +2957,13 @@ function g.key(x,y,z)
         pattern_keys[y] = nil
         if pattern_key_count == 0 and pattern_copy_performed == false then
           
-          -- Resets current chord_pattern immediately
-          if y == chord_pattern then
+          -- Resets current active_chord_pattern immediately
+          if y == active_chord_pattern then
             print('Manual reset of current pattern; disabling arranger')
             params:set('arranger_enabled', 0)
             pattern_queue = false
-            seq_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-            chord_seq_position = 0
+            seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+            chord_pattern_position = 0
             reset_external_clock()
             reset_pattern()
             
@@ -2940,8 +2973,8 @@ function g.key(x,y,z)
             
             pattern_queue = false
             set_chord_pattern(y)
-            seq_seq_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-            chord_seq_position = 0
+            seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+            chord_pattern_position = 0
             reset_external_clock()
             reset_pattern()
 
@@ -2989,12 +3022,12 @@ function g.key(x,y,z)
               arranger_pattern_key_interrupt = false
             else
             -- apply changes to chord pattern
-              if y == arranger_seq[x_offset]then
-                arranger_seq[x_offset] = 0
+              if y == arranger[x_offset]then
+                arranger[x_offset] = 0
               else
-                arranger_seq[x_offset] = y
+                arranger[x_offset] = y
               end
-              gen_arranger_seq_padded()
+              gen_arranger_padded()
             end
           else
             -- print('arranger_pattern_key_first = FALSE')
@@ -3049,24 +3082,24 @@ end
 function apply_arranger_shift()
   if d_cuml > 0 then  -- same as interaction == 'arranger_shift'? todo p2 clean up anywhere this check is used
     for i = 1, d_cuml do
-      table.insert(arranger_seq, event_edit_pattern, 0)
-      table.remove(arranger_seq, max_arranger_seq_length + 1)
+      table.insert(arranger, event_edit_pattern, 0)
+      table.remove(arranger, max_arranger_length + 1)
       table.insert(events, event_edit_pattern, nil)
       events[event_edit_pattern] = {{},{},{},{},{},{},{},{}}
-      table.remove(events, max_arranger_seq_length + 1)
+      table.remove(events, max_arranger_length + 1)
     end
-    gen_arranger_seq_padded()
+    gen_arranger_padded()
     d_cuml = 0
 
   elseif d_cuml < 0 then
     for i = 1, math.abs(d_cuml) do --math.min(math.abs(d_cuml), 1) do
-      table.remove(arranger_seq, math.max(event_edit_pattern - i, 1))
-      table.insert(arranger_seq, 0)
+      table.remove(arranger, math.max(event_edit_pattern - i, 1))
+      table.insert(arranger, 0)
       table.remove(events, math.max(event_edit_pattern - i, 1))
       table.insert(events, {})
-      events[max_arranger_seq_length] = {{},{},{},{},{},{},{},{}}
+      events[max_arranger_length] = {{},{},{},{},{},{},{},{}}
     end
-    gen_arranger_seq_padded()
+    gen_arranger_padded()
     d_cuml = 0
   end
 end
@@ -3499,7 +3532,7 @@ function enc(n,d)
   if n == 1 then
     -- ------- SCROLL ARRANGER GRID VIEW--------
     -- if grid_view_name == 'Arranger' then
-    --   arranger_grid_offset = util.clamp(arranger_grid_offset + d, 0, max_arranger_seq_length -  16)
+    --   arranger_grid_offset = util.clamp(arranger_grid_offset + d, 0, max_arranger_length -  16)
     --   grid_redraw()
     -- end
             
@@ -3888,38 +3921,38 @@ function gen_dash(source)
   -- iterate through all steps in arranger so we can get a total for steps_remaining_in_arrangement
   -- then build the arranger dash charts, limited to area drawn on screen (~30px)
   ---------------------------------------------------------------------------------------------------
-  for i = math.max(arranger_seq_position, 1), arranger_seq_length do
+  for i = math.max(arranger_position, 1), arranger_length do
     
   -- _sticky vars handle instances when the active arranger segment is interrupted, in which case we want to freeze its vars to stop the segment from updating on the dash (while still allowing upcoming segments to update)
   -- Scenarios to test for:
     -- 1. User changes the current arranger segment pattern while on that segment. In this case we want to keep displaying the currently *playing* chord pattern
     -- 2. User changes the current chord pattern by double tapping it on the Chord grid view. This sets arranger_active to false and should suspend the arranger mini chart until Arranger pickup occurs.
-    -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_seq_padded shenanigans)
-    -- 4. We DO want this to update if the arranger is reset (arranger_seq_position = 0, however)
+    -- 3. Current arranger segment is turned off, resulting in it picking up a different pattern (either the previous pattern or wrapping around to grab the last pattern. arranger_padded shenanigans)
+    -- 4. We DO want this to update if the arranger is reset (arranger_position = 0, however)
     
-    -- Note: arranger_seq_position == i idenifies if we're on the active segment. Implicitly false when arranger is reset (arranger_seq_position 0) todo p2 make local
-    if arranger_seq_position == i then
+    -- Note: arranger_position == i idenifies if we're on the active segment. Implicitly false when arranger is reset (arranger_position 0) todo p2 make local
+    if arranger_position == i then
       -- todo p2 would be nice to rewrite this so these can be local
       if arranger_active == true then
-        active_pattern = chord_pattern
+        active_pattern = active_chord_pattern
         active_chord_pattern_length = chord_pattern_length[active_pattern]
-        active_chord_seq_position = math.max(chord_seq_position, 1)
+        active_chord_pattern_position = math.max(chord_pattern_position, 1)
         segment_level = 15
       else
         segment_level = 2 -- interrupted segment pattern, redraw will add +1 for better contrast only on events
       end
       pattern_sticky = active_pattern
       chord_pattern_length_sticky = active_chord_pattern_length
-      chord_seq_position_sticky = active_chord_seq_position
+      chord_pattern_position_sticky = active_chord_pattern_position
 
-      local steps_incr = math.max(active_chord_pattern_length - math.max((active_chord_seq_position or 1) - 1, 0), 0)
+      local steps_incr = math.max(active_chord_pattern_length - math.max((active_chord_pattern_position or 1) - 1, 0), 0)
       steps_remaining_in_pattern = steps_incr
       steps_remaining_in_active_pattern = steps_remaining_in_active_pattern + steps_incr
     -- print('active_pattern = ' .. active_pattern) --todo debug to see if this is always set
     else -- upcoming segments always grab their current values from arranger
-      pattern_sticky = arranger_seq_padded[i]
+      pattern_sticky = arranger_padded[i]
       chord_pattern_length_sticky = chord_pattern_length[pattern_sticky]
-      chord_seq_position_sticky = 1
+      chord_pattern_position_sticky = 1
       steps_remaining_in_pattern = chord_pattern_length[pattern_sticky]
       segment_level = params:get('arranger_enabled') == 1 and 15 or 2
     end
@@ -3929,8 +3962,8 @@ function gen_dash(source)
     
     -- todo p3 some sort of weird race condition is happening at init that requires nil check on events
     if events ~= nil and dash_steps < 30 then -- capped so we only store what is needed for the dash (including inserted blanks)
-      for s = chord_seq_position_sticky, chord_pattern_length_sticky do -- todo debug this was letting 0 values through at some point. Debug if errors surface.
-        -- if s == 0 then print('s == 0 ' .. chord_seq_position_sticky .. '  ' .. chord_pattern_length_sticky) end -- p0 debug looking for 0000s
+      for s = chord_pattern_position_sticky, chord_pattern_length_sticky do -- todo debug this was letting 0 values through at some point. Debug if errors surface.
+        -- if s == 0 then print('s == 0 ' .. chord_pattern_position_sticky .. '  ' .. chord_pattern_length_sticky) end -- p0 debug looking for 0000s
         if dash_steps == 30 then
          break 
         end -- second length check for each step iteration cuts down on what is saved for long segments
@@ -3957,7 +3990,7 @@ end
 function redraw()
   screen.clear()
   local dash_x = 94
-    
+      
   -- Screens that pop up when g.keys are being held down take priority--------
   -- POP-up g.key tip always takes priority
   if view_key_count > 0 then
@@ -4285,10 +4318,10 @@ function redraw()
       --------------------------------------------      
       screen.level(0)
       screen.move(dash_x + 2, y_offset + 5)
-      if chord_seq_position == 0 then
-        screen.text(pattern_name[chord_pattern].. '.RST')
+      if chord_pattern_position == 0 then
+        screen.text(pattern_name[active_chord_pattern].. '.RST')
       else
-        screen.text(pattern_name[chord_pattern] ..'.'.. chord_seq_position .. '/' .. chord_pattern_length[chord_pattern])
+        screen.text(pattern_name[active_chord_pattern] ..'.'.. chord_pattern_position .. '/' .. chord_pattern_length[active_chord_pattern])
       end
       
       --------------------------------------------
@@ -4314,7 +4347,7 @@ function redraw()
       screen.pixel(dash_x + 3, arranger_dash_y + 27)
       screen.fill()
       
-      local arranger_dash_x = dash_x + (arranger_seq_position == 0 and 5 or 3) -- If arranger is reset, add an initial gap to the x position
+      local arranger_dash_x = dash_x + (arranger_position == 0 and 5 or 3) -- If arranger is reset, add an initial gap to the x position
       
       -- Draw arranger patterns and events timeline straight from x_dash_flat
       for i = 1, dash_steps do -- alternative to #dash_patterns. This is faster at the cost of a global var which I guess is okay?
@@ -4373,26 +4406,26 @@ function redraw()
       --------------------------------------------      
       screen.move(dash_x + 2,arranger_dash_y + 9)
 
-      if arranger_seq_position == 0 then
+      if arranger_position == 0 then
         if arranger_queue == nil then
           screen.text('RST')
         elseif arranger_active == false then
-          screen.text((arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)) .. '.'.. math.min(chord_seq_position - chord_pattern_length[chord_pattern], 0))
+          screen.text((arranger_queue or util.wrap(arranger_position + 1, 1, arranger_length)) .. '.'.. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
         else
           screen.text(arranger_queue .. '.0')
         end
       elseif arranger_active == false then
-        if arranger_seq_position == arranger_seq_length then
+        if arranger_position == arranger_length then
           if params:string('playback') == "Loop"  then
-            screen.text('LP.' .. math.min(chord_seq_position - chord_pattern_length[chord_pattern], 0))
+            screen.text('LP.' .. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
           else
-            screen.text('EN.' .. math.min(chord_seq_position - chord_pattern_length[chord_pattern], 0))
+            screen.text('EN.' .. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
           end
         else
-          screen.text((arranger_queue or util.wrap(arranger_seq_position + 1, 1, arranger_seq_length)) .. '.'.. math.min(chord_seq_position - chord_pattern_length[chord_pattern], 0))
+          screen.text((arranger_queue or util.wrap(arranger_position + 1, 1, arranger_length)) .. '.'.. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
         end
       else
-        screen.text(arranger_seq_position .. '.' .. chord_seq_position)
+        screen.text(arranger_position .. '.' .. chord_pattern_position)
         
       end      
       screen.fill()
