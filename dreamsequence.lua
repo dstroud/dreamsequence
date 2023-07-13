@@ -68,20 +68,20 @@ function init()
 
   crow.ii.jf.event = function(e, value)
     if e.name == 'mode' then
-      print('preinit jf.mode = '..value)
+      -- print('preinit jf.mode = '..value)
       preinit_jf_mode = value
     elseif e.name == 'time' then
       jf_time = value
-      print('jf_time = ' .. value)
+      -- print('jf_time = ' .. value)
     end
   end
   
   
   function capture_preinit()
     preinit_clock_source = params:get('clock_source')
-    print('preinit_clock_source = ' .. preinit_clock_source)
+    -- print('preinit_clock_source = ' .. preinit_clock_source)
     preinit_clock_crow_out = params:get('clock_crow_out')
-    print('preinit_clock_crow_out = ' .. preinit_clock_crow_out)
+    -- print('preinit_clock_crow_out = ' .. preinit_clock_crow_out)
     preinit_jf_mode = clock.run(
       function()
         clock.sleep(0.005) -- a small hold for usb round-trip
@@ -289,7 +289,7 @@ function init()
   ------------------
   -- CHORD PARAMS --
   ------------------
-  params:add_group('chord', 'CHORD', 24)  
+  params:add_group('chord', 'CHORD', 23)  
   
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
@@ -312,8 +312,8 @@ function init()
   -- params:add_number('chord_rotate', 'Pattern rotate', -14, 14, 0)
   -- params:set_action('chord_rotate',function() pattern_rotate_abs('chord_rotate') end)  
   
-  params:add_number('chord_shift', 'Pattern shift', -14, 14, 0)
-  params:set_action('chord_shift',function() pattern_shift_abs('chord_shift') end)
+  -- params:add_number('chord_shift', 'Pattern shift', -14, 14, 0)
+  -- params:set_action('chord_shift',function() pattern_shift_abs('chord_shift') end)
   
   -- will act on current pattern unlike numbered seq param
   params:add_number('chord_pattern_length', 'Pattern length', 1, 8, 4)
@@ -666,8 +666,7 @@ function init()
   -- arranger_pattern_keys = {}
   arranger_pattern_key_first = nil -- simpler way to identify the first key held down so we can handle this as a "copy" action and know when to act on it or ignore it. Don't need a whole table.
   arranger_loop_key_count = 0 -- rename arranger_events_strip_key_count?
-  arranger_pattern_key_count = 0
-  arranger_pattern_key_interrupt = false
+  -- arranger_pattern_key_interrupt = false -- todo p1 probably not needed
   key_counter = 4
   pattern_key_count = 0
   chord_key_count = 0
@@ -892,15 +891,15 @@ function update_menus()
   
   -- CHORD MENU
   if params:string('chord_dest') == 'Mute' then
-    menus[2] = {'chord_dest', 'chord_shift', 'chord_div_index'} -- maybe add chord_type back depending on readout
+    menus[2] = {'chord_dest', 'chord_div_index'} -- maybe add chord_type back depending on readout
   elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_shift', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_shift', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
   elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_shift', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_dest') == 'Disting' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_shift', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- SEQ MENU
@@ -1441,27 +1440,27 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
   local chord_type = nil
   
   -- todo p0 just shortening triad strings for now but this needs to be revisited when we flip the switch back on 7ths
-  if is_major then
+if is_major then
     if is_augmented then
       if is_seventh then
-        chord_type = "Augmented Major 7"
+        chord_type = 'M+7' -- "Augmented Major 7"
       else
-        chord_type = "aug"
+        chord_type = '+' -- "Augmented"
       end
     elseif is_diminished then
       if is_seventh then
-        chord_type = "Diminished 7"
+        chord_type = '\u{B0}7'  --  "Diminished 7"
       else
-        chord_type = "dim"
+        chord_type = '\u{B0}' -- "Diminished"
       end
     elseif is_half_diminished then
-      chord_type = "Half Diminished 7"
+      chord_type = '\u{F8}7' -- "Half Diminished 7"
     elseif is_minormajor_seventh then
-      chord_type = "Minor Major 7"
+      chord_type = 'm\u{266e}7' --  "Minor Major 7"   -- not used by DS but is this valid?
     elseif is_major_seventh then
-      chord_type = "Major 7"
+      chord_type = 'M7' --  "Major 7"
     elseif is_seventh then
-      chord_type = "Dominant 7"
+      chord_type = '7'  --  "Dominant 7"
     elseif added_string == "6" then
       if bass_string == "9" then
         chord_type = "Major 69"
@@ -1475,29 +1474,29 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
     elseif added_string == "13" then
       chord_type = "Major 13"
     else
-      chord_type = "maj"
+      chord_type = 'M' -- "Major"
     end
   else -- minor
     if is_augmented then
       if is_seventh then
-        chord_type = "Augmented 7"
+        chord_type = '+7' -- "Augmented 7"
       else
-        chord_type = "aug"
+        chord_type = '+' -- "Augmented"
       end
     elseif is_diminished then
       if is_seventh then
-        chord_type = "Diminished 7"
+        chord_type = '\u{B0}7' -- "Diminished 7"
       else
-        chord_type = "dim"
+        chord_type = '\u{B0}' -- "Diminished"
       end
     elseif is_half_diminished then
-      chord_type = "Half Diminished 7"
+      chord_type = '\u{F8}7' -- "Half Diminished 7"
     elseif is_minormajor_seventh then
-      chord_type = "Minor Major 7"
+      chord_type = 'm\u{266e}7' -- "Minor Major 7"
     elseif is_major_seventh then
-      chord_type = "Major 7" -- this overrides the lowercase roman degree
+      chord_type = 'M7' -- "Major 7" -- this overrides the lowercase roman degree
     elseif is_seventh then
-      chord_type = "Minor 7"
+      chord_type = 'm7' -- "Minor 7"
     elseif added_string == "6" then
       if bass_string == "9" then
         chord_type = "Minor 69"
@@ -1511,7 +1510,7 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
     elseif added_string == "13" then
       chord_type = "Minor 13"
     else
-      chord_type = "min"
+      chord_type = 'm' -- "Minor"
     end
   end
   return(chord_type)
@@ -1876,9 +1875,11 @@ function advance_chord_pattern()
     if seq_start_mode_1 == 2 then play_seq = true end -- 'On step'
     
     if chord_key_count == 0 then
-      -- chord_no = current_chord_c + ((params:get('chord_type') + 2) == 4 and 7 or 0) -- used for chord readout, distinguishing between triad and 7ths
+
       -- todo p0 temporarily setting chord readout to only show triad until new glyphs are added and we have time to review. Technically this is fine since triad or 7th is defined per voice.
-      chord_no = current_chord_c -- used for chord readout, distinguishing between triad and 7ths. todo p1 simplify if sticking with triad readout
+      chord_no = current_chord_c + ((params:get('chord_type') + 2) == 4 and 7 or 0) -- used for chord readout, distinguishing between triad and 7ths
+      -- chord_no = current_chord_c -- used for chord readout, distinguishing between triad and 7ths. todo p1 simplify if sticking with triad readout
+
       gen_chord_readout()
     end
 
@@ -2002,6 +2003,7 @@ function gen_chord_readout()
   if chord_no > 0 then
     local chord_degree = MusicUtil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]  -- Adding 7 to index returns 7th variants
     local chord_name = MusicUtil.NOTE_NAMES[util.wrap((MusicUtil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
+    -- print('chord_name ' .. chord_name)
     local modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- modified to only do triad readout for now.
     chord_readout = params:string('chord_readout') == 'Degree' and chord_degree or chord_name .. modifier
   end
@@ -2528,7 +2530,7 @@ function grid_redraw()
       ----------------------------------------------------------------------------
       -- Arranger shifting rework here
       ----------------------------------------------------------------------------
-      if arranger_loop_key_count > 0 or arranger_pattern_key_count > 0 then
+      if arranger_loop_key_count > 0 then
         x_draw_shift = 0
         local in_bounds = event_edit_segment <= arranger_length -- some weird stuff needs to be handled if user is shifting events past the end of the pattern length
         if d_cuml >= 0 then -- Shifting arranger pattern to the right and opening up this many segments between event_edit_segment and event_edit_segment + d_cuml
@@ -2706,6 +2708,7 @@ end
 
 
 -- GRID KEYS
+-- todo p1 put in some top level checks so we can break this up into functions or something navigatable
 function g.key(x,y,z)
   if z == 1 then
 
@@ -2794,12 +2797,19 @@ function g.key(x,y,z)
 
     -- view_key buttons  
     elseif x == 16 and y > 5 then
-      view_key_count = view_key_count + 1
-      table.insert(grid_view_keys, y)
-      if view_key_count == 1 then 
-        grid_view_name = grid_views[y - 5] 
-      elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
-          screen_view_name = 'Chord+seq'
+      if interaction == nil then  -- interactions block view switching
+        view_key_count = view_key_count + 1
+        
+        -- following lines cancel any pending pattern changes by acting as if a copy was just performed (overrides)
+        -- pattern_key_count = 0
+        -- pattern_copy_performed = true
+        
+        table.insert(grid_view_keys, y)
+        if view_key_count == 1 then
+          grid_view_name = grid_views[y - 5] 
+        elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
+            screen_view_name = 'Chord+seq'
+        end
       end
       
     --ARRANGER KEY DOWN-------------------------------------------------------
@@ -2830,75 +2840,38 @@ function g.key(x,y,z)
         
       
       -- ARRANGER SEGMENT CHORD PATTERNS
-      -- now work with event copy+paste and give promps to jump to segment or enter event editor
-      elseif y < 5 then
-        -- store the first key pressed so we can ignore it later if it's being used as a way to copy and past events
-        if arranger_pattern_key_count == 0 then arranger_pattern_key_first = x end
+      elseif y < 5 and interaction ~= 'arranger_shift' then
+        if y == arranger[x_offset] then
+          arranger[x_offset] = 0
+        else
+          arranger[x_offset] = y
+        end
+        gen_arranger_padded()
         
-        arranger_pattern_key_count = arranger_pattern_key_count + 1
-
-        -- First pattern key down is special because it needs to enable alternate K2/K3 and E3 modes. If user interacts with those, we don't want to toggle the pattern. So we do all that on key up wheras any copy+paste of patterns/events can happen here on key down.
-        if arranger_pattern_key_count == 1 and arranger_loop_key_count == 0 then
-          event_edit_segment = x_offset
-
-        elseif arranger_loop_key_count == 0 and arranger_pattern_key_count > 1 and interaction == nil then
-
-          -- todo same as below. simplify
-          -----------------------------------
-          -- apply changes to chord pattern
-          if y == arranger[x_offset] then
-            arranger[x_offset] = 0
-          else
-            arranger[x_offset] = y
-          end
-          gen_arranger_padded()
-            
-          -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
+        -- allow pasting of events while setting patterns (but not the other way around)
+        if interaction == 'event_copy' then
           events[x_offset] = deepcopy(events[event_edit_segment])
           print('Copy+paste events from segment ' .. event_edit_segment .. ' to segment ' .. x)
           gen_dash('Event copy+paste')
-          -----------------------------------
-
-          -- an event paste was just performed so block any change on the final key release
-          arranger_pattern_key_interrupt = true
-          -- print('SETTING arranger_pattern_key_interrupt = TRUE')
-          
-        elseif arranger_loop_key_count == 1 and interaction == nil then
-          
-          -- todo same as above. simplify
-          -----------------------------------
-          -- apply changes to chord pattern
-          if y == arranger[x_offset] then
-            arranger[x_offset] = 0
-          else
-            arranger[x_offset] = y
-          end
-          gen_arranger_padded()
-        
-          events[x_offset] = deepcopy(events[event_edit_segment])
-          print('Copy+paste events from segment ' .. event_edit_segment .. ' to segment ' .. x)
-          gen_dash('Event copy+paste')
-          -----------------------------------
         end
         
-      -- Arranger events strip key down
+      -- ARRANGER EVENTS TIMELINE KEY DOWN
       elseif y == 5 then
         arranger_loop_key_count = arranger_loop_key_count + 1
-
-        -- First touched pattern is the one we edit, effectively resetting on key_count = 0
-        if arranger_pattern_key_count == 0 and arranger_loop_key_count == 1 then
-          event_edit_segment = x_offset
-
-        -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
-        -- arranger shift interaction will block this
-        -- implicit here that more than 1 key is held down so we're pasting
-        elseif interaction == nil then
-          events[x_offset] = deepcopy(events[event_edit_segment])
-          print('Copy+paste events from segment ' .. event_edit_segment .. ' to segment ' .. x)
-          gen_dash('Event copy+paste')
-        end
-        if arranger_pattern_key_count == 1 then 
-          arranger_pattern_key_interrupt = true
+        if interaction ~= 'arranger_shift' then -- nil then
+          interaction = 'event_copy'  
+          -- First touched pattern is the one we edit, effectively resetting on key_count = 0
+          if arranger_loop_key_count == 1 then
+            event_edit_segment = x_offset
+  
+          -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
+          -- arranger shift interaction will block this
+          -- implicit here that more than 1 key is held down so we're pasting
+          else
+            events[x_offset] = deepcopy(events[event_edit_segment])
+            print('Copy+paste events from segment ' .. event_edit_segment .. ' to segment ' .. x)
+            gen_dash('Event copy+paste')
+          end
         end
       end
       
@@ -2920,6 +2893,7 @@ function g.key(x,y,z)
         gen_dash('g.key chord_pattern_length')
 
       elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
+        interaction = 'chord_pattern_copy'
         pattern_key_count = pattern_key_count + 1
         pattern_keys[y] = 1
         if pattern_key_count == 1 then
@@ -2991,41 +2965,48 @@ function g.key(x,y,z)
 
     -- Chord key up      
     elseif grid_view_name == 'Chord' then
-      if x == 16 and y <5 then
-        pattern_key_count = math.max(pattern_key_count - 1,0)
-        pattern_keys[y] = nil
-        if pattern_key_count == 0 and pattern_copy_performed == false then
-          
-          -- Resets current active_chord_pattern immediately
-          if y == active_chord_pattern then
-            print('Manual reset of current pattern; disabling arranger')
-            params:set('arranger', 1)
-            pattern_queue = false
-            seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-            chord_pattern_position = 0
-            reset_external_clock()
-            reset_pattern()
+      if x == 16 then
+        if y <5 then
+          pattern_key_count = math.max(pattern_key_count - 1,0)
+          pattern_keys[y] = nil
+          if pattern_key_count == 0 and pattern_copy_performed == false then
             
-          -- Manual jump to queued pattern  
-          elseif y == pattern_queue then
-            print('Manual jump to queued pattern')
-            
-            pattern_queue = false
-            set_chord_pattern(y)
-            seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
-            chord_pattern_position = 0
-            reset_external_clock()
-            reset_pattern()
-
-          -- Cue up a new pattern        
-          else                       
-            print('New pattern queued; disabling arranger')
-            if pattern_copy_performed == false then
-              pattern_queue = y
+            -- Resets current active_chord_pattern immediately if transport is stopped
+            if y == active_chord_pattern and transport_active == false then
+              print('Manual reset of current pattern; disabling arranger')
               params:set('arranger', 1)
+              pattern_queue = false
+              seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+              chord_pattern_position = 0
+              reset_external_clock()
+              reset_pattern()
+              
+            -- Manual jump to queued pattern  
+            elseif y == pattern_queue and transport_active == false then
+              print('Manual jump to queued pattern')
+              
+              pattern_queue = false
+              set_chord_pattern(y)
+              seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+              chord_pattern_position = 0
+              reset_external_clock()
+              reset_pattern()
+  
+            -- Cue up a new pattern        
+            else 
+              print('New pattern queued; disabling arranger')
+              if pattern_copy_performed == false then
+                pattern_queue = y
+                params:set('arranger', 1)
+              end
             end
           end
         end
+        if pattern_key_count == 0 then
+          -- print('resetting pattern_copy_performed to false')
+          pattern_copy_performed = false
+          interaction = nil
+        end  
       elseif x < 15 then
         chord_key_count = chord_key_count - 1
         if chord_key_count == 0 then
@@ -3036,81 +3017,25 @@ function g.key(x,y,z)
         end
       end
     
-    -- Arranger key up  
+    
+    -- ARRANGER KEY UP
     elseif grid_view_name == 'Arranger' then
       local x_offset = x + arranger_grid_offset -- currently only used 
-
-      -- ARRANGER SEGMENT CHORD PATTERNS
-      -- extra check on arranger_pattern_key_count to toss out any key up that is a result of having a g.key held down in event editor and releasing after switching back to arranger.
       
-      if y < 5 and arranger_pattern_key_count > 0 then
-        arranger_pattern_key_count = math.max(arranger_pattern_key_count - 1, 0)
-        -- arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
-
-        -- print('---------- KEY UP ------------')
-        if arranger_loop_key_count == 0 then
-          -- print('arranger_loop_key_count == 0')
-          
-          if x == arranger_pattern_key_first then
-            -- print('arranger_pattern_key_first = TRUE')
-            arranger_pattern_key_first = nil
-            -- print('setting arranger_pattern_key_first to NIL')
-            
-            -- check if this key was used to perform a pseudo copy. If so, don't do anything on release (but reset this check)
-            if arranger_pattern_key_interrupt == true then
-              arranger_pattern_key_interrupt = false
-            else
-            -- apply changes to chord pattern
-              if y == arranger[x_offset]then
-                arranger[x_offset] = 0
-              else
-                arranger[x_offset] = y
-              end
-              gen_arranger_padded()
-            end
-          else
-            -- print('arranger_pattern_key_first = FALSE')
-          end
-
-            -- Insert/remove patterns/events after arranger shift with K3
-          if arranger_loop_key_count == 0 and arranger_pattern_key_count == 0 then
-            apply_arranger_shift()
-            interaction = nil
-          end
-          
-          -- additional check for a really rare situation. Be sure to test when attempting a refactor of this mess:
-          -- pattern key 1 down
-          --                   pattern key 2 down
-          -- pattern key 1 up
-          -- pattern key 1 down
-          -- pattern key 1 up
-          --                   pattern key 2 up
-          -- pattern key 1 down is now blocked
-          if arranger_loop_key_count == 0 and arranger_pattern_key_count == 0 then
-            arranger_pattern_key_interrupt = false
-            -- print('No keys held: setting arranger_pattern_key_interrupt to FALSE')  
-          end
-          
-        end
-        
-      
-      -- Arranger loop strip
-      elseif y == 5 then
+      -- ARRANGER EVENTS TIMELINE KEY UP
+      if y == 5 then
         arranger_loop_key_count = math.max(arranger_loop_key_count - 1, 0)
         
         -- Insert/remove patterns/events after arranger shift with K3
-        if arranger_loop_key_count == 0 and arranger_pattern_key_count == 0 then 
-          apply_arranger_shift()
+        if arranger_loop_key_count == 0 then
+          if interaction == 'arranger_shift' then
+            apply_arranger_shift()
+          end
           interaction = nil
-          -- print('event strip setting arranger_pattern_key_interrupt to FALSE')
-          arranger_pattern_key_interrupt = false
         end
       end
     end
-  
-    if pattern_key_count == 0 then
-      pattern_copy_performed = false 
-    end
+
   end
   redraw()
   grid_redraw()
@@ -3161,11 +3086,11 @@ function key(n,z)
       -- Not used at the moment
         
       -- Arranger Events strip held down
-      if (arranger_loop_key_count > 0 or arranger_pattern_key_count > 0) and interaction == nil then
+      if arranger_loop_key_count > 0 and interaction ~= 'arranger_shift' then -- interaction == nil then
         arranger_queue = event_edit_segment
         -- jumping arranger queue cancels pattern change on key up
         -- print('setting arranger_pattern_key_interrupt to TRUE')
-        arranger_pattern_key_interrupt = true -- don't change pattern on g.key up
+        -- arranger_pattern_key_interrupt = true -- don't change pattern on g.key up
         grid_redraw()
       
       elseif screen_view_name == 'Events' then
@@ -3223,7 +3148,7 @@ function key(n,z)
       -- Transport controls K2 - STOP/RESET --
       ----------------------------------------
         
-      elseif interaction == nil then
+      elseif interaction ~= 'arranger_shift' then -- == nil then -- actually seems fine to do transport controls this during arranger shift?
 
         if params:string('clock_source') == 'internal' then
           -- print('internal clock')
@@ -3232,7 +3157,7 @@ function key(n,z)
             transport_state = 'pausing'
             print(transport_state)        
             clock_start_method = 'continue'
-          elseif transport_state == 'pausing' or transport_state == 'paused' then
+          else  --  remove so we can always do a stop (external sync and weird state exceptions) if transport_state == 'pausing' or transport_state == 'paused' then
             reset_external_clock()
             if params:get('arranger') == 2 then
               reset_arrangement()
@@ -3249,7 +3174,7 @@ function key(n,z)
             transport_state = 'pausing'
             print(transport_state)
           -- don't let link reset while transport is active or it gets outta sync
-          elseif transport_state == 'paused' then
+          elseif transport_state == 'paused' or transport_state == 'stopped' then --  modified so we can always do a stop when not playing (external sync and weird state exceptions) 
             if params:get('arranger') == 2 then
               reset_arrangement()
             else
@@ -3264,7 +3189,7 @@ function key(n,z)
             print(transport_state)        
             clock_start_method = 'continue'
             -- start = true
-          elseif transport_state == 'pausing' or transport_state == 'paused' then
+          else --  remove so we can always do a stop (external sync and weird state exceptions)  if transport_state == 'pausing' or transport_state == 'paused' then
             reset_external_clock()
             if params:get('arranger') == 2 then
               reset_arrangement()
@@ -3314,13 +3239,13 @@ function key(n,z)
       -- Event Editor --
       -- K3 with Event Timeline key held down enters Event editor / function key event editor
       ---------------------------------------------------------------------------        
-      elseif (arranger_loop_key_count > 0 or arranger_pattern_key_count > 0) and interaction == nil then
+      elseif arranger_loop_key_count > 0 and interaction ~= 'arranger_shift' then -- interaction == nil then
         arranger_loop_key_count = 0
-        arranger_pattern_key_count = 0
         event_edit_step = 0
         event_edit_lane = 0
         event_edit_active = false
         screen_view_name = 'Events'
+        interaction = nil
         grid_redraw()
   
       -- K3 saves event to events
@@ -3652,7 +3577,7 @@ function enc(n,d)
     --------------------
     -- Arranger shift --  
     --------------------
-    elseif grid_view_name == 'Arranger' and (arranger_loop_key_count > 0 or arranger_pattern_key_count > 0) then
+    elseif grid_view_name == 'Arranger' and arranger_loop_key_count > 0 then
       -- Arranger segment detail options are on-screen
       -- block event copy+paste, K2 and K3 (arranger jump and event editor)
       -- new global to identify types of user interactions that should block certain other interactions e.g. copy+paste, arranger jump, and entering event editor
@@ -3661,7 +3586,7 @@ function enc(n,d)
       
       -- an event paste was just performed so block any change on the final key release
       -- todo p2 thought: can probably set a special interaction that works in place of arranger_pattern_key_interrupt
-      arranger_pattern_key_interrupt = true
+      -- arranger_pattern_key_interrupt = true
       grid_redraw()
   
     elseif screen_view_name == 'Session' then
@@ -4035,9 +3960,9 @@ function redraw()
       screen.move(2,8)
       screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
       screen.move(2,28)
-      screen.text('ENC 2: Rotate ↑↓')
+      screen.text('ENC 2: rotate ↑↓')
       screen.move(2,38)
-      screen.text('ENC 3: Transpose ←→')
+      screen.text('ENC 3: transpose ←→')
       screen.level(4)
       screen.move(1,54)
       screen.line(128,54)
@@ -4067,9 +3992,9 @@ function redraw()
       screen.move(2,8)
       screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
       screen.move(2,28)
-      screen.text('ENC 2: Rotate ↑↓')
+      screen.text('ENC 2: rotate ↑↓')
       screen.move(2,38)
-      screen.text('ENC 3: Transpose ←→')
+      screen.text('ENC 3: transpose ←→')
       screen.level(4)
       screen.move(1,54)
       screen.line(128,54)
@@ -4083,9 +4008,9 @@ function redraw()
       screen.move(2,8)
       screen.text(string.upper(grid_view_name) .. ' GRID FUNCTIONS')
       screen.move(2,28)
-      screen.text('ENC 2: Rotate ↑↓')
+      screen.text('ENC 2: rotate ↑↓')
       screen.move(2,38)
-      screen.text('ENC 3: Transpose ←→')
+      screen.text('ENC 3: transpose ←→')
       screen.level(4)
       screen.move(1,54)
       screen.line(128,54)
@@ -4102,7 +4027,7 @@ function redraw()
     screen.text('ARRANGER SEGMENT ' .. event_edit_segment)
     -- todo: might be cool to add a scrollable (K2) list of events in this segment here
     screen.move(2,38)
-    screen.text('ENC 3: Shift segments ←→')
+    screen.text('ENC 3: shift segments ←→')
     screen.level(4)
     screen.move(1,54)
     screen.line(128,54)
@@ -4110,22 +4035,22 @@ function redraw()
   
     
   -- Arranger events timeline held down
-  elseif arranger_loop_key_count > 0 or arranger_pattern_key_count > 0 then
+  elseif arranger_loop_key_count > 0 then
     screen.level(15)
     screen.move(2,8)
     screen.text('ARRANGER SEGMENT ' .. event_edit_segment)
     -- todo: might be cool to add a scrollable (K2) list of events in this segment here
     screen.move(2,28)
-    screen.text('Tap to paste events')
+    screen.text('Hold+tap: paste events')
     screen.move(2,38)
-    screen.text('ENC 3: Shift segments ←→')
+    screen.text('ENC 3: shift segments ←→')
     screen.level(4)
     screen.move(1,54)
     screen.line(128,54)
     screen.stroke()
     screen.level(3)
     screen.move(1,62)
-    screen.text('(K2) JUMP TO')    
+    screen.text('(K2) CUE SEG.')    
     screen.move(82,62)
     screen.text('(K3) EVENTS')
 
@@ -4143,13 +4068,15 @@ function redraw()
   elseif grid_view_name == 'Chord' and pattern_key_count > 0 then -- add a new interaction for this
     screen.level(15)
     screen.move(2,8)
-    screen.text("CHORD PATTERN '" .. pattern_name[pattern_copy_source] .. "'' COPIED")
+    screen.text("CHORD PATTERN '" .. pattern_name[pattern_copy_source] .. "'")
     screen.move(2,28)
-    screen.text('1. Tap a pattern to paste')
+    -- screen.text('Tap a pattern to paste')
+    screen.text('Hold+tap: paste pattern') --. ' .. pattern_name[pattern_copy_source])
     screen.move(2,38)
-    screen.text('2. Release to queue pattern')
+    screen.text('Release: queue pattern')
     screen.move(2,48)
-    screen.text('3. Tap again to force jump')
+    -- screen.text('Tap again to force jump')
+    screen.text('Tap 2x while stopped: jump')
     screen.level(4)
     screen.move(1,54)
     screen.line(128,54)
@@ -4172,11 +4099,11 @@ function redraw()
           screen.text('ARRANGER SEGMENT ' .. event_edit_segment .. ' EVENTS')
           screen.level(15)
           screen.move(2,23)
-          screen.text('Select an event slot on Grid')
+          screen.text('Grid: select event slot')
           screen.move(2,33)
           screen.text('1↓8: chord pattern step')
           screen.move(2,43)
-          screen.text('1→16: order of execution')
+          screen.text('1→16: event order')
           screen.level(4)
           screen.move(1,54)
           screen.line(128,54)
@@ -4281,6 +4208,12 @@ function redraw()
           line = line + 1
         end
         
+        -- scrollbar
+        screen.level(10)
+        local offset = scrollbar(events_index, #events_menus, 4, 2, 40) -- (index, total, in_view, locked_row, screen_height)
+        local bar_height = 4 / #events_menus * 40
+        screen.rect(127, offset, 1, bar_height)
+        screen.fill()
       
      -- Events editor sticky header
         screen.level(4)
@@ -4312,13 +4245,6 @@ function redraw()
           screen.text_right('(K3) SAVE')
         end
       end
-    
-      -- scrollbar
-      screen.level(10)
-      local offset = scrollbar(events_index, #events_menus, 4, 2, 40) -- (index, total, in_view, locked_row, screen_height)
-      local bar_height = 4 / #events_menus * 40
-      screen.rect(127, offset, 1, bar_height)
-      screen.fill()
         
         
     -- SESSION VIEW (NON-EVENTS), not holding down Arranger segments g.keys  
