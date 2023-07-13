@@ -323,11 +323,11 @@ function rotate_pattern(view, direction)
       key_counter = key_counter - 1
       redraw()
       if key_counter == 0 then
-        print('Deleting all events in segment ' .. event_edit_pattern)
+        print('Deleting all events in segment ' .. event_edit_segment)
         for step = 1,8 do
-          events[event_edit_pattern][step] = {}
+          events[event_edit_segment][step] = {}
         end
-        events[event_edit_pattern].populated = 0
+        events[event_edit_segment].populated = 0
         grid_redraw()
         key_counter = 4
         break

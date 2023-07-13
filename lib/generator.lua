@@ -14,7 +14,7 @@ function generator()
   params:set('transpose', math.random(-6,6))
   
   -- 7ths are still kinda risky and might be better left to the seq section
-  params:set('chord_type', percent_chance(50) and 4 or 3)
+  params:set('chord_type', percent_chance(50) and 1 or 2)
 
   if params:get('clock_source') == 1 then 
     params:set('clock_tempo', math.random(50,140))
@@ -49,9 +49,7 @@ function chord_generator_lite()
     
   --SEQUENCE RANDOMIZATION
   params:set('transpose', math.random(-6,6))
-  
-  -- 7ths are still kinda risky and might be better left to the seq section
-  params:set('chord_type', percent_chance(50) and 4 or 3)
+  params:set('chord_type', percent_chance(50) and 1 or 2)
 
   if params:get('clock_source') == 1 then 
     params:set('clock_tempo', math.random(50,140))
