@@ -109,7 +109,7 @@ The Chord view is used to sequence chord patterns A-D. Since the arp and harmoni
 
 ----------------------------------------------------------------------------------------------------------------------
 ### SEQ view
-![dreamsequence](doc/grid_arp.svg)
+![dreamsequence](doc/grid_seq.svg)
 The Arp view is used to create an arpeggio or one-shot (strummed) pattern based on the currently-playing chord.
 
 - Notes from the active chord are sequenced using columns 1-14. Ex: if playing a Cmaj chord, columns 1-3 would result in the notes C, E, G. Columns 4-6 would result in the same notes one octave higher. Chord Type in the Arp menu can result in 4 notes/columns per octave.
