@@ -19,65 +19,70 @@ Optional:
 
 Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It can be a live performance tool, a compositional assistant, a generative sequencing playground, or all of these at once. Dreamsequence is fun all by itself but really opens up when you bring friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader by processing external data streams through its harmonizers.
 
-I find music theory to be pretty baffling so I've worked hard to make Dreamsequence intuitive for those of us who are musically inclined but not necessarily music nerds. Anyone should be able to get a song going in a few minutes without any prior knowlege. I've even built some simple algorithms to generate chord progressions and sequences at the push of a button, which turns out to be a really fun way to shuffle the deck before a session.
+I find music theory to be mostly baffling so I've worked hard to make Dreamsequence intuitive for those of us who are musically inclined but not necessarily card-carrying music nerds. Anyone should be able to get a song going in a few minutes without any prior knowlege. I've even built some simple algorithms to generate chord progressions and sequences at the push of a button, which turns out to be a really fun way to shuffle the deck before a session.
 
-But Dreamsequence can also get as deep and complex as you're willing to go. The Arranger and its event scheduling system allows you to create your own procedural layer for modulating every aspect of your patch- e.g. key changes, chord inversions, clock rates, sequence destinations, pattern transformations, sending triggers to your Eurorack, etc... Basically, if you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point in the process, you'll definitely want to spend some time with Events.
+But Dreamsequence can also get as deep and complex as you're willing to go. The Arranger and its Event scheduling system allows you to create your own procedural layer for controlling (or ceding to chaos) every aspect of your patch, e.g. key changes, chord inversions, clock rates, sequence destinations, pattern transformations, triggering Eurorack at set points, etc... Basically, if you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll definitely want to spend some time with Events.
 
-If you'd like to learn more about exactly _how_ Dreamsequence works, the rest of this overview section will cover each of the functional components that make up Dreamsequence. But if you are ready to jump in and find your own way, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
+If you'd like to learn more about exactly _how_ it all comes together, the rest of this overview section will cover each of the functional components that make up Dreamsequence. But if you are ready to jump in and find your own way, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
 
 ***NOTE: Dreamsequence 1.1 suppports saving/loading of your song through the system Parameters>>Pset menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but still recommend you wrap up any work before updating.***
 
 
-### Grid-based chord sequencer
-- The chord sequencer is the heart of Dreamsequence, always broadcasting an "active" chord that the rest of Dreamsequence uses to create sequences and harmonies.
-- The active chord can be sent directly to a destination for playback (MIDI, Norns engine, i2c, etc...) or it can be muted.
-- Chord patterns are references to chord degrees (I-VII) across two octaves. If you're not a music theory nerd, this means that the available chords mostly sound nice together and we can change the mood of the song by simply switching to a different mode which will adjust all the chords on the fly.
-- 4 chord patterns (A, B, C, D) can be saved then switched between using Grid or the Arranger.
+### CHORD: Grid-based chord pattern sequencer
+- The chord pattern sequencer is the heart of Dreamsequence, always broadcasting an "active" chord that the rest of Dreamsequence uses to create sequences and harmonies.
+- The active chord can be sent to a destination for playback (MIDI, Norns engine, i2c, etc...) or it can be muted.
+- Chord patterns are references to chord degrees (I-VII) across two octaves. If you're not a music theory nerd, this just means that the palette of chords that Grid offers will always sound nice together and we can change the mood of the song by simply switching to a different mode which will change all the chords for us and cascade those changes to everything else using the active chord.
+- 4 chord patterns (A, B, C, D) can be saved then switched between in a quantized manner using Grid (sort of like Ableton Live's Session mode) or the Arranger.
+- New patterns and some basic song/engine randomizations can be procedurally generated by holding down the Chord view key on Grid (last column, row 7) and pressing K3. Or hold rows 7 and 8 then press K3 to generate Chords and Seq together.
 
 
-### Grid-based phrase sequencer (formerly arpeggiator)
-- The phrase sequencer can operate as an arpeggiator, step sequencer, or any number of hybrids that modern science does not yet have terms for.
-- Three ways of setting notes are available:
-  - Play notes in active chord (arpeggiator style)
-  - Play notes in the selected mode (step sequencer style)
-  - Play notes in the selected mode but apply a diatonic transposition based on the active chord
-- 4 ways of starting the sequence are available, combined with 3 ways of forcing the sequence to reset, for a total of 12 sequence "modes" that reward experimentation. See the Norns interface section for more info.
-- Currently the sequence length is limited to 8 notes because only nerds make music with long sequences. Okay, it's mostly a UI limitation I need to think on some more. But you'll be surprised at what can be accomplished with some creativity.
+### SEQ: Grid-based phrase sequencer or arpeggiator (formerly ARP)
+- The phrase sequencer can operate as an arpeggiator, step sequencer, or any number of weird hybrid modes.
+- Four ways of configuring Grid's note mapping are available in the Seq "Notes" menu:
+		- Triad: play notes from active chord (arpeggiator style)
+		- 7th: play notes from active chord + 7th interval (arpeggiator style)
+		- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
+		- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
+- 4 ways of starting the sequence are available, combined with 3 ways of forcing the sequence to reset, for a total of 12 sequence "Modes" that reward experimentation. See the Norns interface section for more info.
+- Currently the sequence length is limited to 8 notes because only nerds make music with long sequences. Okay, it's mostly a UI limitation but I'm not really rushing to solve this; I think you'll be surprised at what can be accomplished with some creativity.
 
-*Hint: play with mismatched chord step length and sequence step lengths, leaving spaces in your chord sequence, and adjusting sequence "Notes" and "Mode" settings (plus Events!).*
+*Hint: play with mismatched Chord step length and Seq step lengths, leaving spaces in your Chord sequence, then play with "Notes" and "Mode" settings (and don't forget Events!)*
+
+- New patterns and some basic engine randomizations can be procedurally generated by holding down the Seq view key on Grid (last column, row 8) and pressing K3. Or hold rows 7 and 8 then press K3 to generate Chords and Seq together.
 
 
-### MIDI harmonizer
-- Transforms an incoming MIDI sequence to play notes using the same options as the phrase sequencer:
-  - Play notes in active chord (arpeggiator style)
-  - Play notes in the selected mode (step sequencer style)
-  - Play notes in the selected mode but apply a diatonic transposition based on the active chord
+### MIDI HARMONIZER: note reprocessor that can handle chords, sequences, arpeggios, or whatever weirdness
+- Transforms incoming MIDI to play notes using the same "Notes" options as Seq:
+		- Triad: play notes from active chord (arpeggiator style)
+		- 7th: play notes from active chord + 7th interval (arpeggiator style)
+		- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
+		- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
   
-- Typical use-cases might include:
-  - Turning a synced step sequencer into a secondary arpeggio, melody, bassline, etc...
-  - Improvising with a MIDI keyboard in a live performance (no dud notes!).
-  - Using a looping MIDI clip from a synced DAW to generate more complex chord voicings and timings (e.g., swing).
+- Ideas:
+  - Turn a synced step sequencer into a chord-aware secondary arpeggio, melody, bassline, etc...
+  - Improvise with a MIDI controller in a live performance (no dud notes!).
+  - Use a looping MIDI clip from a synced DAW to generate more complex chord voicings and timings (e.g. adding some swing).
 
-### CV harmonizer (requires Crow)
-- A trigger recieved at Crow input 2 will sample the voltage at input 1 and use this to play a note using the same options as the phrase sequencer:
-  - Play notes in active chord (arpeggiator style)
-  - Play notes in the selected mode (step sequencer style)
-  - Play notes in the selected mode but apply a diatonic transposition based on the active chord
+
+### CV HARMONIZER superpowered sample and hold + quantizer + chord/mode remapping (requires Crow)
+- A trigger recieved at Crow input 2 will sample the voltage at input 1 and use this to play a note using the same "Notes" options as Seq:
+		- Triad: play notes from active chord (arpeggiator style)
+		- 7th: play notes from active chord + 7th interval (arpeggiator style)
+		- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
+		- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
+- Rests can be inserted by enabling the "Auto-rest" menu option and triggering the same voltage repeatedly within a chord step.
   
-- Typical use-cases might include:
-  - Using Dreamsequence with your eurorack sequencers to make them chord-aware. Reprocessed streams can be sent back out via Crow outputs 1-2 (or elsewhere).
-  - Turning LFOs, function generators, S&H modules, etc... into sequencers.
-  - Using trigger/clock/voltage sources for novel sequence timing.
+- Ideas:
+  - Process CV from your eurorack sequencer then send it back out via Crow outputs 1-2, like a chord quantizer. 
+  - Turn LFOs, function generators, S&H modules, etc... into sequencers.
+  - Use trigger/clock/voltage sources for novel sequence timing or to inject some chaos into shared destination.
 
-### Arranger
-- Sequence playback of chord patterns (A, B, C, D) and schedule "Events" along the Arranger timeline.
 
-- Events set, increment, or randomize parameter values as well as call functions. For example, you might create a dynamic crescendos/accelerandos, schedule a mode/key change, redirect sequences to various destinations, send triggers out from Crow to CV gear, and even generate or transform chord and arp patterns.
+### ARRANGER like a DAW but worse (and also better?)
+- Sequences playback of chord patterns (A, B, C, D) and is the entry point to the Event Editor.
 
-### Generator
-- Algorithmically generate chord progressions and arpeggios, along with some randomization of things like tempo, mode, and key.
+- Events set, increment, randomize, or incite parameters to "wander" throughout your arrangement, with clamping or wrapping value ranges and probability control. Events can be used like rudimentary DAWesque automation lanes or they can be used more sparingly to reconfigure your patch at certain key points in your arrangement.
 
-- Generator algorithms can be selected at random or set using the "C-gen" and "A-gen" Global menu options.
 
 
 # Grid interface
