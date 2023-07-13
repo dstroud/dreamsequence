@@ -64,7 +64,7 @@ If you'd like to learn more about exactly _how_ it all comes together, the rest 
   - Use a looping MIDI clip from a synced DAW to generate more complex chord voicings and timings (e.g. adding some swing).
 
 
-### CV HARMONIZER superpowered sample and hold + quantizer + chord/mode remapping (requires Crow)
+### CV HARMONIZER: superpowered sample and hold + quantizer + chord/mode remapping (requires Crow)
 - A trigger recieved at Crow input 2 will sample the voltage at input 1 and use this to play a note using the same "Notes" options as Seq:
 		- Triad: play notes from active chord (arpeggiator style)
 		- 7th: play notes from active chord + 7th interval (arpeggiator style)
@@ -78,7 +78,7 @@ If you'd like to learn more about exactly _how_ it all comes together, the rest 
   - Use trigger/clock/voltage sources for novel sequence timing or to inject some chaos into shared destination.
 
 
-### ARRANGER like a DAW but worse (and also better?)
+### ARRANGER: like a DAW but worse/better
 - Sequences playback of chord patterns (A, B, C, D) and is the entry point to the Event Editor.
 
 - Events set, increment, randomize, or incite parameters to "wander" throughout your arrangement, with clamping or wrapping value ranges and probability control. Events can be used like rudimentary DAWesque automation lanes or they can be used more sparingly to reconfigure your patch at certain key points in your arrangement.
@@ -87,7 +87,7 @@ If you'd like to learn more about exactly _how_ it all comes together, the rest 
 
 # Grid interface
 
-### Chord view
+### CHORD view
 ![dreamsequence](doc/grid_chord.svg)
 The Chord view is used to sequence chord patterns A-D. Since the arp and harmonizers operate on the active chord, this is typically where you'll begin composing.
 
@@ -108,7 +108,7 @@ The Chord view is used to sequence chord patterns A-D. Since the arp and harmoni
     - Holding the Chord+Arp view keys together enables K3 to generate both a new chord sequence and a new arp.
 
 ----------------------------------------------------------------------------------------------------------------------
-### Arp view
+### SEQ view
 ![dreamsequence](doc/grid_arp.svg)
 The Arp view is used to create an arpeggio or one-shot (strummed) pattern based on the currently-playing chord.
 
@@ -124,7 +124,7 @@ The Arp view is used to create an arpeggio or one-shot (strummed) pattern based 
     - Holding the Arp+Chord view keys together enables K3 to generate both a new chord sequence and a new arp.
 
 ----------------------------------------------------------------------------------------------------------------------
-### Arranger view
+### ARRANGER view
 ![dreamsequence](doc/grid_arranger.svg)
 The Arranger view is used to sequence chord patterns and enter the Events editor.
 
@@ -143,7 +143,7 @@ The Arranger view is used to sequence chord patterns and enter the Events editor
 - The last three keys on the bottom of the rightmost column switch between Arranger, Chord, and Arp views. 
 
 ----------------------------------------------------------------------------------------------------------------------
-### Events view
+### EVENTS view
 ![dreamsequence](doc/grid_events.svg)
 The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement.
 
