@@ -295,8 +295,8 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
-  params:add_option('chord_dest', 'Destination', {'Mute', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
-  params:set_action("chord_dest",function() update_menus() end)
+  params:add_option('chord_output', 'Output', {'Mute', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
+  params:set_action("chord_output",function() update_menus() end)
   
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_duration_index',function(val) chord_duration = division_names[val][1] end) -- pointless?
@@ -409,8 +409,8 @@ function init()
   params:add_number('seq_div_index_1', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_div_index_1', function(val) seq_div = division_names[val][1] end)
 
-  params:add_option("seq_dest_1", "Destination", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  params:set_action("seq_dest_1",function() update_menus() end)
+  params:add_option("seq_output_1", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  params:set_action("seq_output_1",function() update_menus() end)
   
   params:add_number('seq_duration_index_1', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_duration_index_1', function(val) seq_duration = division_names[val][1] end)
@@ -471,8 +471,8 @@ function init()
 
   params:add_option("midi_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
-  params:add_option("midi_dest", "Destination", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'}, 2)
-  params:set_action("midi_dest",function() update_menus() end)
+  params:add_option("midi_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'}, 2)
+  params:set_action("midi_output",function() update_menus() end)
     
   params:add_number('midi_harmonizer_in_port', 'Port in',1,#midi.vports,1)
     params:set_action('midi_harmonizer_in_port', function(value)
@@ -536,8 +536,8 @@ function init()
   
   params:add_option("crow_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
-  params:add_option("crow_dest", "Destination", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  params:set_action("crow_dest", function() update_menus() end)
+  params:add_option("crow_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  params:set_action("crow_output", function() update_menus() end)
   
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
   params:set_action('crow_duration_index', function(val) crow_duration = division_names[val][1] end) -- pointless?
@@ -898,77 +898,77 @@ function update_menus()
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
-  if params:string('chord_dest') == 'Mute' then
-    menus[2] = {'chord_dest', 'chord_div_index'} -- maybe add chord_type back depending on readout
-  elseif params:string('chord_dest') == 'Engine' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
-  elseif params:string('chord_dest') == 'MIDI' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
-  elseif params:string('chord_dest') == 'ii-JF' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
-  elseif params:string('chord_dest') == 'Disting' then
-    menus[2] = {'chord_dest', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+  if params:string('chord_output') == 'Mute' then
+    menus[2] = {'chord_output', 'chord_div_index'} -- maybe add chord_type back depending on readout
+  elseif params:string('chord_output') == 'Engine' then
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+  elseif params:string('chord_output') == 'MIDI' then
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+  elseif params:string('chord_output') == 'ii-JF' then
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
+  elseif params:string('chord_output') == 'Disting' then
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- SEQ MENU
-  if params:string('seq_dest_1') == 'Mute' then
-    menus[3] = {'seq_dest_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_rotate_1',  'seq_shift_1', 'seq_div_index_1'}
-  elseif params:string('seq_dest_1') == 'Engine' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_pp_amp_1', 'seq_pp_cutoff_1', 'seq_pp_tracking_1','seq_pp_gain_1', 'seq_pp_pw_1'}
-  elseif params:string('seq_dest_1') == 'MIDI' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_midi_out_port_1', 'seq_midi_ch_1', 'seq_midi_velocity_1', 'seq_midi_cc_1_val_1'}
-  elseif params:string('seq_dest_1') == 'Crow' then
+  if params:string('seq_output_1') == 'Mute' then
+    menus[3] = {'seq_output_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_rotate_1',  'seq_shift_1', 'seq_div_index_1'}
+  elseif params:string('seq_output_1') == 'Engine' then
+    menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_pp_amp_1', 'seq_pp_cutoff_1', 'seq_pp_tracking_1','seq_pp_gain_1', 'seq_pp_pw_1'}
+  elseif params:string('seq_output_1') == 'MIDI' then
+    menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_midi_out_port_1', 'seq_midi_ch_1', 'seq_midi_velocity_1', 'seq_midi_cc_1_val_1'}
+  elseif params:string('seq_output_1') == 'Crow' then
     if params:string('seq_tr_env_1') == 'Trigger' then
-      menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1'}
+      menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1'}
     else -- AD envelope
-      menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1', 'seq_duration_index_1', 'seq_ad_skew_1',}
+      menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1', 'seq_duration_index_1', 'seq_ad_skew_1',}
     end
-  elseif params:string('seq_dest_1') == 'ii-JF' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_jf_amp_1'}
-  elseif params:string('seq_dest_1') == 'Disting' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_disting_velocity_1'}    
+  elseif params:string('seq_output_1') == 'ii-JF' then
+    menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_jf_amp_1'}
+  elseif params:string('seq_output_1') == 'Disting' then
+    menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_disting_velocity_1'}    
   end
   
   -- MIDI HARMONIZER MENU
-  if params:string('midi_dest') == 'Mute' then
-    menus[4] = {'midi_dest'}
-  elseif params:string('midi_dest') == 'Engine' then
-    menus[4] = {'midi_dest', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
-  elseif params:string('midi_dest') == 'MIDI' then
+  if params:string('midi_output') == 'Mute' then
+    menus[4] = {'midi_output'}
+  elseif params:string('midi_output') == 'Engine' then
+    menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
+  elseif params:string('midi_output') == 'MIDI' then
     if params:get('midi_velocity_passthru') == 2 then
-      menus[4] = {'midi_dest', 'midi_note_map', 'midi_octave', 'midi_duration_index','midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index','midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_cc_1_val'}
     else
-      menus[4] = {'midi_dest', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
     end
-  elseif params:string('midi_dest') == 'Crow' then
+  elseif params:string('midi_output') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[4] = {'midi_dest', 'midi_note_map', 'midi_octave', 'midi_tr_env'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_tr_env'}
     else -- AD envelope
-      menus[4] = {'midi_dest', 'midi_note_map', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
     end
-  elseif params:string('midi_dest') == 'ii-JF' then
-    menus[4] = {'midi_dest', 'midi_note_map', 'midi_octave',  'midi_jf_amp'}
- elseif params:string('midi_dest') == 'Disting' then
-    menus[4] = {'midi_dest', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
+  elseif params:string('midi_output') == 'ii-JF' then
+    menus[4] = {'midi_output', 'midi_note_map', 'midi_octave',  'midi_jf_amp'}
+ elseif params:string('midi_output') == 'Disting' then
+    menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
   end
   
   -- CV HARMONIZER MENU
-  if params:string('crow_dest') == 'Mute' then
-    menus[5] = {'crow_dest'}
-  elseif params:string('crow_dest') == 'Engine' then
-    menus[5] = {'crow_dest', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
-  elseif params:string('crow_dest') == 'MIDI' then
-    menus[5] = {'crow_dest', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
-  elseif params:string('crow_dest') == 'Crow' then
+  if params:string('crow_output') == 'Mute' then
+    menus[5] = {'crow_output'}
+  elseif params:string('crow_output') == 'Engine' then
+    menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
+  elseif params:string('crow_output') == 'MIDI' then
+    menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
+  elseif params:string('crow_output') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[5] = {'crow_dest', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_tr_env', }
+      menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_tr_env', }
     else -- AD envelope
-      menus[5] = {'crow_dest', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
+      menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
     end
-  elseif params:string('crow_dest') == 'ii-JF' then
-    menus[5] = {'crow_dest', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_jf_amp'}
-  elseif params:string('crow_dest') == 'Disting' then
-    menus[5] = {'crow_dest', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_disting_velocity'}    
+  elseif params:string('crow_output') == 'ii-JF' then
+    menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_jf_amp'}
+  elseif params:string('crow_output') == 'Disting' then
+    menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_disting_velocity'}    
   end  
 end
 
@@ -1421,37 +1421,144 @@ end
 -- todo p0 fix aug7 logic pending @dewb's PR
 function get_chord_name(root_num, scale_type, roman_chord_type)
 
+  -- local rct = roman_chord_type or "I"
+
+  -- -- lua does not correctly process utf8 in set character classes, so...
+  -- -- treat degree symbols as asterisks
+  -- rct = string.gsub(rct, "\u{B0}", "*")
+  -- rct = string.gsub(rct, "\u{BA}", "*")
+  -- -- treat upper and lowercase o-stroke as @
+  -- rct = string.gsub(rct, "\u{D8}", "@")
+  -- rct = string.gsub(rct, "\u{F8}", "@")
+  -- -- treat natural sign as &
+  -- rct = string.gsub(rct, "\u{266E}", "&")
+
+  -- local degree_string, augdim_string, added_string, bass_string, inv_string =
+  --   string.match(rct, "([ivxIVX]+)([+*@&M]?)([0-9]*)-?([0-9]?)([bcdefg]?)")
+
+  -- local d = string.lower(degree_string)
+  -- local is_major = degree_string ~= d
+  -- local is_augmented = augdim_string == "+"
+  -- local is_diminished = augdim_string == "*"
+  -- local is_seventh = added_string == "7"
+
+  -- local is_half_diminished = augdim_string == "@" and is_seventh
+  -- local is_major_seventh = augdim_string == "M" and is_seventh
+  -- local is_minormajor_seventh = augdim_string == "&" and is_seventh
+
+  -- local chord_type = nil
+  
+  -- if is_major then
+  --   if is_augmented then
+  --     if is_seventh then
+  --       chord_type = '+M7' -- "Augmented Major 7"
+  --     else
+  --       chord_type = '+' -- "Augmented"
+  --     end
+  --   elseif is_diminished then
+  --     if is_seventh then
+  --       chord_type = '\u{B0}7'  --  "Diminished 7"
+  --     else
+  --       chord_type = '\u{B0}' -- "Diminished"
+  --     end
+  --   elseif is_half_diminished then
+  --     chord_type = '\u{F8}7' -- "Half Diminished 7"
+  --   elseif is_minormajor_seventh then
+  --     chord_type = 'm\u{266e}7' --  "Minor Major 7"
+  --   elseif is_major_seventh then
+  --     chord_type = 'M7' --  "Major 7"
+  --   elseif is_seventh then
+  --     chord_type = '7'  --  "Dominant 7"
+  --   elseif added_string == "6" then
+  --     if bass_string == "9" then
+  --       chord_type = "Major 69"
+  --     else
+  --       chord_type = "Major 6"
+  --     end
+  --   elseif added_string == "9" then
+  --     chord_type = "Major 9"
+  --   elseif added_string == "11" then
+  --     chord_type = "Major 11"
+  --   elseif added_string == "13" then
+  --     chord_type = "Major 13"
+  --   else
+  --     chord_type = '' -- "Major" -- nil because we're no longer spelling out maj/min
+  --   end
+  -- else -- minor
+  --   if is_augmented then
+  --     if is_seventh then
+  --       chord_type = '+7' -- "Augmented 7"
+  --     else
+  --       chord_type = '+' -- "Augmented"
+  --     end
+  --   elseif is_diminished then
+  --     if is_seventh then
+  --       chord_type = '\u{B0}7' -- "Diminished 7"
+  --     else
+  --       chord_type = '\u{B0}' -- "Diminished"
+  --     end
+  --   elseif is_half_diminished then
+  --     chord_type = '\u{F8}7' -- "Half Diminished 7" minor third so this is implicit and doesn't need 'm'
+  --   elseif is_minormajor_seventh then
+  --     chord_type = 'm\u{266e}7' -- "Minor Major 7"
+  --   elseif is_major_seventh then
+  --     chord_type = 'M7' -- "Major 7" -- this overrides the lowercase roman degree
+  --   elseif is_seventh then
+  --     chord_type = 'm7' -- "Minor 7"
+  --   elseif added_string == "6" then
+  --     if bass_string == "9" then
+  --       chord_type = "Minor 69"
+  --     else
+  --       chord_type = "Minor 6"
+  --     end
+  --   elseif added_string == "9" then
+  --     chord_type = "Minor 9"
+  --   elseif added_string == "11" then
+  --     chord_type = "Minor 11"
+  --   elseif added_string == "13" then
+  --     chord_type = "Minor 13"
+  --   else
+  --     chord_type = 'm' -- "Minor"
+  --   end
+  -- end
+  
   local rct = roman_chord_type or "I"
 
-  -- lua does not correctly process utf8 in set character classes, so...
-  -- treat degree symbols as asterisks
-  rct = string.gsub(rct, "\u{B0}", "*")
-  rct = string.gsub(rct, "\u{BA}", "*")
-  -- treat upper and lowercase o-stroke as @
-  rct = string.gsub(rct, "\u{D8}", "@")
-  rct = string.gsub(rct, "\u{F8}", "@")
-  -- treat natural sign as &
-  rct = string.gsub(rct, "\u{266E}", "&")
+  local scale_data = lookup_data(MusicUtil.SCALES, scale_type)
+  if not scale_data then return nil end
+
+  -- normalize special chars to plain ASCII using MuseScore-compatible characters
+  -- lua does not correctly process utf8 in set character classes, so substitute these
+  -- prior to the string.match
+  -- treat degree symbols or asterisks as 'o'
+  rct = string.gsub(rct, "\u{B0}", "o")
+  rct = string.gsub(rct, "\u{BA}", "o")
+  rct = string.gsub(rct, "*", "o")
+  -- treat upper and lowercase o-stroke as 0
+  rct = string.gsub(rct, "\u{D8}", "0")
+  rct = string.gsub(rct, "\u{F8}", "0")
+  -- treat natural sign as h
+  rct = string.gsub(rct, "\u{266E}", "h")
 
   local degree_string, augdim_string, added_string, bass_string, inv_string =
-    string.match(rct, "([ivxIVX]+)([+*@&M]?)([0-9]*)-?([0-9]?)([bcdefg]?)")
+    string.match(rct, "([ivxIVX]+)([+o0hM]*)([1-9]*)-?([1-9]?)([bcdefg]?)")
 
   local d = string.lower(degree_string)
-  local is_major = degree_string ~= d
+  local is_capitalized = degree_string ~= d
   local is_augmented = augdim_string == "+"
-  local is_diminished = augdim_string == "*"
+  local is_diminished = augdim_string == "o"
   local is_seventh = added_string == "7"
 
-  local is_half_diminished = augdim_string == "@" and is_seventh
+  local is_half_diminished = augdim_string == "0" and is_seventh
   local is_major_seventh = augdim_string == "M" and is_seventh
-  local is_minormajor_seventh = augdim_string == "&" and is_seventh
+  local is_augmented_major_seventh = augdim_string == "+M" and is_seventh
+  local is_minormajor_seventh = augdim_string == "h" and is_seventh
 
   local chord_type = nil
-  
-  if is_major then
+  if is_capitalized then -- uppercase, assume major in most circumstances
     if is_augmented then
       if is_seventh then
-        chord_type = '+M7' -- "Augmented Major 7"
+        chord_type = '+7' -- "Augmented 7"
       else
         chord_type = '+' -- "Augmented"
       end
@@ -1465,6 +1572,8 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
       chord_type = '\u{F8}7' -- "Half Diminished 7"
     elseif is_minormajor_seventh then
       chord_type = 'm\u{266e}7' --  "Minor Major 7"
+    elseif is_augmented_major_seventh then
+      chord_type = '+M7' -- "Augmented Major 7"
     elseif is_major_seventh then
       chord_type = 'M7' --  "Major 7"
     elseif is_seventh then
@@ -1484,7 +1593,7 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
     else
       chord_type = '' -- "Major" -- nil because we're no longer spelling out maj/min
     end
-  else -- minor
+  else -- lowercase degree, assume minor in most circumstances
     if is_augmented then
       if is_seventh then
         chord_type = '+7' -- "Augmented 7"
@@ -1493,16 +1602,18 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
       end
     elseif is_diminished then
       if is_seventh then
-        chord_type = '\u{B0}7' -- "Diminished 7"
+        chord_type = '\u{B0}7'  --  "Diminished 7"
       else
         chord_type = '\u{B0}' -- "Diminished"
       end
     elseif is_half_diminished then
-      chord_type = '\u{F8}7' -- "Half Diminished 7" minor third so this is implicit and doesn't need 'm'
+      chord_type = '\u{F8}7' -- "Half Diminished 7"
     elseif is_minormajor_seventh then
-      chord_type = 'm\u{266e}7' -- "Minor Major 7"
+      chord_type = 'm\u{266e}7' --  "Minor Major 7"
+    elseif is_augmented_major_seventh then
+      chord_type = '+M7' -- "Augmented Major 7"
     elseif is_major_seventh then
-      chord_type = 'M7' -- "Major 7" -- this overrides the lowercase roman degree
+      chord_type = 'M7' --  "Major 7"
     elseif is_seventh then
       chord_type = 'm7' -- "Minor 7"
     elseif added_string == "6" then
@@ -1521,6 +1632,26 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
       chord_type = 'm' -- "Minor"
     end
   end
+
+  local degree = nil
+  local roman_numerals = { "i", "ii", "iii", "iv", "v", "vi", "vii" }
+  for i,v in pairs(roman_numerals) do
+    if(v == d) then
+      degree = i
+      break
+    end
+  end
+  if degree == nil then return nil end
+
+  local inv = string.lower(inv_string)
+  local inversion = 0
+  local inversioncodes = { "b", "c", "d", "e", "f", "g" }
+  for i,v in pairs(inversioncodes) do
+    if(v == inv) then
+      inversion = i
+      break
+    end
+  end  
   return(chord_type)
 end
   
@@ -1864,7 +1995,7 @@ function advance_chord_pattern()
 
     -- Play the chord
     if chord_pattern[active_chord_pattern][chord_pattern_position] > 0 then
-      play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
+      play_chord(params:string('chord_output'), params:get('chord_midi_ch'))
       if seq_reset_on_1 == 2 then -- Chord
         seq_pattern_position = 0
         play_seq = true
@@ -2068,7 +2199,7 @@ end
 
 
 function play_chord(destination, channel)
-  local destination = params:string('chord_dest')
+  local destination = params:string('chord_output')
   if destination == 'Engine' then
     
     local amp = params:get('chord_pp_amp') / 100
@@ -2200,7 +2331,7 @@ function advance_seq_pattern()
 
   if seq_pattern[active_seq_pattern][seq_pattern_position] > 0 then
     
-    local destination = params:string('seq_dest_1')
+    local destination = params:string('seq_output_1')
     
     local note = _G['map_note_' .. params:get('seq_note_map_1')](seq_pattern[active_seq_pattern][seq_pattern_position], params:get('seq_octave_1'))
     
@@ -2252,7 +2383,7 @@ function sample_crow(volts)
   or params:get('crow_auto_rest') == 1
   or (params:get('crow_auto_rest') == 2 and (prev_note ~= note)) then
     -- Play the note
-    local destination = params:string('crow_dest')
+    local destination = params:string('crow_output')
     if destination == 'Engine' then
       local amp = params:get('crow_pp_amp') / 100
       local cutoff = params:get('crow_pp_tracking') *.01
@@ -2292,7 +2423,7 @@ midi_event = function(data)
   if d.type == "note_on" then
 
     local note = _G['map_note_' .. params:get('midi_note_map')](d.note - 35, params:get('midi_octave'), params:get('chord_preload') ~= 0) 
-    local destination = params:string('midi_dest')
+    local destination = params:string('midi_output')
     if destination == 'Engine' then
       local amp = params:get('midi_pp_amp') / 100
       local cutoff = params:get('midi_pp_tracking') *.01
@@ -2902,7 +3033,7 @@ function g.key(x,y,z)
         params:set('chord_pattern_length', y)
         gen_dash('g.key chord_pattern_length')
 
-      elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher. Key UP events farther down in function.
+      elseif x == 16 and y <5 then  --Key DOWN events for pattern switcher.
         interaction = 'chord_pattern_copy'
         pattern_key_count = pattern_key_count + 1
         pattern_keys[y] = 1
@@ -2986,10 +3117,14 @@ function g.key(x,y,z)
               print('Manual reset of current pattern; disabling arranger')
               params:set('arranger', 1)
               pattern_queue = false
-              seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
+              -- seq_pattern_position = 0       -- For manual reset of current pattern as well as resetting on manual pattern change
               chord_pattern_position = 0
               reset_external_clock()
               reset_pattern()
+              -- tells dash to show RST rather than 1.0
+              if arranger_position == 1 and chord_pattern_position == 0 then
+                reset_arrangement()
+              end
               
             -- Manual jump to queued pattern  
             elseif y == pattern_queue and transport_active == false then
@@ -4389,8 +4524,10 @@ function redraw()
           screen.text(arranger_queue .. '.0')
         end
       elseif arranger_active == false then
-        if arranger_position == arranger_length then
-          if params:string('playback') == "Loop"  then
+        if chord_pattern_position == 0 then -- condition for when pattern is reset to position 0 and is in-between segments
+          screen.text(arranger_position .. '.0')
+        elseif arranger_position == arranger_length then
+          if params:string('playback') == "Loop" then
             screen.text('LP.' .. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
           else
             screen.text('EN.' .. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
