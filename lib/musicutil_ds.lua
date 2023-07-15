@@ -227,7 +227,7 @@ end
 generate_chord_lookups()
 --]]
 
-local function lookup_data(lookup_table, search)
+function lookup_data(lookup_table, search)  -- DS 2023-07-15 had to make local for some reason. todo p0 research
   
   if type(search) == "string" then 
     search = string.lower(search)
