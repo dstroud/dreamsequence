@@ -21,7 +21,9 @@ function generator()
   end
   
   params:set('mode', math.random(1, 9)) -- Currently this is called each time c-gen runs, but might change this
-  params:set('seq_mode_combo_1', 3) -- not really the best option but this is what the OG algos were built around
+  -- not really the best option but this is what the OG algos were built around
+  params:set('seq_start_on_1', 1)
+  params:set('seq_reset_on_1', 3)
   params:set('seq_note_map_1', math.random(1, 2))
 
   --ENGINE BASED RANDOMIZATIONS
@@ -354,8 +356,9 @@ function seq_generator(mode)
     -- Duration from min of the seq_div to +4 seq_div, min of 1/16T because 1/32 is a bit too quick for PolyPerc in most cases
     params:set('seq_duration_index_1',math.max(math.random(params:get('seq_div_index_1'), params:get('seq_div_index_1') + 4), 5))
     params:set('seq_note_map_1', seq_note_map_1)
-    params:set('seq_mode_combo_1', 3) -- not really the best option but this is what the OG algos were built around
-    -- params:set('seq_note_map_1', 1)
+    -- not really the best option but this is what the OG algos were built around
+    params:set('seq_start_on_1', 1)
+    params:set('seq_reset_on_1', 3)
   
     -- Engine randomizations
     params:set('seq_pp_amp_1', 70)
@@ -458,7 +461,9 @@ function seq_generator(mode)
   table.insert(seq_algos['name'], seq_algo_name)
   table.insert(seq_algos['func'], function()  
     params:set('seq_octave_1', math.random(0,1))
-    params:set('seq_mode_combo_1', 8) -- chord/chord
+
+    params:set('seq_start_on_1', 3) -- chord
+    params:set('seq_reset_on_1', 2) -- chord
     params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
     params:set('seq_duration_index_1',15)
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
@@ -475,9 +480,10 @@ function seq_generator(mode)
 
   local seq_algo_name = 'Strum down'
   table.insert(seq_algos['name'], seq_algo_name)
-  table.insert(seq_algos['func'], function()  
+  table.insert(seq_algos['func'], function()
     params:set('seq_octave_1', math.random(0,1))
-    params:set('seq_mode_combo_1', 8)
+    params:set('seq_start_on_1', 3) -- chord
+    params:set('seq_reset_on_1', 2) -- chord
     params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
     params:set('seq_duration_index_1',15)
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
@@ -702,12 +708,37 @@ end
 
 --utility functions
 -----------------------------------------------------------------
+
+-- bit of a hack to get existing algos working with the expanded WIP musicutil chords. Just classifies as dim/aug/min/maj
+-- todo p0 fix this up right
+function chord_type_simplified(arg)
+  if string.find(arg, "+") then
+    return("aug")
+  elseif string.find(arg, "\u{B0}") then 
+    return("dim")
+  elseif string.find(arg, "\u{F8}") then      -- todo p0 half dim!
+    return("dim") 
+  elseif arg == "7" then	                    -- todo p0 major minor!
+    return("major")
+  elseif string.find(arg, "m\u{266e}") then   -- todo p0 min-major!
+    return("min")     
+  elseif arg == "m7" then
+    return("min")
+  elseif arg == "m" then
+    return("min")  
+  elseif arg == "M7" then
+    return("maj")
+  elseif arg == "" or arg == nil then
+    return("maj")       
+  end  
+end
+
 --builds a lookup table of chord types: aug/dim etc...
 function build_mode_chord_types()
     mode_chord_types = {}
     safe_chord_degrees = {}    
     for i = 1,7 do
-      local chord_type = get_chord_name(2, params:get('mode'), MusicUtil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][i])
+      local chord_type = chord_type_simplified(get_chord_name(2, params:get('mode'), MusicUtil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][i]))
       mode_chord_types[i] = chord_type
       if chord_type == 'maj' or chord_type == 'min' then table.insert(safe_chord_degrees, i) end  --todo p0 what about 7ths here?
     end

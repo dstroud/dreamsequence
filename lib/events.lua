@@ -35,12 +35,14 @@ events_lookup = {										--
 										
 -- Seq										
 {	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_note_map_1', 	name= 'Notes', 	value_type= 'continuous', 				},
-{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_mode_combo_1', 	name= 'Mode', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_start_on_1', 	name= 'Start on', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_reset_on_1', 	name= 'Reset on', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_start_1', 	name= 'Start', 	value_type= 'trigger', 				},
+{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_reset_1', 	name= 'Reset', 	value_type= 'trigger', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_pattern_length_1', 	name= 'Pattern length', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_rotate_1', 	name= 'Pattern rotate', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_shift_1', 	name= 'Pattern shift', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'shuffle_seq_1', 	name= 'Shuffle', 	value_type= 'trigger', 				},
-{	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_prime_1_shot_1', 	name= 'Prime 1-shot', 	value_type= 'trigger', 				},
 {	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_dest_1', 	name= 'Destination', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_octave_1', 	name= 'Octave', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_div_index_1', 	name= 'Step length', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},

@@ -101,14 +101,14 @@ MusicUtil.SCALE_CHORD_DEGREES = {
     name = "Harmonic Minor",
     chords = {
       "i",  "ii\u{B0}",  "III+",  "iv",  "V",  "VI",  "vii\u{B0}",
-      "i\u{266e}7", "ii\u{F8}7", "III+7", "iv7", "V7", "VIM7", "vii\u{B0}7"
+      "i\u{266e}7", "ii\u{F8}7", "III+7", "iv7", "V7", "VIM7", "vii\u{B0}7" --todo p0 "III+7" to "III+M7"
     }
   },
   {
     name = "Melodic Minor",
     chords = {
       "i",  "ii",  "III+",  "IV",  "V",  "vi\u{B0}",  "vii\u{B0}",
-      "i\u{266e}7", "ii7", "III+7", "IV7", "V7", "vi\u{F8}7", "vii\u{F8}7"
+      "i\u{266e}7", "ii7", "III+7", "IV7", "V7", "vi\u{F8}7", "vii\u{F8}7" --todo p0 "III+7" to "III+M7"
     }
   },
   {

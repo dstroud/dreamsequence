@@ -366,40 +366,45 @@ function init()
 
   params:add_option("seq_note_map_1", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
   
-  params:add_option("seq_start_mode_1", "Play", {'Loop', 'On step', 'On chord', '1-shot'}, 1)
-  params:set_save('seq_start_mode_1', false)
-  params:hide(params.lookup['seq_start_mode_1'])
+  params:add_option("seq_start_on_1", "Start on", {'Seq end', 'Step', 'Chord', 'Cue'}, 1)
+  -- params:set_save('seq_start_on_1', false)
+  -- params:hide(params.lookup['seq_start_on_1'])
     
-  params:add_option('seq_reset_mode_1', 'Reset', {'On step', 'On chord', 'On Stop'}, 1)
-  params:set_save('seq_reset_mode_1', false)
-  params:hide(params.lookup['seq_reset_mode_1'])
-  
-  local seq_modes = 
-    {
-    'Loop/step',
-    'Loop/chord',
-    'Loop/stop',
-    'Step/step',
-    'Step/chord',
-    'Step/stop',
-    'Chord/step',
-    'Chord/chord',
-    'Chord/stop',
-    '1-shot/step',
-    '1-shot/chord',
-    '1-shot/stop',
-    }
+  params:add_option('seq_reset_on_1', 'Reset on', {'Step', 'Chord', 'Stop'}, 1)
+  -- params:set_save('seq_reset_on_1', false)
+  -- params:hide(params.lookup['seq_reset_on_1'])
+
+  -- option combo style way of setting the above  
+  -- local seq_modes = 
+  --   {
+  --   'Loop/step',
+  --   'Loop/chord',
+  --   'Loop/stop',
+  --   'Step/step',
+  --   'Step/chord',
+  --   'Step/stop',
+  --   'Chord/step',
+  --   'Chord/chord',
+  --   'Chord/stop',
+  --   '1-shot/step',
+  --   '1-shot/chord',
+  --   '1-shot/stop',
+  --   }
     
-  params:add_option("seq_mode_combo_1", "Mode", seq_modes, 1)
-  params:set_action("seq_mode_combo_1",function(val) set_seq_mode_1(val) end)
-  function set_seq_mode_1(val)
-    params:set('seq_start_mode_1', math.ceil(val/3))
-    params:set('seq_reset_mode_1', (val - 1) % 3 + 1)
-  end
+  -- params:add_option("seq_mode_combo_1", "Mode", seq_modes, 1)
+  -- params:set_action("seq_mode_combo_1",function(val) set_seq_mode_1(val) end)
+  -- function set_seq_mode_1(val)
+  --   params:set('seq_start_on_1', math.ceil(val/3))
+  --   params:set('seq_reset_on_1', (val - 1) % 3 + 1)
+  -- end
   
   -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
-  params:add_binary('seq_prime_1_shot_1','Prime 1-shot', 'trigger')
-  params:set_action('seq_prime_1_shot_1',function()  seq_1_shot_1 = true end)
+  params:add_binary('seq_start_1','Start', 'trigger')
+  params:set_action('seq_start_1',function()  play_seq = true end) -- seq_1_shot_1 = true end)
+  
+  -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
+  params:add_binary('seq_reset_1','Reset', 'trigger')
+  params:set_action('seq_reset_1',function() seq_pattern_position = 0 end)
   
   params:add_number('seq_div_index_1', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_div_index_1', function(val) seq_div = division_names[val][1] end)
@@ -802,11 +807,14 @@ function init()
         transport_state = 'stopped' -- just flips to the stop icon so user knows they don't have to do this manually
       end
 
-      if params:get('seq_reset_mode_1') == 3 then
-        play_seq = true
-      else
-        play_seq = false
-      end
+      -- don't remember why this was needed?
+      -- local seq_reset_on_1 = params:get('seq_reset_on_1')
+      -- if seq_reset_on_1 == 3 then -- Stop or Event type.
+      --   play_seq = true
+      -- else
+      --   play_seq = false
+      -- end
+      play_seq = false
     
       build_scale() -- Have to run manually because mode bang comes after all of this for some reason. todo p2 look into this for the billionth time. There is some reason for it.
       get_next_chord()
@@ -904,21 +912,21 @@ function update_menus()
   
   -- SEQ MENU
   if params:string('seq_dest_1') == 'Mute' then
-    menus[3] = {'seq_dest_1', 'seq_mode_combo_1', 'seq_rotate_1',  'seq_shift_1', 'seq_div_index_1'}
+    menus[3] = {'seq_dest_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_rotate_1',  'seq_shift_1', 'seq_div_index_1'}
   elseif params:string('seq_dest_1') == 'Engine' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_mode_combo_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_pp_amp_1', 'seq_pp_cutoff_1', 'seq_pp_tracking_1','seq_pp_gain_1', 'seq_pp_pw_1'}
+    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_pp_amp_1', 'seq_pp_cutoff_1', 'seq_pp_tracking_1','seq_pp_gain_1', 'seq_pp_pw_1'}
   elseif params:string('seq_dest_1') == 'MIDI' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_mode_combo_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_midi_out_port_1', 'seq_midi_ch_1', 'seq_midi_velocity_1', 'seq_midi_cc_1_val_1'}
+    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_midi_out_port_1', 'seq_midi_ch_1', 'seq_midi_velocity_1', 'seq_midi_cc_1_val_1'}
   elseif params:string('seq_dest_1') == 'Crow' then
     if params:string('seq_tr_env_1') == 'Trigger' then
-      menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_mode_combo_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1'}
+      menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1'}
     else -- AD envelope
-      menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_mode_combo_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1', 'seq_duration_index_1', 'seq_ad_skew_1',}
+      menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1', 'seq_duration_index_1', 'seq_ad_skew_1',}
     end
   elseif params:string('seq_dest_1') == 'ii-JF' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_mode_combo_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_jf_amp_1'}
+    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_jf_amp_1'}
   elseif params:string('seq_dest_1') == 'Disting' then
-    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_mode_combo_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_disting_velocity_1'}    
+    menus[3] = {'seq_dest_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_disting_velocity_1'}    
   end
   
   -- MIDI HARMONIZER MENU
@@ -1410,6 +1418,7 @@ end
 
 
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
+-- todo p0 fix aug7 logic pending @dewb's PR
 function get_chord_name(root_num, scale_type, roman_chord_type)
 
   local rct = roman_chord_type or "I"
@@ -1439,11 +1448,10 @@ function get_chord_name(root_num, scale_type, roman_chord_type)
 
   local chord_type = nil
   
-  -- todo p0 just shortening triad strings for now but this needs to be revisited when we flip the switch back on 7ths
-if is_major then
+  if is_major then
     if is_augmented then
       if is_seventh then
-        chord_type = 'M+7' -- "Augmented Major 7"
+        chord_type = '+M7' -- "Augmented Major 7"
       else
         chord_type = '+' -- "Augmented"
       end
@@ -1456,7 +1464,7 @@ if is_major then
     elseif is_half_diminished then
       chord_type = '\u{F8}7' -- "Half Diminished 7"
     elseif is_minormajor_seventh then
-      chord_type = 'm\u{266e}7' --  "Minor Major 7"   -- not used by DS but is this valid?
+      chord_type = 'm\u{266e}7' --  "Minor Major 7"
     elseif is_major_seventh then
       chord_type = 'M7' --  "Major 7"
     elseif is_seventh then
@@ -1474,7 +1482,7 @@ if is_major then
     elseif added_string == "13" then
       chord_type = "Major 13"
     else
-      chord_type = 'M' -- "Major"
+      chord_type = '' -- "Major" -- nil because we're no longer spelling out maj/min
     end
   else -- minor
     if is_augmented then
@@ -1490,7 +1498,7 @@ if is_major then
         chord_type = '\u{B0}' -- "Diminished"
       end
     elseif is_half_diminished then
-      chord_type = '\u{F8}7' -- "Half Diminished 7"
+      chord_type = '\u{F8}7' -- "Half Diminished 7" minor third so this is implicit and doesn't need 'm'
     elseif is_minormajor_seventh then
       chord_type = 'm\u{266e}7' -- "Minor Major 7"
     elseif is_major_seventh then
@@ -1620,15 +1628,15 @@ function sequence_clock(sync_val)
       end
   
       if clock_step % seq_div == 0 then
-        local seq_start_mode_1 = params:get('seq_start_mode_1')
-        if seq_start_mode_1 == 1 then -- loop
+        local seq_start_on_1 = params:get('seq_start_on_1')
+        if seq_start_on_1 == 1 then -- Seq end
           advance_seq_pattern()
           grid_dirty = true
-        elseif seq_start_mode_1 == 4 then  -- 1-shot
-          if seq_1_shot_1 == true then
-            advance_seq_pattern()
-            grid_dirty = true
-          end
+        -- elseif seq_start_on_1 == 4 then  -- Cue
+        --   if seq_1_shot_1 == true then  -- seq_1_shot_1 is sort of an override for play_seq that takes priority when in seq_start_on_1 'cue' mode
+        --     advance_seq_pattern()
+        --     grid_dirty = true
+        --   end
         elseif play_seq then
           advance_seq_pattern()
           grid_dirty = true      
@@ -1731,9 +1739,7 @@ end
 function clock.transport.start(sync_value)
   -- little check for MIDI because user can technically start and stop as per usual and we don't want to restart coroutine
   if not (params:string('clock_source') == 'midi' and transport_active) then
-    -- print('Transport starting')
-    local seq_start_mode_1 = params:get('seq_start_mode_1')
-    if seq_start_mode_1 == 1 then -- loop
+    if params:get('seq_start_on_1') == 1 then -- Seq end
       play_seq = true
     end
     start = true
@@ -1803,8 +1809,8 @@ end
 
 function advance_chord_pattern()
   chord_pattern_retrig = true -- indicates when we're on a new chord seq step for CV harmonizer auto-rest logic
-  local seq_start_mode_1 = params:get('seq_start_mode_1')
-  local seq_reset_mode_1 = params:get('seq_reset_mode_1')
+  local seq_start_on_1 = params:get('seq_start_on_1')
+  local seq_reset_on_1 = params:get('seq_reset_on_1')
   local arrangement_reset = false
 
   -- Advance arranger sequence if enabled
@@ -1859,20 +1865,20 @@ function advance_chord_pattern()
     -- Play the chord
     if chord_pattern[active_chord_pattern][chord_pattern_position] > 0 then
       play_chord(params:string('chord_dest'), params:get('chord_midi_ch'))
-      if seq_reset_mode_1 == 2 then
+      if seq_reset_on_1 == 2 then -- Chord
         seq_pattern_position = 0
         play_seq = true
       end
-      if seq_start_mode_1 == 3 then -- 'On chord'
+      if seq_start_on_1 == 3 then -- Chord
         play_seq = true
       end
     end
     
-    if seq_reset_mode_1 == 1 then
+    if seq_reset_on_1 == 1 then -- Step
       seq_pattern_position = 0
     end
     
-    if seq_start_mode_1 == 2 then play_seq = true end -- 'On step'
+    if seq_start_on_1 == 2 then play_seq = true end -- Step
     
     if chord_key_count == 0 then
 
@@ -2002,10 +2008,14 @@ end
 function gen_chord_readout()
   if chord_no > 0 then
     local chord_degree = MusicUtil.SCALE_CHORD_DEGREES[params:get('mode')]['chords'][chord_no]  -- Adding 7 to index returns 7th variants
-    local chord_name = MusicUtil.NOTE_NAMES[util.wrap((MusicUtil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
-    -- print('chord_name ' .. chord_name)
-    local modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree) -- modified to only do triad readout for now.
-    chord_readout = params:string('chord_readout') == 'Degree' and chord_degree or chord_name .. modifier
+    if params:string('chord_readout') == 'Degree' then
+      chord_readout = chord_degree
+    else -- chord name
+      local chord_name = MusicUtil.NOTE_NAMES[util.wrap((MusicUtil.SCALES[params:get('mode')]['intervals'][util.wrap(chord_no, 1, 7)] + 1) + params:get('transpose'), 1, 12)]
+      local modifier = get_chord_name(1 + 1, params:get('mode'), chord_degree)
+      chord_readout = (chord_name .. modifier)
+      -- print('chord_name ' .. chord_name .. modifier .. '  ' .. chord_degree)
+    end
   end
 end  
 
@@ -2223,12 +2233,12 @@ function advance_seq_pattern()
   end
   
   if seq_pattern_position >= seq_pattern_length[active_seq_pattern] then
-    local seq_start_mode_1 = params:string('seq_start_mode_1')
-    if seq_start_mode_1 ~= 'Loop' then
+    local seq_start_on_1 = params:get('seq_start_on_1')
+    if seq_start_on_1 ~= 1 then -- seq end
       play_seq = false
-      if seq_start_mode_1 == '1-shot' then -- only reset if we're currently in one-shot mode. Could go either way here.
-        seq_1_shot_1 = false
-      end
+      -- if seq_start_on_1 == 4 then -- Only reset if we're currently in Event start_on mode. Could go either way here.
+      --   seq_1_shot_1 = false
+      -- end
      end
   end   
 end
