@@ -4,10 +4,7 @@ Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid
 
 Required: Monome Norns (**v2.7.6 or later**) and Grid
 
-Optional:
-- Crow
-- MIDI sequencers/controllers
-- Just Friends, Disting EX
+Optional: MIDI sequencers/controllers, Crow, Just Friends, Disting EX
 
 [![Watch the video](https://img.youtube.com/vi/Z6plHOHKwdg/0.jpg)](https://youtu.be/Z6plHOHKwdg)
 
@@ -15,28 +12,63 @@ Optional:
 
 
 
+# Intro
+
+Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid.
+
+It can be the centerpiece of your live performances, a compositional assistant, and generative sequencing playground.
+
+Dreamsequence does not aim to be a fully-featured sequencer that can do anything and everything. In fact, sequences are limited to just 8 steps at for moment. The joy of using Dreamsequence is in its intuitive, theory-informed playfulness that allows us to explore various ways of reinterpreting simple musical patterns.
+
+While fun all by itself, Dreamsequence really opens up when you add friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader capable of processing external musical data streams through its harmonizers. Sequences and harmonies can be merged with note deduplication and duration handling taken care of.
+
+For those looking to make experimental music that goes beyond randomization and LFOs (not that there's anything wrong with that), Dreamsequence features an Arranger and Event scheduling system that lets you create your own procedural layer for controlling (or ceding to chaos) every aspect of your creation over the course of time. If you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll certainly want to spend some time with Events.
+
+I hope you have as much fun using Dreamsequence as I have had creating it. I'd love to see what you're making with it- and feedback is always welcome.
+
+Cheers,
+Dan
+
+--- 
+
 # Overview
 
-Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It can be a live performance tool, a compositional assistant, a generative sequencing playground, or all of these at once. Dreamsequence is fun all by itself but really opens up when you bring friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader by processing external data streams through its harmonizers.
+> **_NOTE:_** Dreamsequence suppports saving/loading of your song through the system PARAMETERS>>PSET menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but things will be missed and I recommend you wrap up any work before updating.
+>
 
-I find music theory to be mostly baffling so I've worked hard to make Dreamsequence intuitive for those of us who are musically inclined but not necessarily card-carrying music nerds. Anyone should be able to get a song going in a few minutes without any prior knowlege. I've even built some simple algorithms to generate chord progressions and sequences at the push of a button, which turns out to be a really fun way to shuffle the deck before a session.
-
-But Dreamsequence can also get as deep and complex as you're willing to go. The Arranger and its Event scheduling system allows you to create your own procedural layer for controlling (or ceding to chaos) every aspect of your patch, e.g. key changes, chord inversions, clock rates, sequence destinations, pattern transformations, triggering Eurorack at set points, etc... Basically, if you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll definitely want to spend some time with Events.
-
-If you'd like to learn more about exactly _how_ it all comes together, the rest of this overview section will explain each of the functional components that make up Dreamsequence. But if you are ready to jump in and find your own way, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
-
-***NOTE: Dreamsequence 1.1 suppports saving/loading of your song through the system Parameters>>Pset menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but still recommend you wrap up any work before updating.***
+The rest of this Overview will explain how the components that make up Dreamsequence operate. It's a bit dry and technical, so if you are more of the skim-the-manual type, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
 
 
-### CHORD: Grid-based chord pattern sequencer
+### Topology
+```mermaid
+graph TD;
+    Arranger-->Chords
+    Arranger-->Events;
+    Events-->Chords;
+    Events-->Seq;
+    Events-->MIDI_harmonizer;
+    Events-->CV_harmonizer;
+    Chords-->Seq;
+    Chords-->MIDI_harmonizer;
+    Chords-->CV_harmonizer;
+    Chords-->Seq;
+    Chords-->Output;
+    Seq-->Output;
+    MIDI_harmonizer-->Output;
+    CV_harmonizer-->Output;
+```
+
+### Chord sequencer
+*Grid-based chord pattern sequencer*
 - The chord pattern sequencer is the heart of Dreamsequence, always broadcasting an "active" chord that the rest of Dreamsequence uses to create sequences and harmonies.
-- The active chord can be sent to a destination for playback (MIDI, Norns engine, i2c, etc...) or it can be muted.
+- The active chord can be sent to an output for playback (MIDI, Norns engine, i2c, etc...) or it can be muted.
 - Chord patterns are references to chord degrees (I-VII) across two octaves. If you're not a music theory nerd, this just means that the palette of chords that Grid offers will always sound nice together and we can change the mood of the song by simply switching to a different mode which will change all the chords for us and cascade those changes to everything else using the active chord.
 - 4 chord patterns (A, B, C, D) can be saved then switched between in a quantized manner using Grid (sort of like Ableton Live's Session mode) or the Arranger.
 - New patterns and some basic song/engine randomizations can be procedurally generated by holding down the Chord view key on Grid (last column, row 7) and pressing K3. Or hold rows 7 and 8 then press K3 to generate Chords and Seq together.
 
 
-### SEQ: Grid-based pattern sequencer or arpeggiator (formerly ARP)
+### Seq (sequencer/arp)
+*Grid-based pattern sequencer or arpeggiator (formerly ARP)*
 - The Seq can operate based on the chord sequencer as an arpeggiator, run independently, or in any number of hybrid modes of your choosing.
 - Seq currently has just 8 notes. This may seem limiting at first, but the idea is see how much juice we can squeeze out of the sequence by using techniques like sequence triggering, resetting, pattern transformation, note mapping, etc...
 - Four ways of configuring Grid's note mapping are available in the Seq "Notes" menu:
@@ -45,12 +77,16 @@ If you'd like to learn more about exactly _how_ it all comes together, the rest 
 		- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
 		- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
 
-*Hint: play with mismatched Chord step length and Seq step lengths, leaving spaces in your Chord sequence, then play with the "Start on" and "Reset on" settings (and don't forget Events!)*
+
+ 	> **_TIP:_** play with mismatched Chord step length and Seq step lengths, leaving spaces in your Chord sequence, then play with the "Start on" and "Reset on" settings. And don't forget Events!
+	> 
+
 
 - New patterns and some basic engine randomizations can be procedurally generated by holding down the Seq view key on Grid (last column, row 8) and pressing K3. Or hold rows 7 and 8 then press K3 to generate Chord and Seq patterns together.
 
 
-### MIDI HARMONIZER: note reprocessor for chords, sequences, arpeggios, whatever
+### MIDI Harmonizer
+*Note reprocessor for chords, sequences, arpeggios, whatever*
 - Transforms incoming MIDI to play notes using the same "Notes" options as Seq:
 		- Triad: play notes from active chord (arpeggiator style)
 		- 7th: play notes from active chord + 7th interval (arpeggiator style)
@@ -63,7 +99,8 @@ If you'd like to learn more about exactly _how_ it all comes together, the rest 
   - Use a looping MIDI clip from a synced DAW to generate more complex chord voicings and timings (e.g. adding some swing).
 
 
-### CV HARMONIZER: magical sample and hold + quantizer + chord/mode remapping (requires Crow)
+### CV Harmonizer
+*Magical sample and hold + quantizer + chord/mode remapping (requires Crow)*
 - A trigger recieved at Crow input 2 will sample the voltage at input 1 and use this to play a note using the same "Notes" options as Seq:
 		- Triad: play notes from active chord (arpeggiator style)
 		- 7th: play notes from active chord + 7th interval (arpeggiator style)
@@ -74,10 +111,11 @@ If you'd like to learn more about exactly _how_ it all comes together, the rest 
 - Ideas:
   - Process CV from your eurorack sequencer then send it back out via Crow outputs 1-2, like a chord quantizer. 
   - Turn LFOs, function generators, S&H modules, etc... into sequencers.
-  - Use trigger/clock/voltage sources for novel sequence timing or to inject some chaos into shared destination.
+  - Use trigger/clock/voltage sources for novel sequence timing or to inject some chaos into a merged output.
 
 
-### ARRANGER: like a DAW but [worse/better]
+### Arranger
+*Like a DAW but [worse/better]*
 - Sequences playback of chord patterns (A, B, C, D) and is the entry point to the Event Editor.
 
 - Events set, increment, randomize, or incite parameters to "wander" throughout your arrangement, with clamping or wrapping value ranges and probability control. Events can be used like rudimentary DAWesque automation lanes or they can be used more sparingly to reconfigure your patch at certain key points in your arrangement.
@@ -151,8 +189,12 @@ The Events view is used to manage the scheduling of parameter changes and functi
 - Grid displays a view of events in the Arranger segment, where events fire left-to-right then top-to-bottom (like reading in English).
   - Rows 1-8 represent each step in the segment's chord pattern, just like on the Grid chord view. We don't show a playhead moving from top to bottom but it might help to imagine it. Grid keys will be dimly-illuminated to indicate the length of the assigned pattern (A-D). Note that you can create events beyond the range of the chord pattern's length- they just won't fire.
   - Columns 1-16 are event 'lanes' that fire left-to-right just before the chord on that step plays.
-  
-TIP: To make it easier to keep track of your events, consider dedicating one lane/column to a certain type of event, such as having chord velocity changes in lane 1, pattern manipulations in lane 2, etc.. or just embrace chaos.  I don't care man.
+    
+
+
+  > **_TIP:_** To make it easier to keep track of your events, consider dedicating one lane/column to a certain type of event, such as having chord velocity changes in lane 1, pattern manipulations in lane 2, etc.. or just embrace chaos.
+  > 
+
 
 - Tapping on an unpopulated/dim event position will open the event settings and display "(New)" in the header. Settings will default to the last touched event so you can just tap a key, change a value, save, and repeat x times to build a sequence of related events.
     
@@ -254,14 +296,15 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Clock: System clock setting.
 	- Internal and MIDI clock sources work and have full transport support. MIDI clock out ports must be set via K1>>PARAMETERS>>CLOCK
-TIP: It’s possible to finagle a sort of count-in when syncing to MIDI by sending an external start, stopping on Dreamsequence (K2 2x), then scheduling a clean punch-in on the next beat using K3. This avoids the age-old issue of timing being a little off on the first beat when MIDI devices sync.
 
+ 	> **_TIP:_** TIP: It’s possible to finagle a sort of count-in when syncing to MIDI by sending an external start, stopping on Dreamsequence (K2 2x), then scheduling a clean punch-in on the next beat using K3. This avoids the age-old issue of timing being a little off on the first beat when MIDI devices sync.
+  > 
  	- Link works but using K3 to start transport is disabled due to a bug with clock.link.start() clobbering running clocks. Code wizards: please contact me if you'd like to poke around in the Norns code to help troubleshoot.
 	- Crow clock source is not supported at this time.
 
 - Crow clock: Frequency of the pulses from Crow out port 3. Defaults to note-style divisions but Pulses Per Quarter Note (PPQN) are also available by scrolling left. Note that higher PPQN settings are likely to result in instability. _At launch, Dreamsequence sets the Norns system clock "crow out" parameter to "off" since Dreamsequence generates its own clock pulses for Crow that only runs when the script's transport is playing. It will revert changes upon quitting the script._
 
-- Dedupe <: This enables and sets the threshold for detecting and de-duplicating repeat notes at each destination. This can be particularly helpful when merging sequences from different sources (say combining harmonizer with chords). Rather than trying to send the same note twice (potentially resulting in truncated notes or phase cancellation issues), this will let the initial note pass and filter out the second note if it arrives within the specified period of time.
+- Dedupe <: This enables and sets the threshold for detecting and de-duplicating repeat notes at each output. This can be particularly helpful when merging sequences from different sources (say combining harmonizer with chords). Rather than trying to send the same note twice (potentially resulting in truncated notes or phase cancellation issues), this will let the initial note pass and filter out the second note if it arrives within the specified period of time.
 
 - Chord preload: This setting enables the sequencer to fetch upcoming chord changes slightly early for processing the harmonizer inputs. This compensates for situations where the incoming note may arrive slightly before the chord change it's intended to harmonize with, such as when playing on a keyboard and hitting a note just before the chord change. This does not affect the timing of Chord and Seq playback.
 
@@ -271,7 +314,7 @@ TIP: It’s possible to finagle a sort of count-in when syncing to MIDI by sendi
 
 #### CHORD menu
 
-- Destination: Where the output of the chord sequence is sent for playback. Some menu items are destination-specific.
+- Output: Where the output of the chord sequence is sent for playback. Some menu items are output-specific.
   - Mute: Still sends active chords to the Seq and harmonizers, they just won't play directly. 
   - Engine: Norns PolyPerc engine.
   - MIDI: Output on the selected MIDI port.
@@ -310,7 +353,7 @@ TIP: It’s possible to finagle a sort of count-in when syncing to MIDI by sendi
 
 #### SEQ menu
 
-- Destination: Where the output of the Seq is sent for playback. Some menu items are destination-specific.
+- Output: Where the output of the Seq is sent for playback. Some menu items are output-specific.
   - Mute: Seq still plays but there is no sound output.
   - Engine: Norns PolyPerc engine.
   - MIDI: Output on the selected MIDI port.
@@ -330,14 +373,15 @@ TIP: It’s possible to finagle a sort of count-in when syncing to MIDI by sendi
   - Chord: start Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored). Useful for turning Seq into a chord strummer, or to layer notes on top of the chord, building alternative chord types and voicings.
   - Cue: start seq Seq when it recieves a "Start" event or the "Start" param is triggered via K1>>PARAMETERS>>EDIT>>SEQ (also MIDI/OSC mappable so this can be called by external sources).
 
-TIP: "Start" events/PMAP triggers can be combined with any of the above configurations for additional control.
+> **_NOTE:_**  "Start" events/PMAP triggers can be combined with any of the above configurations for additional control.
 
 - Reset on: The sequence can be forced to reset before its normal end using this setting. Depending on when the reset occurs, this can prevent the sequence from reaching its end, keeping it in a suspended loop.
   - Step: reset Seq when the chord sequencer advances a step.
   - Chord: reset Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored).
   - Stop: reset Seq when the transport is stopped and patterns are reset (not on pause).
 
-TIP: "Reset" events/PMAP triggers can be combined with any of the above configurations for additional control.
+	> **_TIP:_** "Reset" events/PMAP triggers can be combined with any of the above configurations for additional control.```
+  	> 
 
   
 - Octave: Shifts output from -2 to +4 octaves.
@@ -370,7 +414,7 @@ TIP: "Reset" events/PMAP triggers can be combined with any of the above configur
 
 #### MIDI HARMONIZER menu
 
-- Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
+- Output: Where the output of the harmonizer is sent for playback. Some menu items are output-specific.
   - Mute: No sound is output.
   - Engine: Norns PolyPerc engine.
   - MIDI: Output on the selected MIDI port.
@@ -406,7 +450,7 @@ TIP: "Reset" events/PMAP triggers can be combined with any of the above configur
 
 - Pass velocity (_MIDI_): Option to use the incoming MIDI velocity for the outgoing note.
 
-- Velocity (_MIDI, Disting_): Note velocity (only available for MIDI destination when pass velocity = false).
+- Velocity (_MIDI, Disting_): Note velocity (only available for MIDI output when pass velocity = false).
 
 - Mod wheel: (_MIDI_): Send MIDI control change 1 value out to the configured MIDI port and channel.
 
@@ -416,7 +460,7 @@ TIP: "Reset" events/PMAP triggers can be combined with any of the above configur
 
 #### CV HARMONIZER menu
 
-- Destination: Where the output of the harmonizer is sent for playback. Some menu items are destination-specific.
+- Output: Where the output of the harmonizer is sent for playback. Some menu items are output-specific.
   - Mute: No sound is output.
   - Engine: Norns PolyPerc engine.
   - MIDI: Output on the selected MIDI port.
@@ -470,7 +514,7 @@ TIP: "Reset" events/PMAP triggers can be combined with any of the above configur
 Dreamsequence supports using Crow to send and recieve CV and triggers:
 - Crow IN 1: CV used to determine note pitch of the CV harmonizer. Can be unquantized or quantized. Attenuation recommended
 - Crow IN 2: Trigger (rising past 2 volts) in will sample the CV on Crow IN 1 and send a note from the CV harmonizer
-- Crow OUT 1: "Crow" destination V/oct out
-- Crow OUT 2: "Crow" destination trigger or 10v attack/decay envelope out
+- Crow OUT 1: "Crow" output V/oct out
+- Crow OUT 2: "Crow" output trigger or 10v attack/decay envelope out
 - Crow OUT 3: Clock out (beat-division or PPQN) set in "Global:Crow clock" menu item
 - Crow OUT 4: A trigger can be sent from this output by scheduling an [Arranger Event](https://github.com/dstroud/dreamsequence/edit/main/README.md#events-view). More to come.
