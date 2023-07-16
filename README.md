@@ -11,20 +11,19 @@ Optional: MIDI sequencers/controllers, Crow, Just Friends, Disting EX
 [Dreamsequence demo and basics on YouTube](https://youtu.be/Z6plHOHKwdg)
 
 
-
 # Intro
 
 Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid.
 
-It can be the centerpiece of your live performances, a compositional assistant, and generative sequencing playground.
+Depending on your need, it can be your primary live performance tool, a compositional assistant, a generative sequencing playground, or just some thing you poke at that happens to make nice-sounding beeps.
 
-Dreamsequence does not aim to be a fully-featured sequencer that can do anything and everything. In fact, sequences are limited to just 8 steps at for moment. The joy of using Dreamsequence is in its intuitive, theory-informed playfulness that allows us to explore various ways of reinterpreting simple musical patterns.
+The joy of using Dreamsequence is in its intuitive, theory-informed interactivity that allows us to explore various ways of reinterpreting simple musical patterns. Dreamsequence does not aim to be a fully-featured sequencer that can do anything and everything. In fact, sequences are limited to just 8 steps at the moment. But I think you will be delighted by what can be done with these simple inputs.
 
-While fun all by itself, Dreamsequence really opens up when you add friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader capable of processing external musical data streams through its harmonizers. Sequences and harmonies can be merged with note deduplication and duration handling taken care of.
+While fun all by itself, Dreamsequence really opens up when you add friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader capable of processing external musical data streams through its harmonizers. Sequences and harmonies can be intelligently merged with natural sounding results.
 
-For those looking to make experimental music that goes beyond randomization and LFOs (not that there's anything wrong with that), Dreamsequence features an Arranger and Event scheduling system that lets you create your own procedural layer for controlling (or ceding to chaos) every aspect of your creation over the course of time. If you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll certainly want to spend some time with Events.
+For those looking to make experimental music that goes beyond randomization and LFOs (not that there's anything wrong with that), Dreamsequence features an Arranger and Event scheduling system that lets you create your own procedural layer for controlling (or ceding to chaos) every aspect of your creation over the course of time. If you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll be rewarded by spending some time with Events.
 
-I hope you have as much fun using Dreamsequence as I have had creating it. I'd love to see what you're making with it- and feedback is always welcome.
+I hope you have as much fun using Dreamsequence as I have had creating it, and I'd love to hear about how you're using it at https://llllllll.co/t/dreamsequence
 
 Cheers,
 Dan
@@ -33,30 +32,11 @@ Dan
 
 # Overview
 
-> **_NOTE:_** Dreamsequence suppports saving/loading of your song through the system PARAMETERS>>PSET menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but things will be missed and I recommend you wrap up any work before updating.
+
+This Overview will explain how the components that make up Dreamsequence operate. It's a bit dry and technical, so if you are more of the skim-the-manual type, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
+
+ > **_NOTE:_** Dreamsequence suppports saving/loading of your song through the system PARAMETERS>>PSET menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but things will be missed and I recommend you wrap up any work before updating.
 >
-
-The rest of this Overview will explain how the components that make up Dreamsequence operate. It's a bit dry and technical, so if you are more of the skim-the-manual type, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/edit/main/README.md#norns-interface) guide handy for reference.
-
-
-### Topology
-```mermaid
-graph TD;
-    Arranger-->Chords
-    Arranger-->Events;
-    Events-->Chords;
-    Events-->Seq;
-    Events-->MIDI_harmonizer;
-    Events-->CV_harmonizer;
-    Chords-->Seq;
-    Chords-->MIDI_harmonizer;
-    Chords-->CV_harmonizer;
-    Chords-->Seq;
-    Chords-->Output;
-    Seq-->Output;
-    MIDI_harmonizer-->Output;
-    CV_harmonizer-->Output;
-```
 
 ### Chord sequencer
 *Grid-based chord pattern sequencer*
@@ -72,14 +52,14 @@ graph TD;
 - The Seq can operate based on the chord sequencer as an arpeggiator, run independently, or in any number of hybrid modes of your choosing.
 - Seq currently has just 8 notes. This may seem limiting at first, but the idea is see how much juice we can squeeze out of the sequence by using techniques like sequence triggering, resetting, pattern transformation, note mapping, etc...
 - Four ways of configuring Grid's note mapping are available in the Seq "Notes" menu:
-		- Triad: play notes from active chord (arpeggiator style)
-		- 7th: play notes from active chord + 7th interval (arpeggiator style)
-		- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
-		- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
+	- Triad: play notes from active chord (arpeggiator style)
+	- 7th: play notes from active chord + 7th interval (arpeggiator style)
+	- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
+	- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
 
 
- 	> **_TIP:_** play with mismatched Chord step length and Seq step lengths, leaving spaces in your Chord sequence, then play with the "Start on" and "Reset on" settings. And don't forget Events!
-	> 
+ 		> **_TIP:_** play with mismatched Chord step length and Seq step lengths, leaving spaces in your Chord sequence, then play with the "Start on" and "Reset on" settings. And don't forget Events!
+		> 
 
 
 - New patterns and some basic engine randomizations can be procedurally generated by holding down the Seq view key on Grid (last column, row 8) and pressing K3. Or hold rows 7 and 8 then press K3 to generate Chord and Seq patterns together.
@@ -88,10 +68,10 @@ graph TD;
 ### MIDI Harmonizer
 *Note reprocessor for chords, sequences, arpeggios, whatever*
 - Transforms incoming MIDI to play notes using the same "Notes" options as Seq:
-		- Triad: play notes from active chord (arpeggiator style)
-		- 7th: play notes from active chord + 7th interval (arpeggiator style)
-		- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
-		- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
+	- Triad: play notes from active chord (arpeggiator style)
+	- 7th: play notes from active chord + 7th interval (arpeggiator style)
+	- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
+	- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
   
 - Ideas:
   - Turn a synced step sequencer into a chord-aware secondary arpeggio, melody, bassline, etc...
@@ -102,10 +82,10 @@ graph TD;
 ### CV Harmonizer
 *Magical sample and hold + quantizer + chord/mode remapping (requires Crow)*
 - A trigger recieved at Crow input 2 will sample the voltage at input 1 and use this to play a note using the same "Notes" options as Seq:
-		- Triad: play notes from active chord (arpeggiator style)
-		- 7th: play notes from active chord + 7th interval (arpeggiator style)
-		- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
-		- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
+	- Triad: play notes from active chord (arpeggiator style)
+	- 7th: play notes from active chord + 7th interval (arpeggiator style)
+	- Mode+transp.: play notes in the selected mode but apply a diatonic transposition based on the active chord degree
+	- Mode: play notes in the selected mode irrespective of the active chord (step sequencer style)
 - Rests can be inserted by enabling the "Auto-rest" menu option and triggering the same voltage repeatedly within a chord step.
   
 - Ideas:
@@ -247,7 +227,8 @@ The Events view is used to manage the scheduling of parameter changes and functi
 
 ![dreamsequence](doc/dreamsequence.png)
 
-Most of your work on Norns will be done through 5 menus. They are not very exciting but they have some good stuff in there. But before we dig into those, let's take a look at the mini dashboards on the right side of the screen.
+Most of your work on Norns will be done through 5 main menus that look like the example above. Scrolling to the top menu (GLOBAL in the example above) with E2 will allow you to browse using E3. Before taking a closer look at the contents of these menus, let's take a look at the mini dashboards on the right side of the screen.
+
 ----------------------------------------------------------------------------------------------------------------------
  
 ### Pattern Dashboard
@@ -259,8 +240,9 @@ Most of your work on Norns will be done through 5 menus. They are not very excit
 - Play/pause/stop symbols in the upper right will flash when a status change is pending, such as when waiting for Link sync to start or waiting for the current chord step to complete before pausing. Pressing pause/start can cancel pending changes.
 - In the center of the dash, the active chord will be displayed. Holding down a chord sequence key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key. The chord readout can be changed from chord name to chord degree using K1>>PARAMETERS>>EDIT>>PREFERENCES>>"Chords as"
 
-> **_TIP:_** Active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) but each sequencer/harmonizer can override this with the similiar "Notes" menu.
-> 
+	> **_TIP:_** Active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) but each sequencer/harmonizer can override this with the similiar "Notes" menu.
+	>
+
 ----------------------------------------------------------------------------------------------------------------------
 
 ### Arranger Dashboard
@@ -273,8 +255,8 @@ Most of your work on Norns will be done through 5 menus. They are not very excit
 - In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. One advantage this dashboard has over Grid for live performances is that it gives an indication of segment/chord pattern length.
 - At the bottom of the chart is a timeline that highlights any steps that have an event. In the example above, events occur on the first step of the 2 upcoming segments, and on every step of the last segment.
 - At the very bottom of the dash is a readout of the remaining time in the arrangement.
-- Interrupting the Arranger (by turning it off manually on the Arranger Grid view or changing chord patterns on the Chord Grid view) will turn it off and enter a suspended state where the current chord pattern continues to play in a loop. In this state, the dashboard changes to show:
-	- 1. The segment the Arranger will resume on once it has turned on and and resyncronizes and 2. The number of steps remaining until that can occur. Formatted as 'RESUMING SEGMENT'.'STEPS UNTIL RESYNC' 
+- Interrupting the Arranger (by turning it off manually on the Arranger Grid view or changing chord patterns on the Chord Grid view) will turn it off and enter a suspended state where the current chord pattern continues to play in a loop. In this state, the dashboard changes to show
+	-  The segment the Arranger will resume on once it has turned on and and resyncronizes and the number of steps remaining until that can occur. Formatted as 'RESUMING SEGMENT'.'STEPS UNTIL RESYNC' 
 	- "LP" or "EN" indicates that we are on the last segment of the arrangement and resuming the Arranger will result in looping (LP) to the beginning or ending (EN) of the arrangement, depending on the Arranger mode.
 	- The remaining time in arrangement upon arranger resume. Time remaining on the active pattern is not counted because it’s technically not part of the arrangement.
     
