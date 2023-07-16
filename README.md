@@ -125,6 +125,7 @@ graph TD;
 # Grid interface
 
 ![dreamsequence](doc/grid_chord.svg)
+
 The Chord view is used to program chord patterns A-D. Since the Seq and harmonizers can create notes based on the active chord, this is typically where you'll begin composing.
 
 - Sequence plays from top to bottom and sequence length is set using column 15.
@@ -145,6 +146,7 @@ The Chord view is used to program chord patterns A-D. Since the Seq and harmoniz
 
 ----------------------------------------------------------------------------------------------------------------------
 ![dreamsequence](doc/grid_seq.svg)
+
 The Seq view is used to program the notes in the monophonic sequence/arpeggio/strum pattern.
 
 - Each column represents a different note pitch, determined by one of the following "Notes" Seq menu options:
@@ -164,6 +166,7 @@ The Seq view is used to program the notes in the monophonic sequence/arpeggio/st
 
 ----------------------------------------------------------------------------------------------------------------------
 ![dreamsequence](doc/grid_arranger.svg)
+
 The Arranger view is used to sequence chord patterns and enter the Events view.
 
 - Rows 1-4 correspond to chord patterns A-D and columns 1-16 represent "segments" of the Arranger sequence. The Arranger length automatically resizes to the rightmost set pattern and any gaps in the sequence are filled in lighter colors to indicate that the previous chord pattern will be sustained. If the first segment isn't filled it will default to pattern A or it will grab the last populated pattern (since the Arranger loops).
@@ -182,6 +185,7 @@ The Arranger view is used to sequence chord patterns and enter the Events view.
 
 ----------------------------------------------------------------------------------------------------------------------
 ![dreamsequence](doc/grid_events.svg)
+
 The Events view is used to manage the scheduling of parameter changes and functions at certain points in the Arrangement.
 
 - Events view is entered by holding down a segment on the Arranger Timeline (row 5) then pressing K3. Think of it as zooming in on that segment- and thus the chord pattern (A-D).
@@ -190,11 +194,8 @@ The Events view is used to manage the scheduling of parameter changes and functi
   - Rows 1-8 represent each step in the segment's chord pattern, just like on the Grid chord view. We don't show a playhead moving from top to bottom but it might help to imagine it. Grid keys will be dimly-illuminated to indicate the length of the assigned pattern (A-D). Note that you can create events beyond the range of the chord pattern's length- they just won't fire.
   - Columns 1-16 are event 'lanes' that fire left-to-right just before the chord on that step plays.
     
-
-
-  > **_TIP:_** To make it easier to keep track of your events, consider dedicating one lane/column to a certain type of event, such as having chord velocity changes in lane 1, pattern manipulations in lane 2, etc.. or just embrace chaos.
-  > 
-
+  	> **_TIP:_** To make it easier to keep track of your events, consider dedicating one lane/column to a certain type of event, such as having chord velocity changes in lane 1, pattern manipulations in lane 2, etc.. or just embrace chaos.
+  	> 
 
 - Tapping on an unpopulated/dim event position will open the event settings and display "(New)" in the header. Settings will default to the last touched event so you can just tap a key, change a value, save, and repeat x times to build a sequence of related events.
     
@@ -244,7 +245,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
 
 ## Norns screen
 
-![dreamsequence](doc/global_screen.png)
+![dreamsequence](doc/dreamsequence.png)
 
 Most of your work on Norns will be done through 5 menus. They are not very exciting but they have some good stuff in there. But before we dig into those, let's take a look at the mini dashboards on the right side of the screen.
 ----------------------------------------------------------------------------------------------------------------------
@@ -254,11 +255,12 @@ Most of your work on Norns will be done through 5 menus. They are not very excit
 ![dreamsequence](doc/pattern_dash.png)
 
 - This dashboard gives us a summary of transport status, the current chord pattern (A-D) and active chord.
-- The numbers in the top left of the dash provide information about the current pattern in the format 'PATTERN'.'CURRENT STEP'/'PATTERN LENGTH'. Example: “B.2/8” means pattern B, step 2 of 8 total. ‘RST’ appears when pattern has been reset.
+- The numbers in the top left of the dash provide information about the current pattern in the format 'PATTERN'.'CURRENT STEP'/'PATTERN LENGTH'. Example: “A.3/4” means pattern A, step 3 of 4 total. ‘RST’ appears when pattern has been reset.
 - Play/pause/stop symbols in the upper right will flash when a status change is pending, such as when waiting for Link sync to start or waiting for the current chord step to complete before pausing. Pressing pause/start can cancel pending changes.
 - In the center of the dash, the active chord will be displayed. Holding down a chord sequence key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key. The chord readout can be changed from chord name to chord degree using K1>>PARAMETERS>>EDIT>>PREFERENCES>>"Chords as"
 
-Note: active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) but each source can override this with the similiar "Notes" menu.
+> **_TIP:_** Active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) but each sequencer/harmonizer can override this with the similiar "Notes" menu.
+> 
 ----------------------------------------------------------------------------------------------------------------------
 
 ### Arranger Dashboard
@@ -266,13 +268,13 @@ Note: active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) b
 ![dreamsequence](doc/arranger_dash.png)
 
 - Dashboard will be brightly illuminated when Arranger is enabled, and dimmed when disabled.
-- The numbers in the top left indicate the current Arranger segment and step in the format 'SEGMENT'.'STEP'. "2.1" in the example above means the Arranger is on step 1 of the 2nd Arranger segment. "RST" indicates the Arranger has been reset to its initial position.
-- To the right, a symbol will indicate if the Arranger is in Loop mode (as in the example above) or One-shot mode (arrow symbol).
-- In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. In the example above, pattern A will be played once, then pattern B twice, then pattern C twice. The length of each segment is at a scale of one pixel per step.
-- At the bottom of the chart is a timeline that highlights any steps that have an event. In the example above, events occur on the first step of the upcoming segment, followed by a segment with an event on every step.
+- The numbers in the top left indicate the current Arranger segment and step in the format 'SEGMENT'.'STEP'. "1.3" in the example above means the Arranger is on step 3 of the 1st Arranger segment. "RST" indicates the Arranger has been reset to its initial position.
+- To the right, a symbol will indicate if the Arranger is in Loop mode (circular symbol as in the example above) or One-shot mode (arrow symbol). This symbol will flash when on the last segment of the Arranger as a heads-up.
+- In the middle of the dashboard, a mini chart shows the current and upcoming Arranger segments. One advantage this dashboard has over Grid for live performances is that it gives an indication of segment/chord pattern length.
+- At the bottom of the chart is a timeline that highlights any steps that have an event. In the example above, events occur on the first step of the 2 upcoming segments, and on every step of the last segment.
 - At the very bottom of the dash is a readout of the remaining time in the arrangement.
-- Interrupting the Arranger (by disabling arranger manually or changing chord patterns) will turn it off and enter a suspended state where the current chord pattern continues to play in a loop. In this state, the dashboard changes to show:
-	- 1. The segment the Arranger will resume on if it is re-enabled and 2. The number of steps remaining until that can occur. Formatted as 'RESUMING SEGMENT'.'STEPS UNTIL RESYNC' 
+- Interrupting the Arranger (by turning it off manually on the Arranger Grid view or changing chord patterns on the Chord Grid view) will turn it off and enter a suspended state where the current chord pattern continues to play in a loop. In this state, the dashboard changes to show:
+	- 1. The segment the Arranger will resume on once it has turned on and and resyncronizes and 2. The number of steps remaining until that can occur. Formatted as 'RESUMING SEGMENT'.'STEPS UNTIL RESYNC' 
 	- "LP" or "EN" indicates that we are on the last segment of the arrangement and resuming the Arranger will result in looping (LP) to the beginning or ending (EN) of the arrangement, depending on the Arranger mode.
 	- The remaining time in arrangement upon arranger resume. Time remaining on the active pattern is not counted because it’s technically not part of the arrangement.
     
@@ -297,8 +299,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - Clock: System clock setting.
 	- Internal and MIDI clock sources work and have full transport support. MIDI clock out ports must be set via K1>>PARAMETERS>>CLOCK
 
- 	> **_TIP:_** TIP: It’s possible to finagle a sort of count-in when syncing to MIDI by sending an external start, stopping on Dreamsequence (K2 2x), then scheduling a clean punch-in on the next beat using K3. This avoids the age-old issue of timing being a little off on the first beat when MIDI devices sync.
-  > 
+ 		> **_TIP:_** It’s possible to finagle a sort of count-in when syncing to MIDI by sending an external start, stopping on Dreamsequence (K2 2x), then scheduling a clean punch-in on the next beat using K3. This avoids the age-old issue of timing being a little off on the first beat when MIDI devices sync.
+  		> 
  	- Link works but using K3 to start transport is disabled due to a bug with clock.link.start() clobbering running clocks. Code wizards: please contact me if you'd like to poke around in the Norns code to help troubleshoot.
 	- Crow clock source is not supported at this time.
 
@@ -373,7 +375,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
   - Chord: start Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored). Useful for turning Seq into a chord strummer, or to layer notes on top of the chord, building alternative chord types and voicings.
   - Cue: start seq Seq when it recieves a "Start" event or the "Start" param is triggered via K1>>PARAMETERS>>EDIT>>SEQ (also MIDI/OSC mappable so this can be called by external sources).
 
-> **_NOTE:_**  "Start" events/PMAP triggers can be combined with any of the above configurations for additional control.
+	> **_NOTE:_**  "Start" events/PMAP triggers can be combined with any of the above configurations for additional control.
+  	> 
 
 - Reset on: The sequence can be forced to reset before its normal end using this setting. Depending on when the reset occurs, this can prevent the sequence from reaching its end, keeping it in a suspended loop.
   - Step: reset Seq when the chord sequencer advances a step.
