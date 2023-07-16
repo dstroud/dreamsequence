@@ -370,7 +370,7 @@ function init()
   -- params:set_save('seq_start_on_1', false)
   -- params:hide(params.lookup['seq_start_on_1'])
     
-  params:add_option('seq_reset_on_1', 'Reset on', {'Step', 'Chord', 'Stop'}, 1)
+  params:add_option('seq_reset_on_1', 'Reset on', {'Step', 'Chord', 'Stop'}, 3)
   -- params:set_save('seq_reset_on_1', false)
   -- params:hide(params.lookup['seq_reset_on_1'])
 
@@ -1998,7 +1998,7 @@ function advance_chord_pattern()
       play_chord(params:string('chord_output'), params:get('chord_midi_ch'))
       if seq_reset_on_1 == 2 then -- Chord
         seq_pattern_position = 0
-        play_seq = true
+        -- play_seq = true
       end
       if seq_start_on_1 == 3 then -- Chord
         play_seq = true
