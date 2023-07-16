@@ -2025,7 +2025,10 @@ end
 
 
 function arranger_ending()
-  arranger_one_shot_last_pattern = arranger_position >= arranger_length and params:string('playback') == '1-shot'
+  arranger_one_shot_last_pattern = 
+  arranger_position >= arranger_length 
+  and params:string('playback') == '1-shot'
+  and (arranger_queue == nil or arranger_queue > arranger_length)
 end
 
 
@@ -3236,6 +3239,7 @@ function key(n,z)
         -- jumping arranger queue cancels pattern change on key up
         -- print('setting arranger_pattern_key_interrupt to TRUE')
         -- arranger_pattern_key_interrupt = true -- don't change pattern on g.key up
+        if arranger_queue <= arranger_length then arranger_one_shot_last_pattern = false end -- instantly de-blink glyph
         grid_redraw()
       
       elseif screen_view_name == 'Events' then
@@ -4497,22 +4501,32 @@ function redraw()
       screen.text(seconds_remaining)
       
       -- Arranger mode glyph
-      screen.level(0)
       local x_offset = dash_x + 27
       local y_offset = arranger_dash_y + 4
+
       if params:string('playback') == 'Loop' then
+        screen.level(((
+          arranger_position == arranger_length 
+          and (arranger_queue == nil or arranger_queue > arranger_length)) -- if arranger is jumped on the last seg
+        and fast_blinky or 0) * 2)
         for i = 1, #glyphs.loop do
           screen.pixel(glyphs.loop[i][1] + x_offset, glyphs.loop[i][2] + y_offset)
         end
       else 
+        screen.level(((arranger_position == arranger_length 
+          and arranger_one_shot_last_pattern) -- if arranger is jumped on the last seg
+        and fast_blinky or 0) * 2)
+
         for i = 1, #glyphs.one_shot do
           screen.pixel(glyphs.one_shot[i][1] + x_offset, glyphs.one_shot[i][2] + y_offset)
         end
       end
-
+      screen.fill()
+      
       --------------------------------------------
       -- Arranger position readout
       --------------------------------------------      
+      screen.level(0)
       screen.move(dash_x + 2,arranger_dash_y + 9)
 
       if arranger_position == 0 then

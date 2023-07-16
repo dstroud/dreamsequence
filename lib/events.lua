@@ -14,7 +14,7 @@ events_lookup = {										--
 										
 -- Chord										
 {	category= 'Chord', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'chord_pattern_length', 	name= 'Pattern length', 	value_type= 'continuous', 				},
-{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_output', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_spread', 	name= 'Spread', 	value_type= 'continuous', 				},
@@ -34,16 +34,16 @@ events_lookup = {										--
 {	category= 'Chord', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'chord_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 										
 -- Seq										
-{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_note_map_1', 	name= 'Notes', 	value_type= 'continuous', 				},
-{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_start_on_1', 	name= 'Start on', 	value_type= 'continuous', 				},
-{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_reset_on_1', 	name= 'Reset on', 	value_type= 'continuous', 				},
-{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_start_1', 	name= 'Start', 	value_type= 'trigger', 				},
-{	category= 'Seq', 	subcategory= 'Style', 	event_type= 'param', 	id= 'seq_reset_1', 	name= 'Reset', 	value_type= 'trigger', 				},
+{	category= 'Seq', 	subcategory= 'Type', 	event_type= 'param', 	id= 'seq_note_map_1', 	name= 'Notes', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Type', 	event_type= 'param', 	id= 'seq_start_on_1', 	name= 'Start on', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Type', 	event_type= 'param', 	id= 'seq_reset_on_1', 	name= 'Reset on', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Type', 	event_type= 'param', 	id= 'seq_start_1', 	name= 'Start', 	value_type= 'trigger', 				},
+{	category= 'Seq', 	subcategory= 'Type', 	event_type= 'param', 	id= 'seq_reset_1', 	name= 'Reset', 	value_type= 'trigger', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_pattern_length_1', 	name= 'Pattern length', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_rotate_1', 	name= 'Pattern rotate', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'param', 	id= 'seq_shift_1', 	name= 'Pattern shift', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Pattern', 	event_type= 'function', 	id= 'shuffle_seq_1', 	name= 'Shuffle', 	value_type= 'trigger', 				},
-{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_dest_1', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_output_1', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_octave_1', 	name= 'Octave', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_div_index_1', 	name= 'Step length', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
 {	category= 'Seq', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'seq_duration_index_1', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
@@ -62,8 +62,8 @@ events_lookup = {										--
 {	category= 'Seq', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'seq_disting_velocity_1', 	name= 'Velocity', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 										
 -- MIDI harmonizer										
-{	category= 'MIDI harmonizer', 	subcategory= 'Style', 	event_type= 'param', 	id= 'midi_note_map', 	name= 'Notes', 	value_type= 'continuous', 				},
-{	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Type', 	event_type= 'param', 	id= 'midi_note_map', 	name= 'Notes', 	value_type= 'continuous', 				},
+{	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_output', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
 {	category= 'MIDI harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'midi_duration_index', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
 {	category= 'MIDI harmonizer', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'midi_pp_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'percent', 			},
@@ -83,8 +83,8 @@ events_lookup = {										--
 {	category= 'MIDI harmonizer', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'midi_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 										
 -- CV harmonizer										
-{	category= 'CV harmonizer', 	subcategory= 'Style', 	event_type= 'param', 	id= 'crow_note_map', 	name= 'Notes', 	value_type= 'continuous', 				},
-{	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_dest', 	name= 'Destination', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Type', 	event_type= 'param', 	id= 'crow_note_map', 	name= 'Notes', 	value_type= 'continuous', 				},
+{	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_output', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
 {	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_duration_index', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
 {	category= 'CV harmonizer', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'crow_auto_rest', 	name= 'Auto-rest', 	value_type= 'continuous', 				},
