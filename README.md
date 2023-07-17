@@ -348,21 +348,30 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 	- Mode+transp.: columns 1-7 play notes from the selected mode and apply a diatonic transposition based on the active chord degree. Columns 8-14 play the same one octave up. Example: In C Major degree I, columns 1-7 would be C, D, E, F, G, A, B. Degree ii would result in D, E, F, G, A, B, C.
 	- Mode: columns 1-7 play notes from the selected mode, columns 8-14 play the same one octave up.
 
-- Start on: The sequence always tries to play until it completes, at which point it loops to be the beginning and is ready to start again as soon as it receives the signal to do so. This menu option determines what can send that signal to start:
-  - Seq end: as soon as the sequence ends, it will start itself in a loop.
-  - Step: start Seq when the chord sequencer advances a step.
-  - Chord: start Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored). Useful for turning Seq into a chord strummer, or to layer notes on top of the chord, building alternative chord types and voicings.
-  - Cue: start seq Seq when it recieves a "Start" event or the "Start" param is triggered via K1>>PARAMETERS>>EDIT>>SEQ (also MIDI/OSC mappable so this can be called by external sources).
+- Start on and Reset on menus: The sequence always tries to play until it completes, at which point it loops to be the beginning and is ready to start again as soon as it receives the signal to do so. These menu options determine what can send that signal to start and what can force a restart before the end of the sequence.
+  - Start on:
+    - Seq end: as soon as the sequence ends, it will start itself in a loop.
+    - Step: start Seq when the chord sequencer advances a step.
+    - Chord: start Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored). Useful for turning Seq into a chord strummer, or to layer notes on top of the chord, building alternative chord types and voicings.
+    - Cue: start seq Seq only when the "Start" param is triggered by an event or MIDI/OSC PMAP.
+	> **_NOTE:_**  "Start" events/PMAP triggers (K1>>PARAMETERS>>EDIT>>SEQ>>Start) can be combined with any of the above configurations for additional control.
+  - Reset on: The sequence can be forced to reset before its normal end using this setting Depending on when the reset occurs, this can prevent the sequence from reaching its end, keeping it in a suspended loop.
+    - Step: reset Seq when the chord sequencer advances a step.
+    - Chord: reset Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored).
+    - Stop: reset Seq when the transport is stopped and patterns are reset (not on pause).
+	> **_NOTE:_**  "Stop" events/PMAP triggers (K1>>PARAMETERS>>EDIT>>SEQ>>Stop) can be combined with any of the above configurations for additional control.
+   
+  The following examples show how the same 6-note sequence can be reinterpreted by changing "Start on" and "Reset on" settings (chords shown below sequence).
+  
+  ![dreamsequence](doc/seq_ex_a.svg)
 
-	> **_NOTE:_**  "Start" events/PMAP triggers can be combined with any of the above configurations for additional control.
+  ![dreamsequence](doc/seq_ex_b.svg)
 
-- Reset on: The sequence can be forced to reset before its normal end using this setting. Depending on when the reset occurs, this can prevent the sequence from reaching its end, keeping it in a suspended loop.
-  - Step: reset Seq when the chord sequencer advances a step.
-  - Chord: reset Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored).
-  - Stop: reset Seq when the transport is stopped and patterns are reset (not on pause).
+  ![dreamsequence](doc/seq_ex_c.svg)
 
-	> **_TIP:_** "Reset" events/PMAP triggers can be combined with any of the above configurations for additional control.
+  ![dreamsequence](doc/seq_ex_d.svg)
 
+  For the sake of simplicity, these examples have one chord repeated 3 times. In practice, chord changes will also be influencing the sequence notes, which can produce mesmerizing results. Also, remember that it's possible to use events to switch between the above settings and/oe directly trigger starts and resets, allowing for significantly more complex sequences than are shown here.
   
 - Octave: Shifts output from -2 to +4 octaves.
 
