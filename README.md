@@ -371,7 +371,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
   ![dreamsequence](doc/seq_ex_d.svg)
 
-  For the sake of simplicity, these examples have one chord repeated 3 times. In practice, chord changes will also be influencing the sequence notes, which can produce mesmerizing results. Also, remember that it's possible to use events to switch between the above settings and/oe directly trigger starts and resets, allowing for significantly more complex sequences than are shown here.
+  For the sake of simplicity, these examples have one chord repeated 3 times. In practice, chord changes will also be influencing the sequence notes, which can produce mesmerizing results. Also, remember that it's possible to use events to switch between the above settings and/or directly trigger starts and resets, allowing for significantly more complex sequences than are shown here.
   
 - Octave: Shifts output from -2 to +4 octaves.
 
