@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.1 @modularbeat
+-- v1.1.1 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -28,7 +28,7 @@ norns.version.required = 230526
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.1'
+  version = 'v1.1.1'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -142,7 +142,7 @@ function init()
   init_generator()
   
   -- midi stuff
-  midi_device = {} -- container for connected midi devices
+  midi_device = {} -- container for connected MIDI devices
   midi_device_names = {} -- container for their names
   refresh_midi_devices()
   
@@ -2515,13 +2515,17 @@ function to_midi(note, velocity, channel, duration, port)
       midi_note_history[i][4] = note_on_time
     end
   end
-  
-  -- Play note and insert new note-on record if appropriate
+
+  -- if note is already playing, send a note-off before note_on is sent again
+  -- else add note into midi_note_history_insert to be turned off later
+  if midi_note_history_insert == false then
+    midi_device[port]:note_off((midi_note), 0, channel)
+  else
+    table.insert(midi_note_history, {duration, midi_note, channel, note_on_time, port})
+  end
+  -- Play note
   if midi_play_note == true then
     midi_device[port]:note_on((midi_note), velocity, channel)
-  end
-  if midi_note_history_insert == true then
-    table.insert(midi_note_history, {duration, midi_note, channel, note_on_time, port})
   end
 end
 
@@ -2611,7 +2615,6 @@ function to_disting(note, velocity, duration)
     if disting_note_history[i][2] == disting_note then
 
       -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below.
-      
       disting_note_history[i][1] = math.max(duration, disting_note_history[i][1])
       disting_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
 
@@ -2626,19 +2629,23 @@ function to_disting(note, velocity, duration)
       disting_note_history[i][3] = note_on_time
     end
   end
-  
-  -- Play note and insert new note-on record if appropriate
-  if disting_play_note == true then
-    -- disting.note seems to be a little weird or at least doesn't respond like typical MIDI in the sense that it won't automatically do a note-off and retrigger on a new MIDI on message. This ends up blocking intentional repeat notes. So we'll roll our own note-off.
+
+
+ -- if note is already playing, send a note-off before note_on is sent again
+  -- else add note into midi_note_history_insert to be turned off later
+  if disting_note_history_insert == false then
+    table.insert(disting_note_history, {duration, disting_note,  note_on_time})
+  else
     crow.ii.disting.note_off(disting_note)    
+  end
+
+  -- Play note
+  if disting_play_note == true then
     -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
     crow.ii.disting.note_pitch(disting_note, (disting_note-48)/12)
     crow.ii.disting.note_velocity(disting_note, velocity/10)
   end
-  
-  if disting_note_history_insert == true then
-    table.insert(disting_note_history, {duration, disting_note,  note_on_time})
-  end
+
 end
 
 
