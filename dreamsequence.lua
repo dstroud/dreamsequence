@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.1.1 @modularbeat
+-- v1.1.2 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -9,6 +9,7 @@
 -- KEY 2: Pause/Stop(2x)
 -- KEY 3: Play
 --
+-- ENC 1: Scroll (16x8 Grid)
 -- ENC 2: Select
 -- ENC 3: Edit 
 --
@@ -30,7 +31,7 @@ norns.version.required = 230526
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.1.1'
+  version = 'v1.1.2'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -417,15 +418,15 @@ function init()
   
   params:add_number('seq_duration_index_1', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_duration_index_1', function(val) seq_duration = division_names[val][1] end)
-  
-  params:add_number('seq_rotate_1', 'Pattern rotate', -8, 8, 0)
+
+  max_seq_pattern_length = 16  
+  params:add_number('seq_rotate_1', 'Pattern rotate', (max_seq_pattern_length * -1), max_seq_pattern_length, 0)
   params:set_action('seq_rotate_1', function() pattern_rotate_abs('seq_rotate_1') end)
   
   params:add_number('seq_shift_1', 'Pattern shift', -14, 14, 0)
   params:set_action('seq_shift_1', function() pattern_shift_abs('seq_shift_1') end)
   
   -- numbered so we can operate on parallel seqs down the road
-  max_seq_pattern_length = 16  
   params:add_number('seq_pattern_length_1', 'Pattern length', 1, max_seq_pattern_length, 8)
   params:set_action('seq_pattern_length_1', function() pattern_length(1) end)
   
@@ -631,8 +632,7 @@ function init()
   pattern_queue = false
   pattern_copy_performed = false
   arranger_retrig = false
-  max_arranger_length = 64 --(64 arranger segments * 8 chord step * 16 event slots = 8192 events... yikes)
-  -- Raw arranger which can contain nils although we're moving away from this I think
+  max_arranger_length = 64
   arranger = {}
   for segment = 1, max_arranger_length do
     arranger[segment] = 0
@@ -1141,7 +1141,7 @@ function pattern_shift_abs(source)
   local new_shift_val = params:get(source)
   if source == 'seq_shift_1' then
     local offset = new_shift_val or 0 - current_shift_seq or 0 -- I actually have no idea why this requires the or 0 WTF??
-    for y = 1,8 do
+    for y = 1, max_seq_pattern_length do
       if seq_pattern[active_seq_pattern][y] ~= 0 then
         seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + offset - current_shift_seq, 1, 14)
       end
@@ -1149,7 +1149,7 @@ function pattern_shift_abs(source)
     current_shift_seq = offset
   elseif source == 'chord_shift' then
     local offset = new_shift_val or 0 - current_shift_chord or 0 -- I actually have no idea why this requires the or 0 WTF??
-    for y = 1,8 do
+    for y = 1, max_chord_pattern_length do
       if chord_pattern[active_chord_pattern][y] ~= 0 then
         chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + offset - current_shift_chord, 1, 14)
       end
@@ -1177,7 +1177,7 @@ function refresh_midi_devices()
     midi_device[i] = midi.connect(i) -- connect each device
     table.insert( -- register its name:
       midi_device_names, -- table to insert to
-      "port "..i..": "..util.trim_string_to_width(midi_device[i].name,80) -- value to insert
+      "port "..i..": "..util.trim_string_to_width(midi_device[i].name, 80) -- value to insert
     )
   end
 end
@@ -1428,108 +1428,7 @@ end
 -- Hacking up MusicUtil.generate_chord_roman to get modified chord_type for chords.
 -- todo p0 fix aug7 logic pending @dewb's PR
 function get_chord_name(root_num, scale_type, roman_chord_type)
-
-  -- local rct = roman_chord_type or "I"
-
-  -- -- lua does not correctly process utf8 in set character classes, so...
-  -- -- treat degree symbols as asterisks
-  -- rct = string.gsub(rct, "\u{B0}", "*")
-  -- rct = string.gsub(rct, "\u{BA}", "*")
-  -- -- treat upper and lowercase o-stroke as @
-  -- rct = string.gsub(rct, "\u{D8}", "@")
-  -- rct = string.gsub(rct, "\u{F8}", "@")
-  -- -- treat natural sign as &
-  -- rct = string.gsub(rct, "\u{266E}", "&")
-
-  -- local degree_string, augdim_string, added_string, bass_string, inv_string =
-  --   string.match(rct, "([ivxIVX]+)([+*@&M]?)([0-9]*)-?([0-9]?)([bcdefg]?)")
-
-  -- local d = string.lower(degree_string)
-  -- local is_major = degree_string ~= d
-  -- local is_augmented = augdim_string == "+"
-  -- local is_diminished = augdim_string == "*"
-  -- local is_seventh = added_string == "7"
-
-  -- local is_half_diminished = augdim_string == "@" and is_seventh
-  -- local is_major_seventh = augdim_string == "M" and is_seventh
-  -- local is_minormajor_seventh = augdim_string == "&" and is_seventh
-
-  -- local chord_type = nil
-  
-  -- if is_major then
-  --   if is_augmented then
-  --     if is_seventh then
-  --       chord_type = '+M7' -- "Augmented Major 7"
-  --     else
-  --       chord_type = '+' -- "Augmented"
-  --     end
-  --   elseif is_diminished then
-  --     if is_seventh then
-  --       chord_type = '\u{B0}7'  --  "Diminished 7"
-  --     else
-  --       chord_type = '\u{B0}' -- "Diminished"
-  --     end
-  --   elseif is_half_diminished then
-  --     chord_type = '\u{F8}7' -- "Half Diminished 7"
-  --   elseif is_minormajor_seventh then
-  --     chord_type = 'm\u{266e}7' --  "Minor Major 7"
-  --   elseif is_major_seventh then
-  --     chord_type = 'M7' --  "Major 7"
-  --   elseif is_seventh then
-  --     chord_type = '7'  --  "Dominant 7"
-  --   elseif added_string == "6" then
-  --     if bass_string == "9" then
-  --       chord_type = "Major 69"
-  --     else
-  --       chord_type = "Major 6"
-  --     end
-  --   elseif added_string == "9" then
-  --     chord_type = "Major 9"
-  --   elseif added_string == "11" then
-  --     chord_type = "Major 11"
-  --   elseif added_string == "13" then
-  --     chord_type = "Major 13"
-  --   else
-  --     chord_type = '' -- "Major" -- nil because we're no longer spelling out maj/min
-  --   end
-  -- else -- minor
-  --   if is_augmented then
-  --     if is_seventh then
-  --       chord_type = '+7' -- "Augmented 7"
-  --     else
-  --       chord_type = '+' -- "Augmented"
-  --     end
-  --   elseif is_diminished then
-  --     if is_seventh then
-  --       chord_type = '\u{B0}7' -- "Diminished 7"
-  --     else
-  --       chord_type = '\u{B0}' -- "Diminished"
-  --     end
-  --   elseif is_half_diminished then
-  --     chord_type = '\u{F8}7' -- "Half Diminished 7" minor third so this is implicit and doesn't need 'm'
-  --   elseif is_minormajor_seventh then
-  --     chord_type = 'm\u{266e}7' -- "Minor Major 7"
-  --   elseif is_major_seventh then
-  --     chord_type = 'M7' -- "Major 7" -- this overrides the lowercase roman degree
-  --   elseif is_seventh then
-  --     chord_type = 'm7' -- "Minor 7"
-  --   elseif added_string == "6" then
-  --     if bass_string == "9" then
-  --       chord_type = "Minor 69"
-  --     else
-  --       chord_type = "Minor 6"
-  --     end
-  --   elseif added_string == "9" then
-  --     chord_type = "Minor 9"
-  --   elseif added_string == "11" then
-  --     chord_type = "Minor 11"
-  --   elseif added_string == "13" then
-  --     chord_type = "Minor 13"
-  --   else
-  --     chord_type = 'm' -- "Minor"
-  --   end
-  -- end
-  
+ 
   local rct = roman_chord_type or "I"
 
   local scale_data = lookup_data(MusicUtil.SCALES, scale_type)
@@ -2583,7 +2482,7 @@ function est_jf_time()
   jf_time_hold = clock.run(
     function()
       clock.sleep(0.005) -- a small hold for usb round-trip
-      local jf_time_s = math.exp(-0.694351 * jf_time + 3.0838) -- jf_time_v_to_s. Should check code to see actuals
+      local jf_time_s = math.exp(-0.694351 * jf_time + 3.0838) -- jf_time_v_to_s.
       print('jf_time_s = ' .. jf_time_s)
       -- return(jf_time_s)   
       end
@@ -3017,7 +2916,8 @@ function g.key(x,y,z)
         
         table.insert(grid_view_keys, y - extra_rows)
         if view_key_count == 1 then
-          grid_view_name = grid_views[y - extra_rows - 5] 
+          grid_view_name = grid_views[y - extra_rows - 5]
+        --todo p0 check if grid_view_keys are being set correctly for all sizes
         elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
           screen_view_name = 'Chord+seq'
         end
@@ -3114,7 +3014,7 @@ function g.key(x,y,z)
         elseif pattern_key_count > 1 then
           print('Copying pattern ' .. pattern_copy_source .. ' to pattern ' .. y)
           pattern_copy_performed = true
-          for i = 1,8 do
+          for i = 1, max_chord_pattern_length do
             chord_pattern[y][i] = chord_pattern[pattern_copy_source][i]
           end
           -- If we're pasting to the currently viewed active_chord_pattern, do it via param so we update param + table.
@@ -4332,7 +4232,7 @@ function redraw()
           screen.move(2,23)
           screen.text('Grid: select event slot')
           screen.move(2,33)
-          screen.text('1↓8: chord pattern step')
+          screen.text('1↓16: chord pattern step')
           screen.move(2,43)
           screen.text('1→16: event order')
           screen.level(4)
