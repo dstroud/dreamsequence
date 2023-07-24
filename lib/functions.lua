@@ -136,13 +136,13 @@ end
 -- "Transposes" pattern if you can call it that
 function transpose_pattern(view, direction)
 if view == 'Chord' then
-  for y = 1,8 do
+  for y = 1, max_chord_pattern_length do
     if chord_pattern[active_chord_pattern][y] ~= 0 then
       chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + direction, 1, 14)
     end
   end
 elseif view == 'Seq' then
-  for y = 1,8 do
+  for y = 1, max_seq_pattern_length do
     if seq_pattern[active_seq_pattern][y] ~= 0 then
       seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + direction, 1, 14)
     end
@@ -277,7 +277,7 @@ while event_k2 == true do
   redraw()
   if key_counter == 0 then
     print('Deleting all events in segment ' .. event_edit_segment)
-    for step = 1,8 do
+    for step = 1, max_chord_pattern_length do
       events[event_edit_segment][step] = {}
     end
     events[event_edit_segment].populated = 0

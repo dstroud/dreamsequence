@@ -293,7 +293,8 @@ end
 
 -- SEQ GENERATOR
 function seq_generator(mode)
-
+  -- print('seq_generator')
+  -- clear_seq(active_seq_pattern)
   -- Base seq pattern length, division, duration
   -- local length = math.random(3,4) * (percent_chance(70) and 2 or 1)
   -- local tuplet_shift = (length / 2) % 2 == 0 and 0 or 1 -- even or odd(tuplets) seq pattern length
@@ -349,6 +350,7 @@ function seq_generator(mode)
   -- Pre-randomizations which can be overwritten by the individual algorithms
   -- This step is omitted when running init (used to populate algo table for menus)
   if mode == 'run' then
+    clear_seq(active_seq_pattern)
     -- Pattern/session randomizations
     params:set('seq_pattern_length_' .. active_seq_pattern, length)
     params:set('seq_div_index_1', div)
@@ -823,7 +825,10 @@ end
 
 
 function clear_seq()
-  for i = 1, seq_pattern_length[active_chord_pattern] do
+  -- print('clear_seq')
+  print('max_seq_pattern_length = ' ..  max_seq_pattern_length)
+  for i = 1, max_seq_pattern_length do -- seq_pattern_length[active_chord_pattern] do
+    -- print('i = ' .. i)
     seq_pattern[1][i] = 0
   end
 end
