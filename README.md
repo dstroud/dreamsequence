@@ -195,6 +195,9 @@ The Events view is used to manage the scheduling of parameter changes and functi
     		- While holding Chord, Seq, or Chord+Seq Grid view keys (last two keys on the rightmost column): Generate a new chord pattern, Seq pattern, or both.
 
 
+- Encoder 1 (E1): Scroll pattern
+  - For 16x8 Grids, extends the Chord and Seq pattern view up to 16 steps.
+
 - Encoder 2 (E2): Select menu
   - Scroll up/down to select a menu.
   - In certain states, alternate functions are enabled: 
