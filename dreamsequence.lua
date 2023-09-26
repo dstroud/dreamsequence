@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.1.2 @modularbeat
+-- v1.1.3b @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -31,7 +31,7 @@ norns.version.required = 230526
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.1.2'
+  version = 'v1.1.3'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -95,7 +95,7 @@ function init()
     )
   
     -- If syncing to Crow clock, turn this off since we need to use Crow inputs for harmonizer. Revert in cleanup()
-    if preinit_clock_source == 4 then params:set('clock_source',1) end
+    -- if preinit_clock_source == 4 then params:set('clock_source',1) end
     
     -- Turn off system Crow clock out so it doesn't conflict with DS' custom one. Revert in cleanup()
     -- Todo p2 look at dynamically turning this on/off rather than use the DS custom clock. Or allow choice.
@@ -107,10 +107,10 @@ function init()
   -- Reverts changes to crow and jf that might have been made by DS
   function cleanup()
     clock.link.stop()
-    if preinit_clock_source == 4 then 
-      params:set('clock_source', preinit_clock_source)
-      print('Restoring clock_source to ' .. preinit_clock_source)
-    end
+    -- if preinit_clock_source == 4 then 
+    --   params:set('clock_source', preinit_clock_source)
+    --   print('Restoring clock_source to ' .. preinit_clock_source)
+    -- end
     if preinit_clock_crow_out ~= 1 then 
       params:set('clock_crow_out', preinit_clock_crow_out)
       print('Restoring clock_crow_out to ' .. preinit_clock_crow_out)
@@ -1574,7 +1574,7 @@ function sequence_clock(sync_val)
   elseif params:string('clock_source') == 'link' then
     clock.sync(params:get('link_quantum'))
   elseif sync_val ~= nil then -- indicates MIDI clock but starting from K3
-    clock.sync(sync_val)  -- uses sync 1 to come in on the beat of an already running MIDI clock
+    clock.sync(sync_val)  -- uses sync 1 to come in on the beat of an already running MIDI clock (or crow)
   end
   
   transport_state = 'playing'
@@ -1611,7 +1611,9 @@ function sequence_clock(sync_val)
     if stop == true then
         
       -- When internally clocked, stop is quantized to occur at the end of the chord step. todo p1 also use this when running off norns link beat_count
-      if params:string('clock_source') == 'internal' or params:string('clock_source') == 'midi' then
+      if params:string('clock_source') == 'internal' 
+      or params:string('clock_source') == 'midi'
+      or params:string('clock_source') == 'crow' then      
         if (clock_step) % (chord_div) == 0 then  --stops at the end of the chord step
           -- print('Transport stopping at clock_step ' .. clock_step .. ', clock_start_method: '.. clock_start_method)
           clock_step = clock_step - 1, 0
@@ -3283,6 +3285,7 @@ function key(n,z)
               reset_pattern()       
             end 
           end
+          
         elseif params:string('clock_source') == 'link' then
           -- print('link clock')
           if transport_state == 'starting' or transport_state == 'playing' then
@@ -3300,7 +3303,23 @@ function key(n,z)
             end
           end
         
-          elseif params:string('clock_source') == 'midi' then
+        elseif params:string('clock_source') == 'midi' then
+          if transport_state == 'starting' or transport_state == 'playing' then
+            stop = true
+            transport_state = 'pausing'
+            print(transport_state)        
+            clock_start_method = 'continue'
+            -- start = true
+          else --  remove so we can always do a stop (external sync and weird state exceptions)  if transport_state == 'pausing' or transport_state == 'paused' then
+            reset_external_clock()
+            if params:get('arranger') == 2 then
+              reset_arrangement()
+            else
+              reset_pattern()       
+            end 
+          end
+          
+        elseif params:string('clock_source') == 'crow' then
           if transport_state == 'starting' or transport_state == 'playing' then
             stop = true
             transport_state = 'pausing'
@@ -3554,10 +3573,10 @@ function key(n,z)
           grid_redraw()
         end
 
-      ----------------------------------
-      -- Transport controls K3 - PLAY --
-      ----------------------------------
-      -- Todo p1 need to have a way of canceling a pending pause once transport controls are reworked
+        ----------------------------------
+        -- Transport controls K3 - PLAY --
+        ----------------------------------
+        -- Todo p1 need to have a way of canceling a pending pause once transport controls are reworked
       elseif interaction == nil then
         if params:string('clock_source') == 'internal' then
           -- todo p0 evaluate this vs transport_state
@@ -3580,6 +3599,14 @@ function key(n,z)
           if transport_active == false then
             -- disabling until issue with internal link start clobbering clocks is addressed
             -- clock.link.start()        
+          else -- we can cancel a pending pause by pressing K3 before it fires
+            stop = false
+            transport_state = 'playing'
+            print(transport_state)            
+          end
+        elseif params:string('clock_source') == 'crow' then
+          if transport_active == false then
+            clock.transport.start(1)  -- pass along sync value so we know to sync on the next beat rather than immediately
           else -- we can cancel a pending pause by pressing K3 before it fires
             stop = false
             transport_state = 'playing'
