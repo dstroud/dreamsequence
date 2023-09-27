@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.1.2 @modularbeat
+-- v1.1.3b @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -26,12 +26,12 @@ rows = g.device.rows or 8
 extra_rows = rows - 8
 include("dreamsequence/lib/includes")
 
-norns.version.required = 230526
+norns.version.required = 230526 -- update when new musicutil lib drops
 
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.1.2'
+  version = 'v1.1.3'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -307,6 +307,8 @@ function init()
   params:add_number('chord_octave','Octave', -2, 4, 0)
   
   params:add_option('chord_type','Chord type', {'Triad', '7th'}, 1)
+  
+  params:add_number('chord_density', 'Density', 0, 8, 3)
   
   params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
   
@@ -909,13 +911,13 @@ function update_menus()
   if params:string('chord_output') == 'Mute' then
     menus[2] = {'chord_output', 'chord_div_index'} -- maybe add chord_type back depending on readout
   elseif params:string('chord_output') == 'Engine' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_density', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_output') == 'MIDI' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_density', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
   elseif params:string('chord_output') == 'ii-JF' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_density', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_output') == 'Disting' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_density', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- SEQ MENU
@@ -2073,35 +2075,62 @@ function update_chord()
   current_chord_x = chord_pattern[active_chord_pattern][chord_pattern_position] > 0 and chord_pattern[active_chord_pattern][chord_pattern_position] or current_chord_x
   current_chord_o = chord_pattern[active_chord_pattern][chord_pattern_position] > 0 and (chord_pattern[active_chord_pattern][chord_pattern_position] > 7 and 1 or 0) or current_chord_o
   current_chord_c = chord_pattern[active_chord_pattern][chord_pattern_position] > 0 and util.wrap(chord_pattern[active_chord_pattern][chord_pattern_position], 1, 7) or current_chord_c
+  
+  -- always includes 7th note since this will be used by seq, harmonizers
   chord_raw = MusicUtil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
+  
   -- chord transformations
+  -- densify_chord()
   invert_chord()
   spread_chord()  
 end
 
--- Makes a copy of the base chord table with inversion applied
-function invert_chord()
+-- First step in creating chord_transformed is to add notes until we've reached chord_density param
+-- todo call from invert_chord so we can add densification param + inversion for whatever notes are needed
+function densify_chord(density) --todo arg
+  local notes_in_chord = (params:get('chord_type') + 2)
+  -- local density = params:get('chord_density')
   chord_transformed = {}
-  for i = 1, (params:get('chord_type') + 2) do
-    chord_transformed[i] = chord_raw[i]
-  end  
-
-  if params:get('chord_inversion') ~= 0 then
-    for i = 1,params:get('chord_inversion') do
-      local index = util.wrap(i, 1, #chord_transformed)
-      chord_transformed[index] = chord_transformed[index] + 12
-    end
-    -- Re-sort them so we can apply additional transformations later
-    table.sort(chord_transformed)
+  for i = 1, notes_in_chord + density do
+    local octave = math.ceil(i / notes_in_chord) - 1
+    chord_transformed[i] = chord_raw[util.wrap(i, 1, notes_in_chord)] + (i > notes_in_chord and (octave * 12) or 0)
   end
+end
+
+-- Applies a sort of inversion by rotating lowest note up to highest octave
+function invert_chord()
+  -- chord_transformed = {}
+  -- for i = 1, (params:get('chord_type') + 2) do
+  --   chord_transformed[i] = chord_raw[i]
+  -- end
+  
+  -- todo: can't just add an octave because that spot may already be filled by density
+  -- maybe just re-run densify and pass an arg to add x notes, then remove x notes from table beginning from start
+  -- local offset = math.ceil(chord_transformed[#chord_transformed] / 12) * 12
+
+  -- if params:get('chord_inversion') ~= 0 then
+  --   for i = 1, params:get('chord_inversion') do
+  --     local index = util.wrap(i, 1, #chord_transformed)
+  --     chord_transformed[index] = chord_transformed[index] + offset
+  --   end
+  --   -- Re-sort them for next step (spread)
+  --   table.sort(chord_transformed)
+  -- end
+  densify_chord(params:get('chord_density') + params:get('chord_inversion'))
+  for i = 1, params:get('chord_inversion') do
+    table.remove(chord_transformed, 1)
+  end  
 end  
 
 
 -- Applies note spread to chord (in octaves)
+-- todo might be better to change so 'Spread' increases density by default then you can pare down with a max 'Density' (rather than spreading in octaves)
 function spread_chord()
   if params:get('chord_spread') ~= 0 then
-    for i = 1,#chord_transformed do
-      chord_transformed[i] = chord_transformed[i] + round((params:get('chord_spread') / (params:get('chord_type') + 1) * (i - 1))) * 12
+    for i = 1, #chord_transformed do
+      -- chord_transformed[i] = chord_transformed[i] + round((params:get('chord_spread') / (params:get('chord_type') + 1) * (i - 1))) * 12
+      -- + round((spread / notes-1 * (i - 1))) * 12
+      chord_transformed[i] = chord_transformed[i] + math.floor(((params:get('chord_spread') + 1) / #chord_transformed * (i - 1))) * 12
     end
   end
 end
@@ -2125,25 +2154,28 @@ function play_chord(destination, channel)
     local gain = params:get('chord_pp_gain') / 100
     local pw = params:get('chord_pp_pw') / 100
 
-    for i = 1, (params:get('chord_type') + 2) do
+    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_engine(note, amp, cutoff, tracking, release, gain, pw)
     end
+    
   elseif destination == 'MIDI' then
     local channel = params:get('chord_midi_ch')
     local port = params:get('chord_midi_out_port')
-    for i = 1, (params:get('chord_type') + 2) do
+    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
     end
   -- elseif destination == 'Crow' then -- todo p3 not yet a valid option
+  
   elseif destination =='ii-JF' then
-    for i = 1, (params:get('chord_type') + 2) do
+    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_jf(note, params:get('chord_jf_amp')/10)
     end
+    
   elseif destination == 'Disting' then
-    for i = 1, (params:get('chord_type') + 2) do
+    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
       to_disting(note, params:get('chord_disting_velocity'), chord_duration)
     end    
