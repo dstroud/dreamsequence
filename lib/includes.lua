@@ -1,5 +1,5 @@
 -- ships with norns
-ER = require("er")
+er = require("er")
 -- musicutil = require("musicutil")
 engine.name = "PolyPerc"
 

@@ -341,7 +341,7 @@ function seq_generator(mode)
   
   -- Generate Euclydian rhythm
   local er_table = {}
-  local er_table = ER.gen(math.random(1, math.max(1,length - 1)), length, 0) --pulses, steps, shift  -- max pulses?
+  local er_table = er.gen(math.random(1, math.max(1,length - 1)), length, 0) --pulses, steps, shift  -- max pulses?
   local er_note_on_count = 0
   for i = 1, #er_table do
     er_note_on_count = er_note_on_count + (er_table[i] and 1 or 0)
@@ -826,7 +826,7 @@ end
 
 function clear_seq()
   -- print('clear_seq')
-  print('max_seq_pattern_length = ' ..  max_seq_pattern_length)
+  -- print('max_seq_pattern_length = ' ..  max_seq_pattern_length)
   for i = 1, max_seq_pattern_length do -- seq_pattern_length[active_chord_pattern] do
     -- print('i = ' .. i)
     seq_pattern[1][i] = 0
