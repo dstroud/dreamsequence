@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.1.3b @modularbeat
+-- v1.2b @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -31,7 +31,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.1.3'
+  version = 'v1.2'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -292,13 +292,13 @@ function init()
   ------------------
   -- CHORD PARAMS --
   ------------------
-  params:add_group('chord', 'CHORD', 23)  
+  params:add_group('chord', 'CHORD', 29)  
   
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
-  params:add_option('chord_output', 'Output', {'Mute', 'Engine', 'MIDI', 'ii-JF', 'Disting'},2)
+  params:add_option('chord_output', 'Output', {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
   params:set_action("chord_output",function() update_menus() end)
   
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
@@ -308,11 +308,15 @@ function init()
   
   params:add_option('chord_type','Chord type', {'Triad', '7th'}, 1)
   
-  params:add_number('chord_polyphony', 'Polyphony', 1, 24, 24)
-  
-  params:add_number('chord_spread', 'Spread', 0, 64, 0, function(param) return plus_string(param:get()) end)
+  params:add_number('chord_range', 'Range', 3, 64, 4) -- intervals
+
+  params:add_number('chord_note_limit', 'Note limit', 1, 24, 24, function(param) return note_limit_string(param:get()) end)
 
   params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
+  
+  params:add_option('chord_playback', 'Strum', {'Off', 'Low-high', 'High-low'}, 1)
+  
+  params:add_number('chord_strum_speed', 'Strum speed', -192, -1, -1, function(param) return strum_string(param:get()) end)
 
   -- params:add_number('chord_rotate', 'Pattern rotate', -14, 14, 0)
   -- params:set_action('chord_rotate',function() pattern_rotate_abs('chord_rotate') end)  
@@ -364,6 +368,14 @@ function init()
   params:add_separator ('chord_disting', 'Disting')
   params:add_number('chord_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
 
+  ----------------------------------------
+  params:add_separator ('chord_crow', 'Crow')
+  
+  params:add_option("chord_tr_env", "Output", {'AD env.', 'Trigger'}, 1)
+  params:set_action("chord_tr_env",function() update_menus() end)
+  
+  params:add_number('chord_ad_skew','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
+  
 
   ------------------
   -- SEQ PARAMS --
@@ -911,13 +923,21 @@ function update_menus()
   if params:string('chord_output') == 'Mute' then
     menus[2] = {'chord_output', 'chord_div_index'} -- maybe add chord_type back depending on readout
   elseif params:string('chord_output') == 'Engine' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_polyphony', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_output') == 'MIDI' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_polyphony', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+    
+  elseif params:string('chord_output') == 'Crow' then
+    if params:string('chord_tr_env') == 'Trigger' then
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index','chord_tr_env'}
+    else -- AD envelope
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
+    end
+    
   elseif params:string('chord_output') == 'ii-JF' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_polyphony', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_output') == 'Disting' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_polyphony', 'chord_spread', 'chord_inversion', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- SEQ MENU
@@ -1201,7 +1221,6 @@ function transport_midi_update()
   midi_transport_ports_index = 1
   for i = 1,16 do
     if params:get('clock_midi_out_' .. i) == 1 then
-      -- print('clock to port ' .. i)
       midi_transport_ports[midi_transport_ports_index] = i
       midi_transport_ports_index = midi_transport_ports_index + 1
     end
@@ -1216,6 +1235,8 @@ function transport_multi_start()
   for i = 1,#midi_transport_ports do
     transport_midi = midi.connect(midi_transport_ports[i])
     transport_midi:start()
+    -- print('midi start - sync_val ' .. clock.get_beats() -  sync_val)
+    -- print('midi start - clock_synced ' .. clock.get_beats() - clock_synced)
   end  
 end
 
@@ -1275,8 +1296,32 @@ function divisions_string(index)
 end
 
 
-function plus_string(arg) 
-  if arg == 0 then return(0) else return('+' .. arg) end
+function interval_string(arg) 
+  -- if arg == 0 then return(0) else return('+' .. arg) end
+  return(arg .. ' intervals')
+end
+
+
+function note_limit_string(arg) 
+  if params:get('chord_note_limit') > params:get('chord_range') then
+    return(arg .. '*')
+  else
+    return(arg)
+  end
+end
+
+
+function ms_string(arg) 
+  return(arg .. 'ms')
+end
+
+
+function strum_string(arg)
+  if arg == -1 then
+    return(1)
+  else
+    return('1/' .. -arg)
+  end
 end
 
 function duration_sec(dur_mod)
@@ -1575,14 +1620,23 @@ function sequence_clock(sync_val)
   print(transport_state)
 
   -- INITIAL SYNC DEPENDING ON CLOCK SOURCE
+  
   if params:string('clock_source') == 'internal' then
-    clock.sync(1)
+    -- replaced by params:set('clock_reset')
+    clock.sync(chord_div / global_clock_div)
+    -- clock.sync(1)
   elseif params:string('clock_source') == 'link' then
+    -- todo if user does not configure link sync quantum correctly relative to chord step length, strumming may get weird.
+    -- might be able to use (chord_div / global_clock_div) as a solution but IDK for sure
     clock.sync(params:get('link_quantum'))
   elseif sync_val ~= nil then -- indicates MIDI clock but starting from K3
-    clock.sync(sync_val)  -- uses sync 1 to come in on the beat of an already running MIDI clock
+    clock.sync(sync_val)  -- uses sync_val arg (chord_div / global_clock_div) to sync on the correct beat of an already running MIDI clock
   end
-  
+
+  -- -- debug
+  -- clock_synced = clock.get_beats()
+  -- print(params:get('clock_tempo') .. 'BPM results in sync time of ' .. clock_synced)
+
   transport_state = 'playing'
   print(transport_state)
     
@@ -1592,7 +1646,7 @@ function sequence_clock(sync_val)
   countdown_timer:start()
   
   while transport_active do
-
+  -- print('initial while-do')
 
   -- SEND MIDI CLOCK START/CONTINUE MESSAGES
     if start == true and stop ~= true then
@@ -1610,7 +1664,8 @@ function sequence_clock(sync_val)
     
     -- ADVANCE CLOCK_STEP
     clock_step = clock_step + 1
-
+    -- print('clock_step = ' .. clock_step)
+    -- if clock_step == 20 then break end
     
     -- STOP LOGIC DEPENDING ON CLOCK SOURCE
     -- Immediate or instant stop
@@ -1709,7 +1764,9 @@ function sequence_clock(sync_val)
   
   
     -- SET SYNC WITHIN LOOP
+    -- if clock_step == 0 then print('clock_step 0, pre-global_clock_div sync ' .. clock.get_beats()) end
     clock.sync(1/global_clock_div)
+    -- if clock_step == 0 then print('clock_step 0, post-global_clock_div sync ' .. clock.get_beats()) end
 
   end
 end
@@ -1793,7 +1850,6 @@ function clock.transport.start(sync_value)
     start = true
     stop = false -- 2023-07-19 added so when arranger stops in 1-shot and then external clock stops, it doesn't get stuck
     transport_active = true
-
     -- Clock for chord/seq/arranger sequences
     sequence_clock_id = clock.run(sequence_clock, sync_value)
   
@@ -2086,24 +2142,24 @@ function update_chord()
   transform_chord()
 end
 
--- Expands chord notes (spread) and inverts
+-- Expands chord notes (range), inverts, and thins based on max notes
 function transform_chord()
   local notes_in_chord = (params:get('chord_type') + 2)
   chord_transformed = {}
-  
-  -- This adds +spread notes and inversion notes in a single pass
-  for i = 1, notes_in_chord + params:get('chord_spread') + params:get('chord_inversion') do
+
+  -- This adds intervals to achieve range plus upper inversion notes in a single pass
+  for i = 1, params:get('chord_range') + params:get('chord_inversion') do
     local octave = math.ceil(i / notes_in_chord) - 1
     chord_transformed[i] = chord_raw[util.wrap(i, 1, notes_in_chord)] + (i > notes_in_chord and (octave * 12) or 0)
   end
   
-  -- remove inverted (low) notes
+  -- remove lower inverted notes
   for i = 1, params:get('chord_inversion') do
     table.remove(chord_transformed, 1)
   end  
   
-  -- Thin out notes in chord to not exceed params:get('chord_polyphony')
-  local polyphony = params:get('chord_polyphony')
+  -- Thin out notes in chord to not exceed params:get('chord_note_limit')
+  local polyphony = params:get('chord_note_limit')
   local notes = #chord_transformed
 
   -- special handling for poly==1
@@ -2132,40 +2188,90 @@ end
 
 function play_chord(destination, channel)
   local destination = params:string('chord_output')
+  local strum_quantum = chord_div / global_clock_div / #chord_transformed / -params:get('chord_strum_speed')
+  -- print('strum_quantum = ' .. strum_quantum)
+  -- Determine the starting and ending indices based on the direction
+  local start, finish, step
+  local playback = params:string('chord_playback')
+  if playback == 'High-low' then
+    start, finish, step = #chord_transformed, 1, -1  -- Bottom to top
+  else
+    start, finish, step = 1, #chord_transformed, 1   -- Top to bottom for chord or Low-high strum/arp
+  end 
+  
   if destination == 'Engine' then
-    
     local amp = params:get('chord_pp_amp') / 100
     local cutoff = params:get('chord_pp_tracking') *.01
     local tracking = params:get('chord_pp_cutoff')
     local release = duration_sec(chord_duration)
     local gain = params:get('chord_pp_gain') / 100
     local pw = params:get('chord_pp_pw') / 100
-
-    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
-      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_engine(note, amp, cutoff, tracking, release, gain, pw)
-    end
     
+    clock.run(function()
+      for i = start, finish, step do
+        local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+        to_engine(note, amp, cutoff, tracking, release, gain, pw)
+        if playback ~= 'Off' then
+          clock.sync(strum_quantum)
+        end
+      end
+    end)    
+
   elseif destination == 'MIDI' then
     local channel = params:get('chord_midi_ch')
     local port = params:get('chord_midi_out_port')
-    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
-      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
-    end
-  -- elseif destination == 'Crow' then -- todo p3 not yet a valid option
-  
+
+    clock.run(function()
+      for i = start, finish, step do
+        local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+        to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
+        if playback ~= 'Off' then
+          clock.sync(strum_quantum)
+        end
+      end
+    end)
+
+  elseif destination == 'Crow' then
+    clock.run(function()
+      for i = start, finish, step do
+        local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+        
+        if params:get('chord_tr_env') == 2 then  -- Trigger
+          to_crow(note,'pulse(.001,10,1)') -- (time,level,polarity)
+        else -- envelope
+          local crow_attack = duration_sec(seq_duration) * params:get('chord_ad_skew') / 100
+          local crow_release = duration_sec(seq_duration) * (100 - params:get('chord_ad_skew')) / 100
+          to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)')  -- (attack,release,shape) SHAPE is bugged? todo p2 shape should be working now
+        end        
+        
+        if playback ~= 'Off' then
+          clock.sync(strum_quantum)
+        end
+      end
+    end)    
+    
   elseif destination =='ii-JF' then
-    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
-      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_jf(note, params:get('chord_jf_amp')/10)
-    end
+    clock.run(function()
+      for i = start, finish, step do
+        local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+        to_jf(note, params:get('chord_jf_amp')/10)
+        if playback ~= 'Off' then
+          clock.sync(strum_quantum)
+        end
+      end
+    end)    
     
   elseif destination == 'Disting' then
-    for i = 1, #chord_transformed do --(params:get('chord_type') + 2) do
-      local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-      to_disting(note, params:get('chord_disting_velocity'), chord_duration)
-    end    
+    clock.run(function()
+      for i = start, finish, step do
+        local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
+        to_disting(note, params:get('chord_disting_velocity'), chord_duration)
+        if playback ~= 'Off' then
+          clock.sync(strum_quantum)
+        end
+      end
+    end)  
+    
   end
 end
 
@@ -2283,6 +2389,7 @@ function advance_seq_pattern()
       local channel = params:get('seq_midi_ch_1')
       local port = params:get('seq_midi_out_port_1')
       to_midi(note, params:get('seq_midi_velocity_1'), channel, seq_duration, port)
+    
     elseif destination == 'Crow' then
       if params:get('seq_tr_env_1') == 2 then  -- Trigger
         to_crow(note,'pulse(.001,10,1)') -- (time,level,polarity)
@@ -2291,6 +2398,7 @@ function advance_seq_pattern()
         local crow_release = duration_sec(seq_duration) * (100 - params:get('seq_ad_skew_1')) / 100
         to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)')  -- (attack,release,shape) SHAPE is bugged?
       end
+    
     elseif destination == 'ii-JF' then
       to_jf(note, params:get('seq_jf_amp_1')/10)
     elseif destination == 'Disting' then
@@ -3578,6 +3686,7 @@ function key(n,z)
       ----------------------------------
       -- Todo p1 need to have a way of canceling a pending pause once transport controls are reworked
       elseif interaction == nil then
+        
         if params:string('clock_source') == 'internal' then
           -- todo p0 evaluate this vs transport_state
           if transport_active == false then
@@ -3587,9 +3696,24 @@ function key(n,z)
             transport_state = 'playing'
             print(transport_state)            
           end
+        
+        -- -- redo to fire params:set('clock_reset') and sync on beat 0 rather than 1
+        -- if params:string('clock_source') == 'internal' then
+        --   -- todo p0 evaluate this vs transport_state
+        --   if transport_active == false then
+        --     -- clock.transport.start()
+        --     params:set('clock_reset') -- resets beat to 0 and starts clock
+        --   else -- we can cancel a pending pause by pressing K3 before it fires
+        --     stop = false
+        --     transport_state = 'playing'
+        --     print(transport_state)            
+        --   end          
+          
+          
         elseif params:string('clock_source') == 'midi' then
           if transport_active == false then
-            clock.transport.start(1)  -- pass along sync value so we know to sync on the next beat rather than immediately
+            -- Needs to punch in on a valid clock division relative to clock.get_beats() for strum calculations to work
+            clock.transport.start(chord_div / global_clock_div)
           else -- we can cancel a pending pause by pressing K3 before it fires
             stop = false
             transport_state = 'playing'
