@@ -310,13 +310,13 @@ function init()
   
   params:add_number('chord_range', 'Range', 3, 64, 4) -- intervals
 
-  params:add_number('chord_note_limit', 'Note limit', 1, 24, 24, function(param) return note_limit_string(param:get()) end)
+  params:add_number('chord_max_notes', 'Max notes', 1, 24, 24, function(param) return max_notes_string(param:get()) end)
 
   params:add_number('chord_inversion', 'Inversion', 0, 16, 0)
   
-  params:add_option('chord_playback', 'Strum', {'Off', 'Low-high', 'High-low'}, 1)
+  params:add_option('chord_style', 'Strum', {'Off', 'Low-high', 'High-low'}, 1)
   
-  params:add_number('chord_strum_speed', 'Strum speed', -192, -1, -1, function(param) return strum_string(param:get()) end)
+  params:add_number('chord_strum_speed', 'Strum speed', 1, 15, 15, function(param) return strum_speed_string(param:get()) end)
 
   -- params:add_number('chord_rotate', 'Pattern rotate', -14, 14, 0)
   -- params:set_action('chord_rotate',function() pattern_rotate_abs('chord_rotate') end)  
@@ -923,21 +923,21 @@ function update_menus()
   if params:string('chord_output') == 'Mute' then
     menus[2] = {'chord_output', 'chord_div_index'} -- maybe add chord_type back depending on readout
   elseif params:string('chord_output') == 'Engine' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_output') == 'MIDI' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
     
   elseif params:string('chord_output') == 'Crow' then
     if params:string('chord_tr_env') == 'Trigger' then
-      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index','chord_tr_env'}
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index','chord_tr_env'}
     else -- AD envelope
-      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
     end
     
   elseif params:string('chord_output') == 'ii-JF' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_output') == 'Disting' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_note_limit', 'chord_inversion', 'chord_playback', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- SEQ MENU
@@ -1296,14 +1296,8 @@ function divisions_string(index)
 end
 
 
-function interval_string(arg) 
-  -- if arg == 0 then return(0) else return('+' .. arg) end
-  return(arg .. ' intervals')
-end
-
-
-function note_limit_string(arg) 
-  if params:get('chord_note_limit') > params:get('chord_range') then
+function max_notes_string(arg) 
+  if params:get('chord_max_notes') > params:get('chord_range') then
     return(arg .. '*')
   else
     return(arg)
@@ -1316,13 +1310,10 @@ function ms_string(arg)
 end
 
 
-function strum_string(arg)
-  if arg == -1 then
-    return(1)
-  else
-    return('1/' .. -arg)
-  end
+function strum_speed_string(arg)
+    return(strum_speeds[arg][2])
 end
+
 
 function duration_sec(dur_mod)
   return(dur_mod/global_clock_div * clock.get_beat_sec())
@@ -1620,22 +1611,14 @@ function sequence_clock(sync_val)
   print(transport_state)
 
   -- INITIAL SYNC DEPENDING ON CLOCK SOURCE
-  
   if params:string('clock_source') == 'internal' then
-    -- replaced by params:set('clock_reset')
-    clock.sync(chord_div / global_clock_div)
-    -- clock.sync(1)
+    -- clock.sync(chord_div / global_clock_div)
+    clock.sync(1) -- this is not ideal but need to look into skipping and resetting via params:set('clock_reset') further
   elseif params:string('clock_source') == 'link' then
-    -- todo if user does not configure link sync quantum correctly relative to chord step length, strumming may get weird.
-    -- might be able to use (chord_div / global_clock_div) as a solution but IDK for sure
     clock.sync(params:get('link_quantum'))
   elseif sync_val ~= nil then -- indicates MIDI clock but starting from K3
     clock.sync(sync_val)  -- uses sync_val arg (chord_div / global_clock_div) to sync on the correct beat of an already running MIDI clock
   end
-
-  -- -- debug
-  -- clock_synced = clock.get_beats()
-  -- print(params:get('clock_tempo') .. 'BPM results in sync time of ' .. clock_synced)
 
   transport_state = 'playing'
   print(transport_state)
@@ -1646,8 +1629,7 @@ function sequence_clock(sync_val)
   countdown_timer:start()
   
   while transport_active do
-  -- print('initial while-do')
-
+    
   -- SEND MIDI CLOCK START/CONTINUE MESSAGES
     if start == true and stop ~= true then
       transport_active = true
@@ -1664,8 +1646,6 @@ function sequence_clock(sync_val)
     
     -- ADVANCE CLOCK_STEP
     clock_step = clock_step + 1
-    -- print('clock_step = ' .. clock_step)
-    -- if clock_step == 20 then break end
     
     -- STOP LOGIC DEPENDING ON CLOCK SOURCE
     -- Immediate or instant stop
@@ -2158,8 +2138,8 @@ function transform_chord()
     table.remove(chord_transformed, 1)
   end  
   
-  -- Thin out notes in chord to not exceed params:get('chord_note_limit')
-  local polyphony = params:get('chord_note_limit')
+  -- Thin out notes in chord to not exceed params:get('chord_max_notes')
+  local polyphony = params:get('chord_max_notes')
   local notes = #chord_transformed
 
   -- special handling for poly==1
@@ -2188,11 +2168,9 @@ end
 
 function play_chord(destination, channel)
   local destination = params:string('chord_output')
-  local strum_quantum = chord_div / global_clock_div / #chord_transformed / -params:get('chord_strum_speed')
-  -- print('strum_quantum = ' .. strum_quantum)
-  -- Determine the starting and ending indices based on the direction
-  local start, finish, step
-  local playback = params:string('chord_playback')
+  local speed = chord_div / global_clock_div / #chord_transformed * strum_speeds[params:get('chord_strum_speed')][1] 
+  local start, finish, step -- Determine the starting and ending indices based on the direction
+  local playback = params:string('chord_style')
   if playback == 'High-low' then
     start, finish, step = #chord_transformed, 1, -1  -- Bottom to top
   else
@@ -2212,7 +2190,7 @@ function play_chord(destination, channel)
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_engine(note, amp, cutoff, tracking, release, gain, pw)
         if playback ~= 'Off' then
-          clock.sync(strum_quantum)
+          clock.sleep(clock.get_beat_sec() * speed)
         end
       end
     end)    
@@ -2226,7 +2204,7 @@ function play_chord(destination, channel)
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
         if playback ~= 'Off' then
-          clock.sync(strum_quantum)
+          clock.sleep(clock.get_beat_sec() * speed)
         end
       end
     end)
@@ -2245,7 +2223,7 @@ function play_chord(destination, channel)
         end        
         
         if playback ~= 'Off' then
-          clock.sync(strum_quantum)
+          clock.sleep(clock.get_beat_sec() * speed)
         end
       end
     end)    
@@ -2256,7 +2234,7 @@ function play_chord(destination, channel)
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_jf(note, params:get('chord_jf_amp')/10)
         if playback ~= 'Off' then
-          clock.sync(strum_quantum)
+          clock.sleep(clock.get_beat_sec() * speed)
         end
       end
     end)    
@@ -2267,7 +2245,7 @@ function play_chord(destination, channel)
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_disting(note, params:get('chord_disting_velocity'), chord_duration)
         if playback ~= 'Off' then
-          clock.sync(strum_quantum)
+          clock.sleep(clock.get_beat_sec() * speed)
         end
       end
     end)  
@@ -3708,7 +3686,6 @@ function key(n,z)
         --     transport_state = 'playing'
         --     print(transport_state)            
         --   end          
-          
           
         elseif params:string('clock_source') == 'midi' then
           if transport_active == false then

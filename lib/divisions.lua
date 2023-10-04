@@ -67,7 +67,7 @@ clock_names = {
   {1536, '8'}
 }
   
-  -- Used for clock modulo and durations
+-- Used for clock modulo and durations
 division_names = {
   {2, '1/64T'},
   {3, '1/64'},
@@ -126,4 +126,23 @@ division_names = {
   {1472, '7 2/3'},
   {1488, '7 3/4'},
   {1536, '8'}
+}
+
+-- Strum speeds relative to chord step length
+strum_speeds = {
+  {1/96, '1/96'},
+  {1/64, '1/64'},
+  {1/48, '1/48'},
+  {1/32, '1/32'},
+  {1/24, '1/24'},
+  {1/16, '1/16'},
+  {1/12, '1/12'},
+  {1/8, '1/8'},
+  {1/6, '1/6'},
+  {1/4, '1/4'},
+  {1/3, '1/3'},
+  {1/2, '1/2'},
+  {2/3, '2/3'},
+  {3/4, '3/4'},
+  {1/1, '1'}
 }
