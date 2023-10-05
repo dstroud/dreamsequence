@@ -292,7 +292,7 @@ function init()
   ------------------
   -- CHORD PARAMS --
   ------------------
-  params:add_group('chord', 'CHORD', 29)  
+  params:add_group('chord', 'CHORD', 30)  
   
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
@@ -316,7 +316,9 @@ function init()
   
   params:add_option('chord_style', 'Strum', {'Off', 'Low-high', 'High-low'}, 1)
   
-  params:add_number('chord_strum_speed', 'Strum speed', 1, 15, 15, function(param) return strum_speed_string(param:get()) end)
+  params:add_number('chord_strum_length', 'Strum length', 1, 15, 15, function(param) return strum_length_string(param:get()) end)
+  
+  params:add_number('chord_timing_curve', 'Strum curve', -100, 100, 0, function(param) return percent(param:get()) end)
 
   -- params:add_number('chord_rotate', 'Pattern rotate', -14, 14, 0)
   -- params:set_action('chord_rotate',function() pattern_rotate_abs('chord_rotate') end)  
@@ -923,21 +925,21 @@ function update_menus()
   if params:string('chord_output') == 'Mute' then
     menus[2] = {'chord_output', 'chord_div_index'} -- maybe add chord_type back depending on readout
   elseif params:string('chord_output') == 'Engine' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
   elseif params:string('chord_output') == 'MIDI' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_midi_cc_1_val'}
     
   elseif params:string('chord_output') == 'Crow' then
     if params:string('chord_tr_env') == 'Trigger' then
-      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index','chord_tr_env'}
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index','chord_tr_env'}
     else -- AD envelope
-      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
     end
     
   elseif params:string('chord_output') == 'ii-JF' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_jf_amp'}
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_jf_amp'}
   elseif params:string('chord_output') == 'Disting' then
-    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_speed', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
+    menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity'}  
   end
   
   -- SEQ MENU
@@ -1310,8 +1312,8 @@ function ms_string(arg)
 end
 
 
-function strum_speed_string(arg)
-    return(strum_speeds[arg][2])
+function strum_length_string(arg)
+    return(strum_lengths[arg][2])
 end
 
 
@@ -2159,6 +2161,7 @@ function transform_chord()
   
 end
 
+
 -- This triggers when mode param changes and allows seq and harmonizers to pick up the new mode immediately. Doesn't affect the chords and doesn't need chord transformations since the chord advancement will overwrite
 function update_chord_action()
   chord_raw = MusicUtil.generate_chord_scale_degree(current_chord_o * 12, params:get('mode'), current_chord_c, true)
@@ -2166,16 +2169,37 @@ function update_chord_action()
 end
 
 
+-- variable curve formula from @dewb
+function strum_timing(note_num, curve)
+  local curve = curve
+  if curve == 0 then
+    return note_num
+  else
+    return (math.exp(curve * note_num) - 1) / (math.exp(curve) - 1)
+  end
+end
+
+
+-- todo yikes this needs a refactor
 function play_chord(destination, channel)
   local destination = params:string('chord_output')
-  local speed = chord_div / global_clock_div / #chord_transformed * strum_speeds[params:get('chord_strum_speed')][1] 
+  local speed = chord_div / global_clock_div * strum_lengths[params:get('chord_strum_length')][1]
   local start, finish, step -- Determine the starting and ending indices based on the direction
   local playback = params:string('chord_style')
+  
   if playback == 'High-low' then
     start, finish, step = #chord_transformed, 1, -1  -- Bottom to top
   else
     start, finish, step = 1, #chord_transformed, 1   -- Top to bottom for chord or Low-high strum/arp
   end 
+  
+  -- todo: lock in position of last note, deduct that from the total chord step length, and reprocess timing so last note always plays at the same time regardless of curve
+  local curve = params:get('chord_timing_curve') * .1
+  local max_pre_scale = strum_timing(#chord_transformed * .1, curve)
+  local prev_y_scaled = 0
+  local y_scaled = 0
+  local y_scaled_delta = 0
+  local note_sequence = 0
   
   if destination == 'Engine' then
     local amp = params:get('chord_pp_amp') / 100
@@ -2189,23 +2213,35 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_engine(note, amp, cutoff, tracking, release, gain, pw)
+        
         if playback ~= 'Off' then
-          clock.sleep(clock.get_beat_sec() * speed)
+          local prev_y_scaled = y_scaled
+          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
+          local y_scaled_delta = y_scaled - prev_y_scaled
+          clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
         end
+        
       end
     end)    
 
   elseif destination == 'MIDI' then
     local channel = params:get('chord_midi_ch')
     local port = params:get('chord_midi_out_port')
-
+    
     clock.run(function()
       for i = start, finish, step do
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_midi(note, params:get('chord_midi_velocity'), channel, chord_duration, port)
+        
         if playback ~= 'Off' then
-          clock.sleep(clock.get_beat_sec() * speed)
+          local prev_y_scaled = y_scaled
+          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
+          local y_scaled_delta = y_scaled - prev_y_scaled
+          clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
         end
+        
       end
     end)
 
@@ -2223,8 +2259,13 @@ function play_chord(destination, channel)
         end        
         
         if playback ~= 'Off' then
-          clock.sleep(clock.get_beat_sec() * speed)
+          local prev_y_scaled = y_scaled
+          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
+          local y_scaled_delta = y_scaled - prev_y_scaled
+          clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
         end
+        
       end
     end)    
     
@@ -2233,9 +2274,15 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_jf(note, params:get('chord_jf_amp')/10)
+
         if playback ~= 'Off' then
-          clock.sleep(clock.get_beat_sec() * speed)
+          local prev_y_scaled = y_scaled
+          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
+          local y_scaled_delta = y_scaled - prev_y_scaled
+          clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
         end
+        
       end
     end)    
     
@@ -2244,9 +2291,15 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_disting(note, params:get('chord_disting_velocity'), chord_duration)
+
         if playback ~= 'Off' then
-          clock.sleep(clock.get_beat_sec() * speed)
+          local prev_y_scaled = y_scaled
+          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
+          local y_scaled_delta = y_scaled - prev_y_scaled
+          clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
         end
+        
       end
     end)  
     
@@ -2592,7 +2645,6 @@ function est_jf_time()
       -- return(jf_time_s)   
       end
   )
-  
 end
 
 

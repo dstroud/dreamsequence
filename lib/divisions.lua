@@ -128,8 +128,8 @@ division_names = {
   {1536, '8'}
 }
 
--- Strum speeds relative to chord step length
-strum_speeds = {
+-- Strum length relative to chord step length
+strum_lengths = {
   {1/96, '1/96'},
   {1/64, '1/64'},
   {1/48, '1/48'},
