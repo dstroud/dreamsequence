@@ -68,7 +68,7 @@ This Overview will explain how the components that make up Dreamsequence operate
 
 ## CV Harmonizer
 *Magical sample and hold + quantizer + chord/mode remapping (requires Crow)*
-- A trigger recieved at Crow input 2 will sample the voltage at input 1 and use this to play a notes from the selected chord or mode.
+- A trigger received at Crow input 2 will sample the voltage at input 1 and use this to play a notes from the selected chord or mode.
 - Rests can be inserted by enabling the "Auto-rest" menu option and triggering the same voltage repeatedly within a chord step.  
 - Ideas:
   - Process CV from your eurorack sequencer then send it back out via Crow outputs 1-2, like a chord quantizer. 
@@ -226,7 +226,7 @@ Most of your work on Norns will be done through 5 main menus that look like the 
 - Play/pause/stop symbols in the upper right will flash when a status change is pending, such as when waiting for Link sync to start or waiting for the current chord step to complete before pausing. Pressing pause/start can cancel pending changes.
 - In the center of the dash, the active chord will be displayed. Holding down a chord sequence key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key. The chord readout can be changed from chord name to chord degree using K1>>PARAMETERS>>EDIT>>PREFERENCES>>"Chords as"
 
-> **_TIP:_** Active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) but each sequencer/harmonizer can override this with the similiar "Notes" menu.
+> **_TIP:_** Active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) but each sequencer/harmonizer can override this with the similar "Notes" menu.
 > 
 
 ----------------------------------------------------------------------------------------------------------------------
@@ -242,7 +242,7 @@ Most of your work on Norns will be done through 5 main menus that look like the 
 - At the bottom of the chart is a timeline that highlights any steps that have an event. In the example above, events occur on the first step of the 2 upcoming segments, and on every step of the last segment.
 - At the very bottom of the dash is a readout of the remaining time in the arrangement.
 - Interrupting the Arranger (by turning it off manually on the Arranger Grid view or changing chord patterns on the Chord Grid view) will turn it off and enter a suspended state where the current chord pattern continues to play in a loop. In this state, the dashboard changes to show
-	-  The segment the Arranger will resume on once it has turned on and and resyncronizes and the number of steps remaining until that can occur. Formatted as 'RESUMING SEGMENT'.'STEPS UNTIL RESYNC' 
+	-  The segment the Arranger will resume on once it has turned on and and resynchronizes and the number of steps remaining until that can occur. Formatted as 'RESUMING SEGMENT'.'STEPS UNTIL RESYNC' 
 	- "LP" or "EN" indicates that we are on the last segment of the arrangement and resuming the Arranger will result in looping (LP) to the beginning or ending (EN) of the arrangement, depending on the Arranger mode.
 	- The remaining time in arrangement upon arranger resume. Time remaining on the active pattern is not counted because it’s technically not part of the arrangement.
     
@@ -297,9 +297,19 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Octave: Shifts output from -2 to +4 octaves.
 
-- Spread: Raises the highest note in the chord by this many octaves while keeping the lowest note at the original octave and redistributing the remaining note(s) between. Ex: Octave 1 and Spread 3 will result in a Cmaj voiced as C1, E2, G3.
+- Range: Expands or shrinks the chord's pitch range, measured in note intervals. An asterisk (*) will appear if this value is less than the "Max notes" parameter, indicating that the value shown here is limiting the number of notes played. Note that a Range of 3 will effectively play 7th chords as triads.
 
+- Max notes: Applied after Range has been set, this parameter limits the number of notes in the chord using a note thinning algorithm. The algorithm prioritizes the first and last notes in the chord, after which the intermediate notes are thinned out and evenly distributed. The resulting chord voicing depends on Range, Max notes, and Inversion. It's possible to end up with some false "chords" like the same note repeated across multiple octaves.
+ 
 - Inversion: Incrementally shifts the lowest note up an octave so that 1 = first inversion, 2 = second inversion, etc... Multiples of 3 (for triads) or 4 (for 7ths) will effectively transpose the sequence up an octave which might be desired when incrementing this parameter with an event automation.
+
+- Strum: Determines if the chord's notes will play all at once (Off), or strum notes in one of two directions (Low-high or High-low).
+
+- Strum length: Length of the strum as a fraction of the chord Step length. The timing of the individual notes is adaptive, depending on the number of notes being strummed.
+
+- Strum curve: Bipolar control (-100% to +100%) over note timing where negative values will cause note timing to slow down over time and positive values will cause note timing to speed up over time. A value of 0% will result in linear timing.
+
+- Ramp: Bipolar control (-100% to +100%) of the Velocity/Amp values for each note. When Strum is off, this will can change the dynamic balance of low and high pitched notes in the chord. When strumming, negative values will lower dynamics over time and positive values will raise dynamics over time.
 
 - Step length: The length of each step/row in the chord pattern, relative to 1 measure. Values ending in T are tuplets.
 
@@ -454,8 +464,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - Notes: Four ways of mapping voltage send to Crow input 1 to notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming voltage which is then quantized to 1v/oct or 1 semitone increments.
     - Triad: voltage of 0v, 1/12v, 2/12v map to notes 1-3 from the active chord interpreted as a triad. Voltage of 3/12v, 4/12v, 5/12v play the same notes one octave up, etc..
 	  - 7th: columns voltage of 0v, 1/12v, 2/12v, 3/12v map to notes 1-4 from the active chord interpreted as a 7th chord. Voltage of 4/12v, 5/12v, 6/12v play the same notes one octave up, etc..
-	  - Mode+transp.: beginning with note 0v and increaseing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode, then a diatonic transposition based on the active chord degree is applied.
-	  - Mode: beginning with note 0v and increaseing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode.
+	  - Mode+transp.: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode, then a diatonic transposition based on the active chord degree is applied.
+	  - Mode: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode.
   
 - Auto-rest: When true, this option will suppress the same note when it is repeated consecutively within one chord step, resulting in a rest. This can be a useful way of adding rest functionality into analog sequencers that don't support such a feature.
 
@@ -497,7 +507,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 # Crow Patching
 
-Dreamsequence supports using Crow to send and recieve CV and triggers:
+Dreamsequence supports using Crow to send and receive CV and triggers:
 - Crow IN 1: CV used to determine note pitch of the CV Harmonizer. Can be unquantized or quantized. Attenuation recommended
 - Crow IN 2: Trigger (rising past 2 volts) in will sample the CV on Crow IN 1 and send a note from the CV Harmonizer
 - Crow OUT 1: "Crow" output V/oct out
