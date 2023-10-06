@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2b @modularbeat
+-- v1.2 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -2170,12 +2170,14 @@ end
 
 
 -- variable curve formula from @dewb
-function strum_timing(note_num, curve)
+-- x == note number * .1
+-- to-do: can move upstream * 0.1 here but not sure what the implications are
+function strum_timing(x, curve)
   local curve = curve
   if curve == 0 then
-    return note_num
+    return x
   else
-    return (math.exp(curve * note_num) - 1) / (math.exp(curve) - 1)
+    return (math.exp(curve * x) - 1) / (math.exp(curve) - 1)
   end
 end
 
@@ -2186,16 +2188,17 @@ function play_chord(destination, channel)
   local speed = chord_div / global_clock_div * strum_lengths[params:get('chord_strum_length')][1]
   local start, finish, step -- Determine the starting and ending indices based on the direction
   local playback = params:string('chord_style')
+  local note_qty = #chord_transformed
   
   if playback == 'High-low' then
-    start, finish, step = #chord_transformed, 1, -1  -- Bottom to top
+    start, finish, step = note_qty, 1, -1  -- Bottom to top
   else
-    start, finish, step = 1, #chord_transformed, 1   -- Top to bottom for chord or Low-high strum/arp
+    start, finish, step = 1, note_qty, 1   -- Top to bottom for chord or Low-high strum/arp
   end 
   
-  -- todo: lock in position of last note, deduct that from the total chord step length, and reprocess timing so last note always plays at the same time regardless of curve
   local curve = params:get('chord_timing_curve') * .1
-  local max_pre_scale = strum_timing(#chord_transformed * .1, curve)
+  -- local max_pre_scale = strum_timing(#chord_transformed * .1, curve) -- scales across all notes
+  local max_pre_scale = strum_timing((note_qty - 1) * .1, curve) * (1/((note_qty - 1) / note_qty)) -- scales to penultimate note
   local prev_y_scaled = 0
   local y_scaled = 0
   local y_scaled_delta = 0
@@ -2216,7 +2219,7 @@ function play_chord(destination, channel)
         
         if playback ~= 'Off' then
           local prev_y_scaled = y_scaled
-          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2236,7 +2239,7 @@ function play_chord(destination, channel)
         
         if playback ~= 'Off' then
           local prev_y_scaled = y_scaled
-          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2260,7 +2263,7 @@ function play_chord(destination, channel)
         
         if playback ~= 'Off' then
           local prev_y_scaled = y_scaled
-          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2277,7 +2280,7 @@ function play_chord(destination, channel)
 
         if playback ~= 'Off' then
           local prev_y_scaled = y_scaled
-          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2294,7 +2297,7 @@ function play_chord(destination, channel)
 
         if playback ~= 'Off' then
           local prev_y_scaled = y_scaled
-          local note_sequence = playback == 'High-low' and (#chord_transformed + 1 - i) or i  -- force counting upwards
+          local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = strum_timing(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
