@@ -23,6 +23,7 @@ events_lookup = {										--
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_strum_length', 	name= 'Strum length', 	value_type= 'continuous', 	formatter= 'strum_length_string', 			},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_timing_curve', 	name= 'Strum curve', 	value_type= 'continuous', 	formatter= 'percent', 			},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_duration_index', 	name= 'Duration', 	value_type= 'continuous', 	formatter= 'divisions_string', 			},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_dynamics_ramp', 	name= 'Ramp (dynamics)', 	value_type= 'continuous', 	formatter= 'percent', 			},
 {	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'percent', 			},
 {	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_cutoff', 	name= 'Cutoff', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Engine', 	event_type= 'param', 	id= 'chord_pp_tracking', 	name= 'Fltr tracking', 	value_type= 'continuous', 	formatter= 'percent', 			},
