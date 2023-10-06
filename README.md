@@ -290,6 +290,7 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
   - Mute: Still sends active chords to the Seq and harmonizers, they just won't play directly. 
   - Engine: Norns PolyPerc engine.
   - MIDI: Output on the selected MIDI port.
+  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. For best results, enable a Strum direction or set "Max notes" to 1. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching). 
   - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
   - Disting: Disting EX Eurorack module requires Crow connected via i2c.
 
