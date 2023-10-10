@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2 @modularbeat
+-- v1.2.1 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -22,7 +22,13 @@
 
 
 g = grid.connect()
-rows = g.device.rows or 8
+if type(g.device) == 'table' then 
+  rows = g.device.rows or 8
+  print(rows .. '-row Grid detected')
+else
+  rows = 8
+  print('No Grid detected')
+end
 extra_rows = rows - 8
 include("dreamsequence/lib/includes")
 
@@ -31,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.2'
+  version = 'v1.2.1'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -1236,7 +1242,6 @@ end
 -- check which ports the global midi clock is being sent to and sends a start message there
 function transport_multi_start()
   transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
-  -- for i in pairs(midi_transport_ports) do  
   for i = 1,#midi_transport_ports do
     transport_midi = midi.connect(midi_transport_ports[i])
     transport_midi:start()
@@ -2226,7 +2231,7 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_pp_amp') / 100 -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(dynamics, 0, 1) -- per destination
@@ -2234,9 +2239,8 @@ function play_chord(destination, channel)
         
         to_engine(note, dynamics, cutoff, tracking, release, gain, pw)
         
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
-          -- local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2253,7 +2257,7 @@ function play_chord(destination, channel)
       for i = start, finish, step do
 
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_midi_velocity') -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(round(dynamics), 0, 127) -- per destination
@@ -2261,9 +2265,8 @@ function play_chord(destination, channel)
         
         to_midi(note, dynamics, channel, chord_duration, port)
         
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
-          -- local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2287,7 +2290,7 @@ function play_chord(destination, channel)
           to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)')  -- (attack,release,shape) SHAPE is bugged? todo p2 shape should be working now
         end        
         
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
@@ -2302,7 +2305,7 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_jf_amp') / 10 -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(dynamics, 0, 50) -- per destination
@@ -2310,7 +2313,7 @@ function play_chord(destination, channel)
         
         to_jf(note, dynamics)
 
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
@@ -2325,14 +2328,14 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_disting_velocity') -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(dynamics, 0, 100) -- per destination
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_disting(note, dynamics, chord_duration) -- params:get('chord_disting_velocity'), chord_duration)
 
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
