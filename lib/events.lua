@@ -17,7 +17,7 @@ events_lookup = {										--
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_range', 	name= 'Range', 	value_type= 'continuous', 				},
-{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_max_notes', 	name= 'Max notes', 	value_type= 'continuous', 	formatter= 'max_notes_string', 			},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_max_notes', 	name= 'Max notes', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_inversion', 	name= 'Inversion', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_style', 	name= 'Strum', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_strum_length', 	name= 'Strum length', 	value_type= 'continuous', 	formatter= 'strum_length_string', 			},

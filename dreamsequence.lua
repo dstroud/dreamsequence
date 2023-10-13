@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2.1 @modularbeat
+-- v1.2.2 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -22,7 +22,7 @@
 
 
 g = grid.connect()
-if type(g.device) == 'table' then 
+if type(g.device) == 'table' then
   rows = g.device.rows or 8
   print(rows .. '-row Grid detected')
 else
@@ -3042,7 +3042,7 @@ function g.key(x,y,z)
 
           -- If the event is populated, Load the Event vars back to the displayed param. Otherwise keep the last touched event's settings so we can iterate quickly.
           if events[event_edit_segment][y + pattern_grid_offset][x] ~= nil then
-
+            
             events_index = 1
             selected_events_menu = events_menus[events_index]
 
@@ -3054,9 +3054,13 @@ function g.key(x,y,z)
 
             params:set('event_category', param_option_to_index('event_category', events_lookup[index].category))
             change_category()
+            
             params:set('event_subcategory', param_option_to_index('event_subcategory', events_lookup[index].subcategory))
+            change_subcategory()
+            
             params:set('event_name', index)
             change_event()
+            
             params:set('event_operation', param_option_to_index('event_operation', operation))
             if operation == 'Random' then
               params:set('event_op_limit_random', param_option_to_index('event_op_limit_random', limit))
@@ -3979,12 +3983,13 @@ function change_category()
   local category = params:get('event_category')
   if debug_change_functions then print('1. change_category called') end
   if category ~= prev_category then
-  if debug_change_functions then print('  1.1 new category') end
+    if debug_change_functions then print('  1.1 new category') end
+    
     update_event_subcategory_options('change_category')
-    params:set('event_subcategory', 1) -- no action- calling manually on next step
+    params:set('event_subcategory', 1) -- no action- calling manually on next step.
     change_subcategory()
   end
-  prev_category = category  -- todo p1 can this be local and persist on next call? I think not.
+    prev_category = category  -- todo p1 can this be local and persist on next call? I think not.
 end
 
 
@@ -3998,6 +4003,7 @@ function change_subcategory()
     set_event_indices()
 
     if debug_change_functions then print('  setting event to ' .. events_lookup[event_subcategory_index_min].name) end
+    
     params:set('event_name', event_subcategory_index_min)
     change_event()
   end  
