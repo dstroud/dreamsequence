@@ -17,7 +17,7 @@ events_lookup = {										--
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_type', 	name= 'Chord type', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_octave', 	name= 'Octave', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_range', 	name= 'Range', 	value_type= 'continuous', 				},
-{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_max_notes', 	name= 'Max notes', 	value_type= 'continuous', 	formatter= 'max_notes_string', 			},
+{	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_max_notes', 	name= 'Max notes', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_inversion', 	name= 'Inversion', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_style', 	name= 'Strum', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Voice', 	event_type= 'param', 	id= 'chord_strum_length', 	name= 'Strum length', 	value_type= 'continuous', 	formatter= 'strum_length_string', 			},
@@ -35,6 +35,7 @@ events_lookup = {										--
 {	category= 'Chord', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'chord_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
 {	category= 'Chord', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'chord_tr_env', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'Chord', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'chord_ad_skew', 	name= 'AD Skew', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Chord', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'chord_crow_slew', 	name= 'Slew', 	value_type= 'continuous', 	formatter= 'ms_string', 			},
 {	category= 'Chord', 	subcategory= 'JF', 	event_type= 'param', 	id= 'chord_jf_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 {	category= 'Chord', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'chord_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 -- Seq										
@@ -62,6 +63,7 @@ events_lookup = {										--
 {	category= 'Seq', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'seq_midi_cc_1_val_1', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
 {	category= 'Seq', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'seq_tr_env_1', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'seq_ad_skew_1', 	name= 'AD Skew', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'Seq', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'seq_crow_slew_1', 	name= 'Slew', 	value_type= 'continuous', 	formatter= 'ms_string', 			},
 {	category= 'Seq', 	subcategory= 'JF', 	event_type= 'param', 	id= 'seq_jf_amp_1', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 {	category= 'Seq', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'seq_disting_velocity_1', 	name= 'Velocity', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 -- MIDI harmonizer										
@@ -82,6 +84,7 @@ events_lookup = {										--
 {	category= 'MIDI harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'midi_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
 {	category= 'MIDI harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'midi_tr_env', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'MIDI harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'midi_ad_skew', 	name= 'AD Skew', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'MIDI harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'midi_crow_slew', 	name= 'Slew', 	value_type= 'continuous', 	formatter= 'ms_string', 			},
 {	category= 'MIDI harmonizer', 	subcategory= 'JF', 	event_type= 'param', 	id= 'midi_jf_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 {	category= 'MIDI harmonizer', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'midi_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 -- CV harmonizer										
@@ -101,6 +104,7 @@ events_lookup = {										--
 {	category= 'CV harmonizer', 	subcategory= 'MIDI', 	event_type= 'param', 	id= 'crow_midi_cc_1_val', 	name= 'CC Mod', 	value_type= 'continuous', 	formatter= 'neg_to_off', 			},
 {	category= 'CV harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'crow_tr_env', 	name= 'Output', 	value_type= 'continuous', 				},
 {	category= 'CV harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'crow_ad_skew', 	name= 'AD Skew', 	value_type= 'continuous', 	formatter= 'percent', 			},
+{	category= 'CV harmonizer', 	subcategory= 'Crow', 	event_type= 'param', 	id= 'crow_crow_slew', 	name= 'Slew', 	value_type= 'continuous', 	formatter= 'ms_string', 			},
 {	category= 'CV harmonizer', 	subcategory= 'JF', 	event_type= 'param', 	id= 'crow_jf_amp', 	name= 'Amp', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 {	category= 'CV harmonizer', 	subcategory= 'Disting', 	event_type= 'param', 	id= 'crow_disting_velocity', 	name= 'Velocity', 	value_type= 'continuous', 	formatter= 'ten_v', 			},
 }										-- end

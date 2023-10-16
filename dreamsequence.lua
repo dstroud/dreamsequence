@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2 @modularbeat
+-- v1.2.3b @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -22,7 +22,13 @@
 
 
 g = grid.connect()
-rows = g.device.rows or 8
+if type(g.device) == 'table' then
+  rows = g.device.rows or 8
+  print(rows .. '-row Grid detected')
+else
+  rows = 8
+  print('No Grid detected')
+end
 extra_rows = rows - 8
 include("dreamsequence/lib/includes")
 
@@ -31,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.2'
+  version = 'v1.2.3'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -59,11 +65,11 @@ function init()
       crow.input[1].stream = sample_crow
       crow.input[1].mode("none")
       -- voltage threshold, hysteresis, "rising", "falling", or “both"
-      -- TODO: might want to use as a gate with "both"
-      crow.input[2].mode("change",2,0.1,"rising")
+      -- TODO: could do a gate with "both" for ADSR envelope
+      crow.input[2].mode("change", 2 , 0.1, "rising")
       crow.input[2].change = crow_trigger
       -- time,level,polarity
-      crow.output[2].action = "pulse(.001,5,1)"
+      crow.output[2].action = "pulse(.001, 5, 1)"
       crow.output[3].slew = 0
     end
   )
@@ -292,7 +298,7 @@ function init()
   ------------------
   -- CHORD PARAMS --
   ------------------
-  params:add_group('chord', 'CHORD', 31)  
+  params:add_group('chord', 'CHORD', 32)  
   
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
@@ -380,11 +386,12 @@ function init()
   
   params:add_number('chord_ad_skew','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
   
+  params:add_number("chord_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
   ------------------
   -- SEQ PARAMS --
   ------------------
-  params:add_group('seq', 'SEQ', 30)
+  params:add_group('seq', 'SEQ', 31)
 
   params:add_option("seq_note_map_1", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
   
@@ -464,11 +471,12 @@ function init()
   ----------------------------------------
   params:add_separator ('seq_midi', 'MIDI')
   params:add_number('seq_midi_out_port_1', 'Port', 1, #midi.vports, 1)
+
   params:add_number('seq_midi_ch_1','Channel',1, 16, 1)
   params:add_number('seq_midi_velocity_1','Velocity',0, 127, 100)
   
   params:add_number('seq_midi_cc_1_val_1', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  params:set_action("seq_midi_cc_1_val_1",function(val) send_cc('seq', 1, val) end)
+  params:set_action("seq_midi_cc_1_val_1",function(val) send_cc('seq', 1, val, '_1') end) -- added _1 suffix
 
   ----------------------------------------
   params:add_separator ('seq_jf_1', 'Just Friends')
@@ -486,11 +494,15 @@ function init()
   
   params:add_number('seq_ad_skew_1','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
   
-  
+  params:add_number("seq_crow_slew_1", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
+
+
+
+
   ------------------
   -- MIDI HARMONIZER PARAMS --
   ------------------
-  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 24)  
+  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 25)  
 
   params:add_option("midi_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
@@ -551,11 +563,15 @@ function init()
   
   params:add_number('midi_ad_skew', 'AD env. skew', 0, 100, 0, function(param) return percent(param:get()) end)
 
-  
+  params:add_number("midi_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
+
+
+
+
   ------------------
   -- CV HARMONIZER PARAMS --
   ------------------
-  params:add_group('cv_harmonizer', 'CV HARMONIZER', 23)
+  params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)
   
   params:add_option("crow_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
@@ -608,7 +624,9 @@ function init()
   
   params:add_number('crow_ad_skew','AD env. skew',0, 100, 0, function(param) return percent(param:get()) end)
   
-  
+  params:add_number("crow_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
+
+
   -----------------------------
   -- INIT STUFF
   -----------------------------
@@ -933,10 +951,10 @@ function update_menus()
     
   elseif params:string('chord_output') == 'Crow' then
     if params:string('chord_tr_env') == 'Trigger' then
-      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index','chord_tr_env'}
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_crow_slew', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index','chord_tr_env'}
     else -- AD envelope
       -- todo add velocity/ 'chord_dynamics_ramp', for AD voltage
-      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
+      menus[2] = {'chord_output', 'chord_type', 'chord_octave', 'chord_crow_slew', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
     end
     
   elseif params:string('chord_output') == 'ii-JF' then
@@ -954,9 +972,9 @@ function update_menus()
     menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_midi_out_port_1', 'seq_midi_ch_1', 'seq_midi_velocity_1', 'seq_midi_cc_1_val_1'}
   elseif params:string('seq_output_1') == 'Crow' then
     if params:string('seq_tr_env_1') == 'Trigger' then
-      menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1'}
+      menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_crow_slew_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1'}
     else -- AD envelope
-      menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1', 'seq_duration_index_1', 'seq_ad_skew_1',}
+      menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_crow_slew_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1', 'seq_duration_index_1', 'seq_ad_skew_1',}
     end
   elseif params:string('seq_output_1') == 'ii-JF' then
     menus[3] = {'seq_output_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_jf_amp_1'}
@@ -977,9 +995,9 @@ function update_menus()
     end
   elseif params:string('midi_output') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_tr_env'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_crow_slew', 'midi_tr_env'}
     else -- AD envelope
-      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_crow_slew', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
     end
   elseif params:string('midi_output') == 'ii-JF' then
     menus[4] = {'midi_output', 'midi_note_map', 'midi_octave',  'midi_jf_amp'}
@@ -996,9 +1014,9 @@ function update_menus()
     menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
   elseif params:string('crow_output') == 'Crow' then
     if params:string('crow_tr_env') == 'Trigger' then
-      menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_tr_env', }
+      menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_crow_slew', 'crow_tr_env', }
     else -- AD envelope
-      menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
+      menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_crow_slew', 'crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
     end
   elseif params:string('crow_output') == 'ii-JF' then
     menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_jf_amp'}
@@ -1236,7 +1254,6 @@ end
 -- check which ports the global midi clock is being sent to and sends a start message there
 function transport_multi_start()
   transport_midi_update() -- update valid transport ports. Is there a callback when these params are touched?
-  -- for i in pairs(midi_transport_ports) do  
   for i = 1,#midi_transport_ports do
     transport_midi = midi.connect(midi_transport_ports[i])
     transport_midi:start()
@@ -1310,7 +1327,7 @@ function chord_range_string(arg)
 end
 
 
-function ms_string(arg) 
+function ms_string(arg)
   return(arg .. 'ms')
 end
 
@@ -2226,7 +2243,7 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_pp_amp') / 100 -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(dynamics, 0, 1) -- per destination
@@ -2234,9 +2251,8 @@ function play_chord(destination, channel)
         
         to_engine(note, dynamics, cutoff, tracking, release, gain, pw)
         
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
-          -- local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2253,7 +2269,7 @@ function play_chord(destination, channel)
       for i = start, finish, step do
 
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_midi_velocity') -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(round(dynamics), 0, 127) -- per destination
@@ -2261,9 +2277,8 @@ function play_chord(destination, channel)
         
         to_midi(note, dynamics, channel, chord_duration, port)
         
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
-          -- local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
           clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
@@ -2280,14 +2295,14 @@ function play_chord(destination, channel)
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         
         if params:get('chord_tr_env') == 2 then  -- Trigger
-          to_crow(note,'pulse(.001,10,1)') -- (time,level,polarity)
+          to_crow(note,'pulse(.001,10,1)', params:get('chord_crow_slew') * .001) -- (time,level,polarity)
         else -- envelope
           local crow_attack = duration_sec(seq_duration) * params:get('chord_ad_skew') / 100
           local crow_release = duration_sec(seq_duration) * (100 - params:get('chord_ad_skew')) / 100
-          to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)')  -- (attack,release,shape) SHAPE is bugged? todo p2 shape should be working now
+          to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('chord_crow_slew') * .001)  -- (attack,release,shape) SHAPE is bugged? todo p2 shape should be working now
         end        
         
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
@@ -2302,7 +2317,7 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_jf_amp') / 10 -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(dynamics, 0, 50) -- per destination
@@ -2310,7 +2325,7 @@ function play_chord(destination, channel)
         
         to_jf(note, dynamics)
 
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
@@ -2325,14 +2340,14 @@ function play_chord(destination, channel)
       for i = start, finish, step do
         
         local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-        local elapsed = (note_sequence - 1) / (note_qty - 1)
+        local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get('chord_disting_velocity') -- per destination
         local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
         local dynamics = util.clamp(dynamics, 0, 100) -- per destination
         local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
         to_disting(note, dynamics, chord_duration) -- params:get('chord_disting_velocity'), chord_duration)
 
-        if playback ~= 'Off' then
+        if playback ~= 'Off' and note_qty ~= 1 then
           local prev_y_scaled = y_scaled
           y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
           local y_scaled_delta = y_scaled - prev_y_scaled
@@ -2462,11 +2477,11 @@ function advance_seq_pattern()
     
     elseif destination == 'Crow' then
       if params:get('seq_tr_env_1') == 2 then  -- Trigger
-        to_crow(note,'pulse(.001,10,1)') -- (time,level,polarity)
+        to_crow(note,'pulse(.001,10,1)', params:get('seq_crow_slew_1') * .001) -- (time,level,polarity)
       else -- envelope
         local crow_attack = duration_sec(seq_duration) * params:get('seq_ad_skew_1') / 100
         local crow_release = duration_sec(seq_duration) * (100 - params:get('seq_ad_skew_1')) / 100
-        to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)')  -- (attack,release,shape) SHAPE is bugged?
+        to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('seq_crow_slew_1') * .001)  -- (attack,release,shape) SHAPE is bugged?
       end
     
     elseif destination == 'ii-JF' then
@@ -2510,14 +2525,16 @@ function sample_crow(volts)
       local channel = params:get('crow_midi_ch')
       local port = params:get('crow_midi_out_port')
       to_midi(note, params:get('crow_midi_velocity'), channel, crow_duration, port)
+      
     elseif destination == 'Crow' then
       if params:get('crow_tr_env') == 2 then  -- Trigger
-        to_crow(note,'pulse(.001,10,1)') -- (time,level,polarity)
+        to_crow(note,'pulse(.001,10,1)', params:get('crow_crow_slew') * .001)
       else -- envelope
         local crow_attack = duration_sec(crow_duration) * params:get('crow_ad_skew') / 100
         local crow_release = duration_sec(crow_duration) * (100 - params:get('crow_ad_skew')) / 100
-        to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)')  -- (attack,release,shape) SHAPE is bugged?
+        to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('crow_crow_slew') * .001)  -- (attack,release,shape) SHAPE is bugged?
       end
+      
     elseif destination =='ii-JF' then
       to_jf(note, params:get('crow_jf_amp')/10)
     elseif destination == 'Disting' then
@@ -2551,11 +2568,11 @@ midi_event = function(data)
       to_midi(note, params:get('midi_velocity_passthru') == 2 and d.vel or params:get('midi_midi_velocity'), channel, midi_duration, port)
     elseif destination == 'Crow' then
       if params:get('crow_tr_env') == 2 then  -- Trigger
-        to_crow(note,'pulse(.001,10,1)') -- (time,level,polarity)
+        to_crow(note,'pulse(.001,10,1)', params:get('midi_crow_slew') * .001) -- (time,level,polarity)
       else -- envelope
         local crow_attack = duration_sec(midi_duration) * params:get('midi_ad_skew') / 100
         local crow_release = duration_sec(midi_duration) * (100 - params:get('midi_ad_skew')) / 100
-        to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)')  -- (attack,release,shape) SHAPE is bugged?
+        to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('midi_crow_slew') * .001)  -- (attack,release,shape) SHAPE is bugged?
       end
     elseif destination =='ii-JF' then
       to_jf(note, params:get('midi_jf_amp')/10)
@@ -2640,7 +2657,7 @@ function to_midi(note, velocity, channel, duration, port)
 end
 
 
-function to_crow(note, action)
+function to_crow(note, action, slew)
   local note_on_time = util.time()
   crow_play_note = true
   crow_note_history_insert = true
@@ -2656,8 +2673,9 @@ function to_crow(note, action)
   end
 
   --Play the note
-  -- todo: revisit after Crow 4.x bugs are worked out
+  -- todo: revisit after Crow 4.x bugs are worked out, re: shape
   if crow_play_note == true then
+    crow.output[1].slew = slew or 0
     crow.output[1].volts = (note) / 12
     crow.output[2].volts = 0  -- Needed or skew 100 AD gets weird
     crow.output[2].action = action
@@ -2672,7 +2690,7 @@ function to_crow(note, action)
 end
 
 
---todo p2 check JF code and/or with Trent to see if there is a calc we can use rather than the regression
+--todo p2 check with Trent to see if there is a calc we can use rather than the regression
 function est_jf_time()
   crow.ii.jf.get ('time') --populates jf_time global
   
@@ -3039,7 +3057,7 @@ function g.key(x,y,z)
 
           -- If the event is populated, Load the Event vars back to the displayed param. Otherwise keep the last touched event's settings so we can iterate quickly.
           if events[event_edit_segment][y + pattern_grid_offset][x] ~= nil then
-
+            
             events_index = 1
             selected_events_menu = events_menus[events_index]
 
@@ -3051,9 +3069,13 @@ function g.key(x,y,z)
 
             params:set('event_category', param_option_to_index('event_category', events_lookup[index].category))
             change_category()
+            
             params:set('event_subcategory', param_option_to_index('event_subcategory', events_lookup[index].subcategory))
+            change_subcategory()
+            
             params:set('event_name', index)
             change_event()
+            
             params:set('event_operation', param_option_to_index('event_operation', operation))
             if operation == 'Random' then
               params:set('event_op_limit_random', param_option_to_index('event_op_limit_random', limit))
@@ -3976,12 +3998,13 @@ function change_category()
   local category = params:get('event_category')
   if debug_change_functions then print('1. change_category called') end
   if category ~= prev_category then
-  if debug_change_functions then print('  1.1 new category') end
+    if debug_change_functions then print('  1.1 new category') end
+    
     update_event_subcategory_options('change_category')
-    params:set('event_subcategory', 1) -- no action- calling manually on next step
+    params:set('event_subcategory', 1) -- no action- calling manually on next step.
     change_subcategory()
   end
-  prev_category = category  -- todo p1 can this be local and persist on next call? I think not.
+    prev_category = category  -- todo p1 can this be local and persist on next call? I think not.
 end
 
 
@@ -3995,6 +4018,7 @@ function change_subcategory()
     set_event_indices()
 
     if debug_change_functions then print('  setting event to ' .. events_lookup[event_subcategory_index_min].name) end
+    
     params:set('event_name', event_subcategory_index_min)
     change_event()
   end  
