@@ -386,7 +386,7 @@ function init()
   
   params:add_number('chord_ad_skew','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
   
-  params:add_number("chord_crow_slew", "Slew", 0, 10000, 0, function(param) return ms_string(param:get()) end)
+  params:add_number("chord_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
   ------------------
   -- SEQ PARAMS --
@@ -476,7 +476,7 @@ function init()
   params:add_number('seq_midi_velocity_1','Velocity',0, 127, 100)
   
   params:add_number('seq_midi_cc_1_val_1', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  params:set_action("seq_midi_cc_1_val_1",function(val) send_cc('seq', 1, val) end)
+  params:set_action("seq_midi_cc_1_val_1",function(val) send_cc('seq', 1, val, '_1') end) -- added _1 suffix
 
   ----------------------------------------
   params:add_separator ('seq_jf_1', 'Just Friends')
@@ -494,7 +494,7 @@ function init()
   
   params:add_number('seq_ad_skew_1','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
   
-  params:add_number("seq_crow_slew_1", "Slew", 0, 10000, 0, function(param) return ms_string(param:get()) end)
+  params:add_number("seq_crow_slew_1", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
 
 
@@ -563,7 +563,7 @@ function init()
   
   params:add_number('midi_ad_skew', 'AD env. skew', 0, 100, 0, function(param) return percent(param:get()) end)
 
-  params:add_number("midi_crow_slew", "Slew", 0, 10000, 0, function(param) return ms_string(param:get()) end)
+  params:add_number("midi_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
 
 
@@ -624,7 +624,7 @@ function init()
   
   params:add_number('crow_ad_skew','AD env. skew',0, 100, 0, function(param) return percent(param:get()) end)
   
-  params:add_number("crow_crow_slew", "Slew", 0, 10000, 0, function(param) return ms_string(param:get()) end)
+  params:add_number("crow_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
 
   -----------------------------
