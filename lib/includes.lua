@@ -15,7 +15,7 @@ include(lib .. "divisions")
 -- Lookup table for events
 include(lib .. "events")
 
--- Chunky bois
+-- Random asortment of functions
 include(lib .. "functions")
 
 -- Chord and arp pattern generator + engine params
