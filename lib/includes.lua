@@ -4,10 +4,7 @@ er = require("er")
 -- musicutil = require("musicutil")
 engine.name = "PolyPerc"
 
--------------------------------------------------------------
-local lib = "dreamsequence_dev/lib/"  -- todo prerelease!
-------------------------------------------------------------
-
+local lib = "dreamsequence/lib/"
 
 -- @dewb's updated musicutil with some modified chord names I've added
 include(lib .. "musicutil_ds")
@@ -26,8 +23,3 @@ include(lib .. "generator")
 
 -- cute little pics
 include(lib .. "glyphs")
-
--- nota bene
-nb = include("lib/nb/lib/nb")  -- not sure why this doesn't work here?
-
-include("lib/mod") -- ooh baby
