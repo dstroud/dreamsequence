@@ -231,13 +231,12 @@ end
 
 
 -- param action to send cc out as encoder is turned
-function send_cc(source, cc_no, val, suffix)
-  if val > -1 then
-    local port = params:get(source .. '_midi_out_port' .. (suffix or ""))
-    local channel = params:get(source .. '_midi_ch' .. (suffix or ""))
-    print('send_cc', port, channel)
-    midi_device[port]:cc(cc_no, val, channel)
-  end
+function send_cc(source, cc_no, val)
+if val > -1 then
+  local channel = params:get(source .. '_midi_ch')
+  local port = params:get(source .. '_midi_out_port')
+  midi_device[port]:cc(cc_no, val, channel)
+end
 end
 
 -------------------------
