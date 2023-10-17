@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2.3b @modularbeat
+-- v1.2.3 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -1790,7 +1790,7 @@ function calc_seconds_remaining()
 function countdown()
   calc_seconds_remaining()
   fast_blinky = fast_blinky ~ 1
-  grid_redraw() -- todo p0 only keep if we are adding grid flashing
+  grid_redraw() -- todo p0 only keep if we are keeping grid flashing
   redraw()  
 end  
     

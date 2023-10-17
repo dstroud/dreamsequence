@@ -239,10 +239,10 @@ function send_cc(source, cc_no, val, suffix)
   end
 end
 
+
 -------------------------
 -- UI FUNCTIONS
 -------------------------
-
 
 -- index of list, count of items in list, #viewable, line height
 -- function scroll_offset_simple(index, total, in_view, height)
