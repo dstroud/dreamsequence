@@ -15,7 +15,7 @@ include(lib .. "divisions")
 -- Lookup table for events
 include(lib .. "events")
 
--- Random asortment of functions
+-- Chunky bois
 include(lib .. "functions")
 
 -- Chord and arp pattern generator + engine params
@@ -23,3 +23,9 @@ include(lib .. "generator")
 
 -- cute little pics
 include(lib .. "glyphs")
+
+-- nota bene
+nb = include("lib/nb/lib/nb")
+
+-- bundled crow nb voice
+include("lib/mod")
