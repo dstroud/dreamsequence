@@ -71,7 +71,7 @@ function init()
       crow.input[2].mode("change", 2 , 0.1, "rising")
       crow.input[2].change = crow_trigger
       -- time,level,polarity
-      crow.output[2].action = "pulse(.001, 5, 1)"
+      -- crow.output[2].action = "pulse(.001, 5, 1)"  -- handled by mod now
       crow.output[3].slew = 0
     end
   )
@@ -299,32 +299,33 @@ function init()
   ------------------
   -- CHORD PARAMS --
   ------------------
-  params:add_group('chord', 'CHORD', 32)  
+  params:add_group('chord', 'CHORD', 16)  
   
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
+  
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
-  nb:add_param("chord_voice", "Voice")
-  -- params:set_action("chord_voice",function() update_menus() end) -- this must overwrite some other action!
-  -- params:hide("chord_voice_raw")
-  
-  -- voice_param_options = {} -- local
-  -- voice_param_index = {} -- local
-  -- for i = 1, params:lookup_param("chord_voice").count do
-  --   local option = params:lookup_param("chord_voice").options[i]
-  --   if option ~= "crow 1/2" and option ~= "crow 3/4" and option ~= "crow para" then
-  --     table.insert(voice_param_options, option)
-  --     table.insert(voice_param_index, i)
+  nb:add_param("chord_voice_raw", "Voice raw")
+  params:hide("chord_voice_raw")
 
-  --   end
-  -- end
+  -- creates masked lookup table for all voice params, masking NB_CROW
+  local voice_param_options = {}
+  local voice_param_index = {}
+  for i = 1, params:lookup_param("chord_voice_raw").count do
+    local option = params:lookup_param("chord_voice_raw").options[i]
+    if option ~= "crow 1/2" and option ~= "crow 3/4" and option ~= "crow para" then
+      table.insert(voice_param_options, option)
+      table.insert(voice_param_index, i)
+    end
+  end
   
-  -- params:add_option("chord_voice", 'Voice', voice_param_options, 1)
-  -- params:set_action("chord_voice", function(index) params:set("chord_voice", voice_param_index[index]) end)
+  params:add_option("chord_voice", 'Voice', voice_param_options, 1)
+  params:set_action("chord_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
+
   
-  params:add_option('chord_output', 'Output', {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  params:set_action("chord_output",function() update_menus() end)
+  -- params:add_option('chord_output', 'Output', {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  -- params:set_action("chord_output",function() update_menus() end)
 
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_duration_index',function(val) chord_duration = division_names[val][1] end) -- set global once vs lookup each time. Not sure if worth the trade-off
@@ -361,58 +362,58 @@ function init()
   params:set_action('chord_pattern_length', function() pattern_length('chord_pattern_length') end)
 
   ----------------------------------------
-  params:add_separator ('chord_engine', 'Engine')
+  -- params:add_separator ('chord_engine', 'Engine')
   
-  params:add_number('chord_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
+  -- params:add_number('chord_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   
-  params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
-  params:add_number('chord_pp_tracking', 'Fltr tracking', 0, 100, 50, function(param) return percent(param:get()) end)
-  pp_gain = controlspec.def{
-    min=0,
-    max=400,
-    warp='lin',
-    step=10,
-    default=100,
-    wrap=false,
-    }
-  params:add_control("chord_pp_gain", "Gain", pp_gain, function(param) return util.round(param:get()) end)
+  -- params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
+  -- params:add_number('chord_pp_tracking', 'Fltr tracking', 0, 100, 50, function(param) return percent(param:get()) end)
+  -- pp_gain = controlspec.def{
+  --   min=0,
+  --   max=400,
+  --   warp='lin',
+  --   step=10,
+  --   default=100,
+  --   wrap=false,
+  --   }
+  -- params:add_control("chord_pp_gain", "Gain", pp_gain, function(param) return util.round(param:get()) end)
   
-  params:add_number("chord_pp_pw", "Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
+  -- params:add_number("chord_pp_pw", "Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('chord_midi', 'MIDI')
+  -- ----------------------------------------
+  -- params:add_separator ('chord_midi', 'MIDI')
   
-  params:add_number('chord_midi_velocity', 'Velocity', 0, 127, 100)
+  -- params:add_number('chord_midi_velocity', 'Velocity', 0, 127, 100)
   
-  params:add_number('chord_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  params:set_action("chord_midi_cc_1_val",function(val) send_cc('chord', 1, val) end)
+  -- params:add_number('chord_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  -- params:set_action("chord_midi_cc_1_val",function(val) send_cc('chord', 1, val) end)
   
-  params:add_number('chord_midi_out_port', 'Port', 1, #midi.vports, 1)
-    -- params:set_action('chord_midi_out_port', function(value) chord_midi_out = midi_device[value] end)    
-  params:add_number('chord_midi_ch', 'Channel', 1, 16, 1)
+  -- params:add_number('chord_midi_out_port', 'Port', 1, #midi.vports, 1)
+  --   -- params:set_action('chord_midi_out_port', function(value) chord_midi_out = midi_device[value] end)    
+  -- params:add_number('chord_midi_ch', 'Channel', 1, 16, 1)
   
-  ----------------------------------------
-  params:add_separator ('chord_jf', 'Just Friends')
-  params:add_number('chord_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
+  -- ----------------------------------------
+  -- params:add_separator ('chord_jf', 'Just Friends')
+  -- params:add_number('chord_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('chord_disting', 'Disting')
-  params:add_number('chord_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
+  -- ----------------------------------------
+  -- params:add_separator ('chord_disting', 'Disting')
+  -- params:add_number('chord_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
 
-  ----------------------------------------
-  params:add_separator ('chord_crow', 'Crow')
+  -- ----------------------------------------
+  -- params:add_separator ('chord_crow', 'Crow')
   
-  params:add_option("chord_tr_env", "Output", {'AD env.', 'Trigger'}, 1)
-  params:set_action("chord_tr_env",function() update_menus() end)
+  -- params:add_option("chord_tr_env", "Output", {'AD env.', 'Trigger'}, 1)
+  -- params:set_action("chord_tr_env",function() update_menus() end)
   
-  params:add_number('chord_ad_skew','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
+  -- params:add_number('chord_ad_skew','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
   
   -- params:add_number("chord_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
   ------------------
   -- SEQ PARAMS --
   ------------------
-  params:add_group('seq', 'SEQ', 31)
+  params:add_group('seq', 'SEQ', 15)
 
   params:add_option("seq_note_map_1", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
   
@@ -459,11 +460,15 @@ function init()
   params:add_number('seq_div_index_1', 'Step length', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_div_index_1', function(val) seq_div = division_names[val][1] end)
   
-  nb:add_param("seq_voice_1", "Voice")
+  nb:add_param("seq_voice_raw_1", "Voice raw")
+  params:hide("seq_voice_raw_1")
+
+  params:add_option("seq_voice_1", 'Voice', voice_param_options, 1)
+  params:set_action("seq_voice_1", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
   -- params:set_action("seq_voice_1",function() update_menus() end) -- this must overwrite some other action!  
 
-  params:add_option("seq_output_1", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  params:set_action("seq_output_1",function() update_menus() end)
+  -- params:add_option("seq_output_1", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  -- params:set_action("seq_output_1",function() update_menus() end)
   
   params:add_number('seq_duration_index_1', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_duration_index_1', function(val) seq_duration = division_names[val][1] end)
@@ -483,57 +488,62 @@ function init()
   
   params:add_number('seq_dynamics_1', 'Dynamics', 0, 100, 70, function(param) return percent(param:get()) end)
 
-  ----------------------------------------
-  params:add_separator ('seq_engine', 'Engine')
+  -- ----------------------------------------
+  -- params:add_separator ('seq_engine', 'Engine')
   
-  params:add_number('seq_pp_amp_1', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
+  -- params:add_number('seq_pp_amp_1', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
   
-  params:add_control("seq_pp_cutoff_1", "Cutoff", controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
+  -- params:add_control("seq_pp_cutoff_1", "Cutoff", controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
   
-  params:add_number('seq_pp_tracking_1', 'Fltr tracking', 0, 100, 50,function(param) return percent(param:get()) end)
-  params:add_control("seq_pp_gain_1","Gain", pp_gain, function(param) return util.round(param:get()) end)
-  params:add_number("seq_pp_pw_1","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
+  -- params:add_number('seq_pp_tracking_1', 'Fltr tracking', 0, 100, 50,function(param) return percent(param:get()) end)
+  -- params:add_control("seq_pp_gain_1","Gain", pp_gain, function(param) return util.round(param:get()) end)
+  -- params:add_number("seq_pp_pw_1","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('seq_midi', 'MIDI')
-  params:add_number('seq_midi_out_port_1', 'Port', 1, #midi.vports, 1)
+  -- ----------------------------------------
+  -- params:add_separator ('seq_midi', 'MIDI')
+  -- params:add_number('seq_midi_out_port_1', 'Port', 1, #midi.vports, 1)
 
-  params:add_number('seq_midi_ch_1','Channel',1, 16, 1)
-  params:add_number('seq_midi_velocity_1','Velocity',0, 127, 100)
+  -- params:add_number('seq_midi_ch_1','Channel',1, 16, 1)
+  -- params:add_number('seq_midi_velocity_1','Velocity',0, 127, 100)
   
-  params:add_number('seq_midi_cc_1_val_1', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  params:set_action("seq_midi_cc_1_val_1",function(val) send_cc('seq', 1, val, '_1') end) -- added _1 suffix
+  -- params:add_number('seq_midi_cc_1_val_1', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  -- params:set_action("seq_midi_cc_1_val_1",function(val) send_cc('seq', 1, val, '_1') end) -- added _1 suffix
 
-  ----------------------------------------
-  params:add_separator ('seq_jf_1', 'Just Friends')
-  params:add_number('seq_jf_amp_1','Amp',0, 50, 10,function(param) return ten_v(param:get()) end)
+  -- ----------------------------------------
+  -- params:add_separator ('seq_jf_1', 'Just Friends')
+  -- params:add_number('seq_jf_amp_1','Amp',0, 50, 10,function(param) return ten_v(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('seq_disting_1', 'Disting')
-  params:add_number('seq_disting_velocity_1', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
+  -- ----------------------------------------
+  -- params:add_separator ('seq_disting_1', 'Disting')
+  -- params:add_number('seq_disting_velocity_1', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('seq_crow', 'Crow')
+  -- ----------------------------------------
+  -- params:add_separator ('seq_crow', 'Crow')
   
-  params:add_option("seq_tr_env_1", "Output", {'AD env.', 'Trigger'}, 1)
-  params:set_action("seq_tr_env_1",function() update_menus() end)
+  -- params:add_option("seq_tr_env_1", "Output", {'AD env.', 'Trigger'}, 1)
+  -- params:set_action("seq_tr_env_1",function() update_menus() end)
   
-  params:add_number('seq_ad_skew_1','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
+  -- params:add_number('seq_ad_skew_1','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
   
-  -- params:add_number("seq_crow_slew_1", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
+  -- -- params:add_number("seq_crow_slew_1", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
 
   ------------------
   -- MIDI HARMONIZER PARAMS --
   ------------------
-  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 25)  
+  params:add_group('midi_harmonizer', 'MIDI HARMONIZER', 8)  
 
   params:add_option("midi_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
-  nb:add_param("midi_voice", "Voice")
+  nb:add_param("midi_voice_raw", "Voice raw")
+  params:hide("midi_voice_raw")
 
-  params:add_option("midi_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'}, 2)
-  params:set_action("midi_output",function() update_menus() end)
+  params:add_option("midi_voice", 'Voice', voice_param_options, 1)
+  params:set_action("midi_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
+  -- params:set_action("midi_voice",function() update_menus() end)
+
+  -- params:add_option("midi_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'}, 2)
+  -- params:set_action("midi_output",function() update_menus() end)
     
   params:add_number('midi_harmonizer_in_port', 'Port in',1,#midi.vports,1)
     params:set_action('midi_harmonizer_in_port', function(value)
@@ -552,46 +562,46 @@ function init()
   
   params:add_number('midi_dynamics', 'Dynamics', 0, 100, 70, function(param) return percent(param:get()) end)
 
-  ----------------------------------------
-  params:add_separator ('midi_harmonizer_engine', 'Engine')
+  -- ----------------------------------------
+  -- params:add_separator ('midi_harmonizer_engine', 'Engine')
   
-  params:add_number('midi_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
-  params:add_control("midi_pp_cutoff", "Cutoff", controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
-  params:add_number('midi_pp_tracking', 'Fltr tracking', 0, 100, 50,function(param) return percent(param:get()) end)
-  params:add_control("midi_pp_gain", "Gain", pp_gain, function(param) return util.round(param:get()) end)
-  params:add_number("midi_pp_pw","Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
+  -- params:add_number('midi_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
+  -- params:add_control("midi_pp_cutoff", "Cutoff", controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
+  -- params:add_number('midi_pp_tracking', 'Fltr tracking', 0, 100, 50,function(param) return percent(param:get()) end)
+  -- params:add_control("midi_pp_gain", "Gain", pp_gain, function(param) return util.round(param:get()) end)
+  -- params:add_number("midi_pp_pw","Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('midi_harmonizer_midi', 'MIDI')
+  -- ----------------------------------------
+  -- params:add_separator ('midi_harmonizer_midi', 'MIDI')
   
-  params:add_number('midi_midi_out_port', 'Port out',1,#midi.vports,1)   -- (clock out ports configured in global midi parameters) 
-  params:add_number('midi_midi_ch','Channel', 1, 16, 1)
-  params:add_option('midi_velocity_passthru', 'Pass velocity', {'Off', 'On'}, 1)
-  params:set_action("midi_velocity_passthru", function() update_menus() end)  
-  params:add_number('midi_midi_velocity', 'Velocity', 0, 127, 100)
+  -- params:add_number('midi_midi_out_port', 'Port out',1,#midi.vports,1)   -- (clock out ports configured in global midi parameters) 
+  -- params:add_number('midi_midi_ch','Channel', 1, 16, 1)
+  -- params:add_option('midi_velocity_passthru', 'Pass velocity', {'Off', 'On'}, 1)
+  -- params:set_action("midi_velocity_passthru", function() update_menus() end)  
+  -- params:add_number('midi_midi_velocity', 'Velocity', 0, 127, 100)
   
-  params:add_number('midi_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  params:set_action("midi_midi_cc_1_val", function(val) send_cc('midi', 1, val) end)
+  -- params:add_number('midi_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  -- params:set_action("midi_midi_cc_1_val", function(val) send_cc('midi', 1, val) end)
   
-  ----------------------------------------
-  params:add_separator ('Just Friends')
+  -- ----------------------------------------
+  -- params:add_separator ('Just Friends')
   
-  params:add_number('midi_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
+  -- params:add_number('midi_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('Disting')
+  -- ----------------------------------------
+  -- params:add_separator ('Disting')
   
-  params:add_number('midi_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
+  -- params:add_number('midi_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('midi_harmonizer_crow', 'Crow')
+  -- ----------------------------------------
+  -- params:add_separator ('midi_harmonizer_crow', 'Crow')
   
-  params:add_option("midi_tr_env", "Output", {'AD env.','Trigger'},1)
-  params:set_action("midi_tr_env",function() update_menus() end)
+  -- params:add_option("midi_tr_env", "Output", {'AD env.','Trigger'},1)
+  -- params:set_action("midi_tr_env",function() update_menus() end)
   
-  params:add_number('midi_ad_skew', 'AD env. skew', 0, 100, 0, function(param) return percent(param:get()) end)
+  -- params:add_number('midi_ad_skew', 'AD env. skew', 0, 100, 0, function(param) return percent(param:get()) end)
 
-  -- params:add_number("midi_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
+  -- -- params:add_number("midi_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
 
 
@@ -599,14 +609,19 @@ function init()
   ------------------
   -- CV HARMONIZER PARAMS --
   ------------------
-  params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)
+  params:add_group('cv_harmonizer', 'CV HARMONIZER', 7)
   
   params:add_option("crow_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
-  nb:add_param("crow_voice", "Voice")
+  nb:add_param("crow_voice_raw", "Voice raw")
+  params:hide("crow_voice_raw")
 
-  params:add_option("crow_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  params:set_action("crow_output", function() update_menus() end)
+  params:add_option("crow_voice", 'Voice', voice_param_options, 1)
+  params:set_action("crow_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
+  -- params:set_action("crow_voice",function() update_menus() end)
+
+  -- params:add_option("crow_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
+  -- params:set_action("crow_output", function() update_menus() end)
   
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
   params:set_action('crow_duration_index', function(val) crow_duration = division_names[val][1] end) -- pointless?
@@ -617,47 +632,47 @@ function init()
   params:add_number('crow_dynamics', 'Dynamics', 0, 100, 70, function(param) return percent(param:get()) end)
 
 
-  ----------------------------------------
-  params:add_separator ('cv_harmonizer_engine', 'Engine')
+  -- ----------------------------------------
+  -- params:add_separator ('cv_harmonizer_engine', 'Engine')
   
-  params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
-  params:add_option('crow_auto_rest', 'Auto-rest', {'Off', 'On'}, 1)
+  -- params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
+  -- params:add_option('crow_auto_rest', 'Auto-rest', {'Off', 'On'}, 1)
 
-  params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
-  params:add_number('crow_pp_tracking', 'Fltr tracking', 0, 100, 50, function(param) return percent(param:get()) end)
+  -- params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
+  -- params:add_number('crow_pp_tracking', 'Fltr tracking', 0, 100, 50, function(param) return percent(param:get()) end)
   
-  params:add_control("crow_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
+  -- params:add_control("crow_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
   
-  params:add_number("crow_pp_pw","Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
+  -- params:add_number("crow_pp_pw","Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('cv_harmonizer_midi', 'MIDI')
+  -- ----------------------------------------
+  -- params:add_separator ('cv_harmonizer_midi', 'MIDI')
   
-  params:add_number('crow_midi_out_port', 'Port', 1, #midi.vports, 1)
+  -- params:add_number('crow_midi_out_port', 'Port', 1, #midi.vports, 1)
   
-  params:add_number('crow_midi_ch','Channel', 1, 16, 1)
+  -- params:add_number('crow_midi_ch','Channel', 1, 16, 1)
   
-  params:add_number('crow_midi_velocity', 'Velocity', 0, 127, 100)
+  -- params:add_number('crow_midi_velocity', 'Velocity', 0, 127, 100)
 
-  params:add_number('crow_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  params:set_action("crow_midi_cc_1_val", function(val) send_cc('crow', 1, val) end)
+  -- params:add_number('crow_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
+  -- params:set_action("crow_midi_cc_1_val", function(val) send_cc('crow', 1, val) end)
 
-  ----------------------------------------
-  params:add_separator ('cv_harmonizer_jf', 'Just Friends')
-  params:add_number('crow_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
+  -- ----------------------------------------
+  -- params:add_separator ('cv_harmonizer_jf', 'Just Friends')
+  -- params:add_number('crow_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
  
-  ----------------------------------------
-  params:add_separator ('cv_harmonizer_disting', 'Disting')
-  params:add_number('crow_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
+  -- ----------------------------------------
+  -- params:add_separator ('cv_harmonizer_disting', 'Disting')
+  -- params:add_number('crow_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
   
-  ----------------------------------------
-  params:add_separator ('cv_harmonizer_crow', 'Crow')
-  params:add_option("crow_tr_env", "Output", {'AD env.','Trigger'},1)
-  params:set_action("crow_tr_env",function() update_menus() end)
+  -- ----------------------------------------
+  -- params:add_separator ('cv_harmonizer_crow', 'Crow')
+  -- params:add_option("crow_tr_env", "Output", {'AD env.','Trigger'},1)
+  -- params:set_action("crow_tr_env",function() update_menus() end)
   
-  params:add_number('crow_ad_skew','AD env. skew',0, 100, 0, function(param) return percent(param:get()) end)
+  -- params:add_number('crow_ad_skew','AD env. skew',0, 100, 0, function(param) return percent(param:get()) end)
   
-  -- params:add_number("crow_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
+  -- -- params:add_number("crow_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
   ----------------------------------------
   params:add_separator('Voices')
@@ -1848,10 +1863,8 @@ function timing_clock()
     
     -- variant which also stores player value. Downside is that each note has to check against note history for all notes irrespective of voice
     for i = #player_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
-      -- local player = params:lookup_param("chord_voice"):get_player()
       player_note_history[i].step = player_note_history[i].step - 1
       if player_note_history[i].step == 0 then
-        -- print('note_off')
         player_note_history[i].player:note_off(player_note_history[i].note)
         table.remove(player_note_history, i)
       end
@@ -2029,7 +2042,7 @@ function advance_chord_pattern()
 
     -- Play the chord
     if chord_pattern[active_chord_pattern][chord_pattern_position] > 0 then
-      play_chord(params:string('chord_output'), params:get('chord_midi_ch'))  --todo why id midi ch here lol?
+      play_chord()-- params:string('chord_output'), params:get('chord_midi_ch'))
       if seq_reset_on_1 == 2 then -- Chord
         seq_pattern_position = 0
         -- play_seq = true
@@ -2318,8 +2331,7 @@ function to_player(player, note, dynamics, duration)
 end
 
 
-function play_chord(destination, channel)
-  -- local destination = params:string('chord_output')
+function play_chord()
   local speed = chord_div / global_clock_div * strum_lengths[params:get('chord_strum_length')][1]
   local start, finish, step -- Determine the starting and ending indices based on the direction
   local playback = params:string('chord_style')
@@ -2338,7 +2350,7 @@ function play_chord(destination, channel)
   local y_scaled = 0
   local y_scaled_delta = 0
   local note_sequence = 0
-  local player = params:lookup_param("chord_voice"):get_player()
+  local player = params:lookup_param("chord_voice_raw"):get_player()
   
   clock.run(function()
     for i = start, finish, step do
@@ -2360,9 +2372,8 @@ function play_chord(destination, channel)
       end
       
     end
-  end)      
-    
-  -- if destination == 'Engine' then
+
+      -- if destination == 'Engine' then
   --   local cutoff = params:get('chord_pp_tracking') *.01
   --   local tracking = params:get('chord_pp_cutoff')
   --   local release = duration_sec(chord_duration)
@@ -2488,6 +2499,8 @@ function play_chord(destination, channel)
   --   end)  
     
   -- end
+  
+  end)    
 end
 
 
@@ -2588,7 +2601,7 @@ function advance_seq_pattern()
   if seq_pattern[active_seq_pattern][seq_pattern_position] > 0 then
     
     -- local destination = params:string('seq_output_1')
-    local player = params:lookup_param("seq_voice_1"):get_player()
+    local player = params:lookup_param("seq_voice_raw_1"):get_player()
     local dynamics = params:get('seq_dynamics_1') * .01
 
     
@@ -2648,7 +2661,7 @@ function sample_crow(volts)
   or (params:get('crow_auto_rest') == 2 and (prev_note ~= note)) then
     -- Play the note
     
-    local player = params:lookup_param("crow_voice"):get_player()
+    local player = params:lookup_param("crow_voice_raw"):get_player()
     local dynamics = params:get('crow_dynamics') * .01
 
     to_player(player, note, dynamics, seq_duration)
@@ -2696,7 +2709,7 @@ midi_event = function(data)
 
     local note = _G['map_note_' .. params:get('midi_note_map')](d.note - 35, params:get('midi_octave'), params:get('chord_preload') ~= 0) + 36 -- todo p1 -35+36 BS for all sources haha
 
-    local player = params:lookup_param("midi_voice"):get_player()
+    local player = params:lookup_param("midi_voice_raw"):get_player()
     local dynamics = params:get('midi_dynamics') * .01 -- todo p1 velocity passthru (normalize to 0-1)
 
     to_player(player, note, dynamics, seq_duration)

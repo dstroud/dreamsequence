@@ -67,7 +67,7 @@ local function add_player(cv, env)
         else
             action = string.format("{ to(%f,%f,'%s'), to(%f,%f,'%s') }", v_vel, attack, attack_shape, v_vel*sustain, decay, decay_shape)
         end
-        print(action)
+        -- print(action)
         crow.output[env].action = action
         crow.output[env]()
         self.count = self.count + 1
@@ -305,8 +305,8 @@ local function add_paraphonic_player()
 
 end
 
-mod.hook.register("script_pre_init", "nb crow pre init", function()  -- registering with the same string will block default NB_CROW mod (but not param creation)
+mod.hook.register("script_pre_init", "nb dreamsequence crow pre init", function()  -- registering with the same string will block default NB_CROW mod (but not param creation)
     add_player(1, 2)
-    add_player(3, 4)
+    -- add_player(3, 4)
     -- add_paraphonic_player()
 end)
