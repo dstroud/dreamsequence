@@ -11,7 +11,7 @@
 --
 -- ENC 1: Scroll (16x8 Grid)
 -- ENC 2: Select
--- ENC 3: Edit 
+-- ENC 3: Edit
 --
 -- Crow IN 1: CV in
 -- Crow IN 2: Trigger in
@@ -66,12 +66,9 @@ function init()
       end
       crow.input[1].stream = sample_crow
       crow.input[1].mode("none")
-      -- voltage threshold, hysteresis, "rising", "falling", or “both"
       -- TODO: could do a gate with "both" for ADSR envelope
-      crow.input[2].mode("change", 2 , 0.1, "rising")
+      crow.input[2].mode("change", 2 , 0.1, "rising") -- voltage threshold, hysteresis, "rising", "falling", or “both"
       crow.input[2].change = crow_trigger
-      -- time,level,polarity
-      -- crow.output[2].action = "pulse(.001, 5, 1)"  -- handled by mod now
       crow.output[3].slew = 0
     end
   )
@@ -299,7 +296,7 @@ function init()
   ------------------
   -- CHORD PARAMS --
   ------------------
-  params:add_group('chord', 'CHORD', 16)  
+  params:add_group('chord', 'CHORD', 16)
   
   chord_div = 192 -- seems to be some race-condition when loading pset, index value 15, and setting this via param action so here we go
   
@@ -361,54 +358,6 @@ function init()
   params:add_number('chord_pattern_length', 'Pattern length', 1, max_chord_pattern_length, 4) -- max length to be based on 
   params:set_action('chord_pattern_length', function() pattern_length('chord_pattern_length') end)
 
-  ----------------------------------------
-  -- params:add_separator ('chord_engine', 'Engine')
-  
-  -- params:add_number('chord_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
-  
-  -- params:add_control("chord_pp_cutoff","Cutoff",controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
-  -- params:add_number('chord_pp_tracking', 'Fltr tracking', 0, 100, 50, function(param) return percent(param:get()) end)
-  -- pp_gain = controlspec.def{
-  --   min=0,
-  --   max=400,
-  --   warp='lin',
-  --   step=10,
-  --   default=100,
-  --   wrap=false,
-  --   }
-  -- params:add_control("chord_pp_gain", "Gain", pp_gain, function(param) return util.round(param:get()) end)
-  
-  -- params:add_number("chord_pp_pw", "Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('chord_midi', 'MIDI')
-  
-  -- params:add_number('chord_midi_velocity', 'Velocity', 0, 127, 100)
-  
-  -- params:add_number('chord_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  -- params:set_action("chord_midi_cc_1_val",function(val) send_cc('chord', 1, val) end)
-  
-  -- params:add_number('chord_midi_out_port', 'Port', 1, #midi.vports, 1)
-  --   -- params:set_action('chord_midi_out_port', function(value) chord_midi_out = midi_device[value] end)    
-  -- params:add_number('chord_midi_ch', 'Channel', 1, 16, 1)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('chord_jf', 'Just Friends')
-  -- params:add_number('chord_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('chord_disting', 'Disting')
-  -- params:add_number('chord_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
-
-  -- ----------------------------------------
-  -- params:add_separator ('chord_crow', 'Crow')
-  
-  -- params:add_option("chord_tr_env", "Output", {'AD env.', 'Trigger'}, 1)
-  -- params:set_action("chord_tr_env",function() update_menus() end)
-  
-  -- params:add_number('chord_ad_skew','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
-  
-  -- params:add_number("chord_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
 
   ------------------
   -- SEQ PARAMS --
@@ -464,11 +413,7 @@ function init()
   params:hide("seq_voice_raw_1")
 
   params:add_option("seq_voice_1", 'Voice', voice_param_options, 1)
-  params:set_action("seq_voice_1", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
-  -- params:set_action("seq_voice_1",function() update_menus() end) -- this must overwrite some other action!  
-
-  -- params:add_option("seq_output_1", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  -- params:set_action("seq_output_1",function() update_menus() end)
+  params:set_action("seq_voice_1", function(index) params:set("seq_voice_raw_1", voice_param_index[index]) end)
   
   params:add_number('seq_duration_index_1', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_duration_index_1', function(val) seq_duration = division_names[val][1] end)
@@ -488,45 +433,6 @@ function init()
   
   params:add_number('seq_dynamics_1', 'Dynamics', 0, 100, 70, function(param) return percent(param:get()) end)
 
-  -- ----------------------------------------
-  -- params:add_separator ('seq_engine', 'Engine')
-  
-  -- params:add_number('seq_pp_amp_1', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
-  
-  -- params:add_control("seq_pp_cutoff_1", "Cutoff", controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
-  
-  -- params:add_number('seq_pp_tracking_1', 'Fltr tracking', 0, 100, 50,function(param) return percent(param:get()) end)
-  -- params:add_control("seq_pp_gain_1","Gain", pp_gain, function(param) return util.round(param:get()) end)
-  -- params:add_number("seq_pp_pw_1","Pulse width",1, 99, 50,function(param) return percent(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('seq_midi', 'MIDI')
-  -- params:add_number('seq_midi_out_port_1', 'Port', 1, #midi.vports, 1)
-
-  -- params:add_number('seq_midi_ch_1','Channel',1, 16, 1)
-  -- params:add_number('seq_midi_velocity_1','Velocity',0, 127, 100)
-  
-  -- params:add_number('seq_midi_cc_1_val_1', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  -- params:set_action("seq_midi_cc_1_val_1",function(val) send_cc('seq', 1, val, '_1') end) -- added _1 suffix
-
-  -- ----------------------------------------
-  -- params:add_separator ('seq_jf_1', 'Just Friends')
-  -- params:add_number('seq_jf_amp_1','Amp',0, 50, 10,function(param) return ten_v(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('seq_disting_1', 'Disting')
-  -- params:add_number('seq_disting_velocity_1', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('seq_crow', 'Crow')
-  
-  -- params:add_option("seq_tr_env_1", "Output", {'AD env.', 'Trigger'}, 1)
-  -- params:set_action("seq_tr_env_1",function() update_menus() end)
-  
-  -- params:add_number('seq_ad_skew_1','AD env. skew', 0 , 100, 0, function(param) return percent(param:get()) end)
-  
-  -- -- params:add_number("seq_crow_slew_1", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
-
 
   ------------------
   -- MIDI HARMONIZER PARAMS --
@@ -539,12 +445,8 @@ function init()
   params:hide("midi_voice_raw")
 
   params:add_option("midi_voice", 'Voice', voice_param_options, 1)
-  params:set_action("midi_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
-  -- params:set_action("midi_voice",function() update_menus() end)
+  params:set_action("midi_voice", function(index) params:set("midi_voice_raw", voice_param_index[index]) end)
 
-  -- params:add_option("midi_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'}, 2)
-  -- params:set_action("midi_output",function() update_menus() end)
-    
   params:add_number('midi_harmonizer_in_port', 'Port in',1,#midi.vports,1)
     params:set_action('midi_harmonizer_in_port', function(value)
       in_midi.event = nil
@@ -562,49 +464,6 @@ function init()
   
   params:add_number('midi_dynamics', 'Dynamics', 0, 100, 70, function(param) return percent(param:get()) end)
 
-  -- ----------------------------------------
-  -- params:add_separator ('midi_harmonizer_engine', 'Engine')
-  
-  -- params:add_number('midi_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
-  -- params:add_control("midi_pp_cutoff", "Cutoff", controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
-  -- params:add_number('midi_pp_tracking', 'Fltr tracking', 0, 100, 50,function(param) return percent(param:get()) end)
-  -- params:add_control("midi_pp_gain", "Gain", pp_gain, function(param) return util.round(param:get()) end)
-  -- params:add_number("midi_pp_pw","Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('midi_harmonizer_midi', 'MIDI')
-  
-  -- params:add_number('midi_midi_out_port', 'Port out',1,#midi.vports,1)   -- (clock out ports configured in global midi parameters) 
-  -- params:add_number('midi_midi_ch','Channel', 1, 16, 1)
-  -- params:add_option('midi_velocity_passthru', 'Pass velocity', {'Off', 'On'}, 1)
-  -- params:set_action("midi_velocity_passthru", function() update_menus() end)  
-  -- params:add_number('midi_midi_velocity', 'Velocity', 0, 127, 100)
-  
-  -- params:add_number('midi_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  -- params:set_action("midi_midi_cc_1_val", function(val) send_cc('midi', 1, val) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('Just Friends')
-  
-  -- params:add_number('midi_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('Disting')
-  
-  -- params:add_number('midi_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('midi_harmonizer_crow', 'Crow')
-  
-  -- params:add_option("midi_tr_env", "Output", {'AD env.','Trigger'},1)
-  -- params:set_action("midi_tr_env",function() update_menus() end)
-  
-  -- params:add_number('midi_ad_skew', 'AD env. skew', 0, 100, 0, function(param) return percent(param:get()) end)
-
-  -- -- params:add_number("midi_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
-
-
-
 
   ------------------
   -- CV HARMONIZER PARAMS --
@@ -615,68 +474,28 @@ function init()
 
   nb:add_param("crow_voice_raw", "Voice raw")
   params:hide("crow_voice_raw")
+  
+  params:add_option('crow_auto_rest', 'Auto-rest', {'Off', 'On'}, 1)
 
   params:add_option("crow_voice", 'Voice', voice_param_options, 1)
-  params:set_action("crow_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
-  -- params:set_action("crow_voice",function() update_menus() end)
+  params:set_action("crow_voice", function(index) params:set("crow_voice_raw", voice_param_index[index]) end)
 
-  -- params:add_option("crow_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  -- params:set_action("crow_output", function() update_menus() end)
-  
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
   params:set_action('crow_duration_index', function(val) crow_duration = division_names[val][1] end) -- pointless?
-  
   
   params:add_number('crow_octave', 'Octave', -2, 4, 0)
   
   params:add_number('crow_dynamics', 'Dynamics', 0, 100, 70, function(param) return percent(param:get()) end)
 
 
-  -- ----------------------------------------
-  -- params:add_separator ('cv_harmonizer_engine', 'Engine')
-  
-  -- params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
-  -- params:add_option('crow_auto_rest', 'Auto-rest', {'Off', 'On'}, 1)
-
-  -- params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
-  -- params:add_number('crow_pp_tracking', 'Fltr tracking', 0, 100, 50, function(param) return percent(param:get()) end)
-  
-  -- params:add_control("crow_pp_gain","Gain", pp_gain,function(param) return util.round(param:get()) end)
-  
-  -- params:add_number("crow_pp_pw","Pulse width", 1, 99, 50, function(param) return percent(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('cv_harmonizer_midi', 'MIDI')
-  
-  -- params:add_number('crow_midi_out_port', 'Port', 1, #midi.vports, 1)
-  
-  -- params:add_number('crow_midi_ch','Channel', 1, 16, 1)
-  
-  -- params:add_number('crow_midi_velocity', 'Velocity', 0, 127, 100)
-
-  -- params:add_number('crow_midi_cc_1_val', 'Mod wheel', -1, 127, -1, function(param) return neg_to_off(param:get()) end)
-  -- params:set_action("crow_midi_cc_1_val", function(val) send_cc('crow', 1, val) end)
-
-  -- ----------------------------------------
-  -- params:add_separator ('cv_harmonizer_jf', 'Just Friends')
-  -- params:add_number('crow_jf_amp', 'Amp', 0, 50, 10, function(param) return ten_v(param:get()) end)
- 
-  -- ----------------------------------------
-  -- params:add_separator ('cv_harmonizer_disting', 'Disting')
-  -- params:add_number('crow_disting_velocity', 'Velocity', 0, 100, 50, function(param) return ten_v(param:get()) end)
-  
-  -- ----------------------------------------
-  -- params:add_separator ('cv_harmonizer_crow', 'Crow')
-  -- params:add_option("crow_tr_env", "Output", {'AD env.','Trigger'},1)
-  -- params:set_action("crow_tr_env",function() update_menus() end)
-  
-  -- params:add_number('crow_ad_skew','AD env. skew',0, 100, 0, function(param) return percent(param:get()) end)
-  
-  -- -- params:add_number("crow_crow_slew", "Slew", 0, 1000, 0, function(param) return ms_string(param:get()) end)
-
-  ----------------------------------------
+  ------------------
+  -- NB PARAMS --
+  ------------------  
   params:add_separator('Voices')
   nb:add_player_params()
+  
+  
+  
   
   -----------------------------
   -- INIT STUFF
@@ -797,12 +616,7 @@ function init()
   seq_pattern_length = {8,8,8,8}
   active_seq_pattern = 1
   seq_pattern_position = 0
-  player_note_history = {}
-  -- midi_note_history = {}
-  -- engine_note_history = {}
-  -- crow_note_history = {}
-  -- jf_note_history = {}
-  -- disting_note_history = {}
+  player_note_history = {}  -- todo p2 performance of having one vs dynamically created history for each voice
   dedupe_threshold()
   reset_clock() -- will turn over to step 0 on first loop
   get_next_chord()
@@ -988,99 +802,27 @@ end
 
   -- UPDATE_MENUS. todo p2: can be optimized by only calculating the current view+page or when certain actions occur
 function update_menus()
-
   -- GLOBAL MENU 
     menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
   menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
-  -- if params:string('chord_output') == 'Mute' then
-  --   menus[2] = {'chord_voice', 'chord_div_index'} -- maybe add chord_type back depending on readout
-  -- elseif params:string('chord_output') == 'Engine' then
-  --   menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_pp_amp', 'chord_dynamics_ramp', 'chord_pp_cutoff', 'chord_pp_tracking', 'chord_pp_gain', 'chord_pp_pw'}
-  -- elseif params:string('chord_output') == 'MIDI' then
-  --   menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_midi_out_port', 'chord_midi_ch', 'chord_midi_velocity', 'chord_dynamics_ramp', 'chord_midi_cc_1_val'}
-    
-  -- elseif params:string('chord_output') == 'Crow' then
-  --   if params:string('chord_tr_env') == 'Trigger' then
-  --     menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_crow_slew', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index','chord_tr_env'}
-  --   else -- AD envelope
-  --     -- todo add velocity/ 'chord_dynamics_ramp', for AD voltage
-  --     menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_crow_slew', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_tr_env', 'chord_duration_index', 'chord_ad_skew'}
-  --   end
-    
-  -- elseif params:string('chord_output') == 'ii-JF' then
-  --   menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_jf_amp', 'chord_dynamics_ramp'}
-  -- elseif params:string('chord_output') == 'Disting' then
-  --   menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_disting_velocity', 'chord_dynamics_ramp'}  
-  -- end
-  
+ 
   -- SEQ MENU
     menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_dynamics_1'}
-  -- if params:string('seq_output_1') == 'Mute' then
-  --   menus[3] = {'seq_voice_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_rotate_1',  'seq_shift_1', 'seq_div_index_1'}
-  -- elseif params:string('seq_output_1') == 'Engine' then
-  --   menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_pp_amp_1', 'seq_pp_cutoff_1', 'seq_pp_tracking_1','seq_pp_gain_1', 'seq_pp_pw_1'}
-  -- elseif params:string('seq_output_1') == 'MIDI' then
-  --   menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_midi_out_port_1', 'seq_midi_ch_1', 'seq_midi_velocity_1', 'seq_midi_cc_1_val_1'}
-  -- elseif params:string('seq_output_1') == 'Crow' then
-  --   if params:string('seq_tr_env_1') == 'Trigger' then
-  --     menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_crow_slew_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1'}
-  --   else -- AD envelope
-  --     menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_crow_slew_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_tr_env_1', 'seq_duration_index_1', 'seq_ad_skew_1',}
-  --   end
-  -- elseif params:string('seq_output_1') == 'ii-JF' then
-  --   menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_jf_amp_1'}
-  -- elseif params:string('seq_output_1') == 'Disting' then
-  --   menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_disting_velocity_1'}    
-  -- end
-  
+
   -- MIDI HARMONIZER MENU
   menus[4] = {'midi_voice', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_dynamics'}
 
---   if params:string('midi_output') == 'Mute' then
---     menus[4] = {'midi_output'}
---   elseif params:string('midi_output') == 'Engine' then
---     menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
---   elseif params:string('midi_output') == 'MIDI' then
---     if params:get('midi_velocity_passthru') == 2 then
---       menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index','midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_cc_1_val'}
---     else
---       menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
---     end
---   elseif params:string('midi_output') == 'Crow' then
---     if params:string('midi_tr_env') == 'Trigger' then
---       menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_crow_slew', 'midi_tr_env'}
---     else -- AD envelope
---       menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_crow_slew', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
---     end
---   elseif params:string('midi_output') == 'ii-JF' then
---     menus[4] = {'midi_output', 'midi_note_map', 'midi_octave',  'midi_jf_amp'}
--- elseif params:string('midi_output') == 'Disting' then
---     menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
---   end
-  
   -- CV HARMONIZER MENU
     menus[5] = {'crow_voice', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_dynamics'}
---   if params:string('crow_output') == 'Mute' then
---     menus[5] = {'crow_output'}
---   elseif params:string('crow_output') == 'Engine' then
---     menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_pp_amp', 'crow_pp_cutoff', 'crow_pp_tracking', 'crow_pp_gain', 'crow_pp_pw'}
---   elseif params:string('crow_output') == 'MIDI' then
---     menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_midi_out_port', 'crow_midi_ch', 'crow_midi_velocity', 'crow_midi_cc_1_val'}
---   elseif params:string('crow_output') == 'Crow' then
---     if params:string('crow_tr_env') == 'Trigger' then
---       menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_crow_slew', 'crow_tr_env', }
---     else -- AD envelope
---       menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_crow_slew', 'crow_tr_env', 'crow_duration_index', 'crow_ad_skew', }
---     end
---   elseif params:string('crow_output') == 'ii-JF' then
---     menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_jf_amp'}
---   elseif params:string('crow_output') == 'Disting' then
---     menus[5] = {'crow_output', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_disting_velocity'}    
---   end  
+end
 
+
+-- return first number from a string
+function find_number(string)
+  return tonumber(string.match (string, "%d+"))
 end
 
 
@@ -1088,12 +830,6 @@ end
 -- function ends_with(string, ends_with)
 --   return string:sub(-#ends_with) == ends_with
 -- end
-  
-  
--- return first number from a string
-function find_number(string)
-  return tonumber(string.match (string, "%d+"))
-end
   
   
 -- -- return .pset number as string assuming format is 'dreamsequence-xxxx.pset'
@@ -1212,7 +948,7 @@ end
 function build_scale()
   -- print('build_scale ' .. params:string('mode'))
   -- builds scale for quantization. 14 steps + diatonic transposition offset
-  notes_nums = MusicUtil.generate_scale_of_length(0, params:get('mode'), 28)
+  notes_nums = MusicUtil.generate_scale_of_length(0, params:get('mode'), 7)
   -- todo p2 might generate freqs for engine and use for chords too?
   -- notes_freq = MusicUtil.note_nums_to_freqs(notes_nums) -- converts note numbers to an array of frequencies
 end
@@ -1859,9 +1595,7 @@ function timing_clock()
   while true do
     clock.sync(1/global_clock_div)
 
-
-    
-    -- variant which also stores player value. Downside is that each note has to check against note history for all notes irrespective of voice
+    -- history table including player value. Downside is that each note has to check against note history for all notes irrespective of voice
     for i = #player_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       player_note_history[i].step = player_note_history[i].step - 1
       if player_note_history[i].step == 0 then
@@ -1869,46 +1603,7 @@ function timing_clock()
         table.remove(player_note_history, i)
       end
     end
-    
-    -- for i = #midi_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
-    --   midi_note_history[i][1] = midi_note_history[i][1] - 1
-    --   if midi_note_history[i][1] == 0 then
-    --     -- print('note_off')
-    --     midi_device[midi_note_history[i][5]]:note_off(midi_note_history[i][2], 0, midi_note_history[i][3]) -- port, note, vel, ch.
-    --     table.remove(midi_note_history, i)
-    --   end
-    -- end
-    
-    -- for i = #disting_note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
-    --   disting_note_history[i][1] = disting_note_history[i][1] - 1
-    --   if disting_note_history[i][1] == 0 then
-    --     -- print('note_off')
-    --     crow.ii.disting.note_off(disting_note_history[i][2])
-    --     table.remove(disting_note_history, i)
-    --   end
-    -- end
-    
-    -- for i = #engine_note_history, 1, -1 do
-    --   engine_note_history[i][1] = engine_note_history[i][1] - 1
-    --   if engine_note_history[i][1] == 0 then
-    --     table.remove(engine_note_history, i)
-    --   end
-    -- end
-    
-    -- for i = #crow_note_history, 1, -1 do
-    --   crow_note_history[i][1] = crow_note_history[i][1] - 1
-    --   if crow_note_history[i][1] == 0 then
-    --     table.remove(crow_note_history, i)
-    --   end
-    -- end
-    
-    -- for i = #jf_note_history, 1, -1 do
-    --   jf_note_history[i][1] = jf_note_history[i][1] - 1
-    --   if jf_note_history[i][1] == 0 then
-    --     table.remove(jf_note_history, i)
-    --   end
-      
-    -- end
+  
   end
 end
     
@@ -2372,134 +2067,6 @@ function play_chord()
       end
       
     end
-
-      -- if destination == 'Engine' then
-  --   local cutoff = params:get('chord_pp_tracking') *.01
-  --   local tracking = params:get('chord_pp_cutoff')
-  --   local release = duration_sec(chord_duration)
-  --   local gain = params:get('chord_pp_gain') / 100
-  --   local pw = params:get('chord_pp_pw') / 100
-    
-  --   clock.run(function()
-  --     for i = start, finish, step do
-        
-  --       local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-  --       local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
-  --       local dynamics = params:get('chord_pp_amp') / 100 -- per destination
-  --       local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
-  --       local dynamics = util.clamp(dynamics, 0, 1) -- per destination
-  --       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-        
-  --       to_engine(note, dynamics, cutoff, tracking, release, gain, pw)
-        
-  --       if playback ~= 'Off' and note_qty ~= 1 then
-  --         local prev_y_scaled = y_scaled
-  --         y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
-  --         local y_scaled_delta = y_scaled - prev_y_scaled
-  --         clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
-  --       end
-        
-  --     end
-  --   end)    
-
-  -- elseif destination == 'MIDI' then
-  --   local channel = params:get('chord_midi_ch')
-  --   local port = params:get('chord_midi_out_port')
-    
-  --   clock.run(function()
-  --     for i = start, finish, step do
-
-  --       local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-  --       local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
-  --       local dynamics = params:get('chord_midi_velocity') -- per destination
-  --       local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
-  --       local dynamics = util.clamp(round(dynamics), 0, 127) -- per destination
-  --       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-        
-  --       to_midi(note, dynamics, channel, chord_duration, port)
-        
-  --       if playback ~= 'Off' and note_qty ~= 1 then
-  --         local prev_y_scaled = y_scaled
-  --         y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
-  --         local y_scaled_delta = y_scaled - prev_y_scaled
-  --         clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
-  --       end
-        
-  --     end
-  --   end)
-
-  -- elseif destination == 'Crow' then
-  --   clock.run(function()
-  --     for i = start, finish, step do
-        
-  --       local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-  --       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-        
-  --       if params:get('chord_tr_env') == 2 then  -- Trigger
-  --         to_crow(note,'pulse(.001,10,1)', params:get('chord_crow_slew') * .001) -- (time,level,polarity)
-  --       else -- envelope
-  --         local crow_attack = duration_sec(seq_duration) * params:get('chord_ad_skew') / 100
-  --         local crow_release = duration_sec(seq_duration) * (100 - params:get('chord_ad_skew')) / 100
-  --         to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('chord_crow_slew') * .001)  -- (attack,release,shape) SHAPE is bugged? todo p2 shape should be working now
-  --       end        
-        
-  --       if playback ~= 'Off' and note_qty ~= 1 then
-  --         local prev_y_scaled = y_scaled
-  --         y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
-  --         local y_scaled_delta = y_scaled - prev_y_scaled
-  --         clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
-  --       end
-        
-  --     end
-  --   end)    
-    
-  -- elseif destination =='ii-JF' then
-  --   clock.run(function()
-  --     for i = start, finish, step do
-        
-  --       local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-  --       local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
-  --       local dynamics = params:get('chord_jf_amp') / 10 -- per destination
-  --       local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
-  --       local dynamics = util.clamp(dynamics, 0, 50) -- per destination
-  --       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-        
-  --       to_jf(note, dynamics)
-
-  --       if playback ~= 'Off' and note_qty ~= 1 then
-  --         local prev_y_scaled = y_scaled
-  --         y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
-  --         local y_scaled_delta = y_scaled - prev_y_scaled
-  --         clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
-  --       end
-        
-  --     end
-  --   end)    
-    
-  -- elseif destination == 'Disting' then
-  --   clock.run(function()
-  --     for i = start, finish, step do
-        
-  --       local note_sequence = playback == 'High-low' and (note_qty + 1 - i) or i  -- force counting upwards
-  --       local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
-  --       local dynamics = params:get('chord_disting_velocity') -- per destination
-  --       local dynamics = dynamics + (dynamics * params:get('chord_dynamics_ramp') * .01 * elapsed)
-  --       local dynamics = util.clamp(dynamics, 0, 100) -- per destination
-  --       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12)
-  --       to_disting(note, dynamics, chord_duration) -- params:get('chord_disting_velocity'), chord_duration)
-
-  --       if playback ~= 'Off' and note_qty ~= 1 then
-  --         local prev_y_scaled = y_scaled
-  --         y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
-  --         local y_scaled_delta = y_scaled - prev_y_scaled
-  --         clock.sleep(clock.get_beat_sec() * speed * y_scaled_delta)
-  --       end
-        
-  --     end
-  --   end)  
-    
-  -- end
-  
   end)    
 end
 
@@ -2579,14 +2146,16 @@ end
 
 
 function map_note_3(note_num, octave, pre)  -- mode mapping + diatonic transposition
-  local diatonic_transpose = (pre == true and next_chord_x or current_chord_x) -1
-  local quantized_note = notes_nums[note_num + diatonic_transpose]
+  local diatonic_transpose = (pre == true and math.max(next_chord_x or current_chord_x, 1)) -1
+  local note_num = note_num + diatonic_transpose
+  local quantized_note = notes_nums[util.wrap(note_num, 1, 7)] + (math.floor((note_num -1) / 7) * 12)
   return(quantized_note + (octave * 12) + params:get('transpose'))
 end
 
 
 function map_note_4(note_num, octave) -- mode mapping
-  local quantized_note = notes_nums[note_num]
+  local note_num = note_num
+  local quantized_note = notes_nums[util.wrap(note_num, 1, 7)] + (math.floor((note_num -1) / 7) * 12)
   return(quantized_note + (octave * 12) + params:get('transpose'))
 end
 
@@ -2603,41 +2172,10 @@ function advance_seq_pattern()
     -- local destination = params:string('seq_output_1')
     local player = params:lookup_param("seq_voice_raw_1"):get_player()
     local dynamics = params:get('seq_dynamics_1') * .01
-
-    
     local note = _G['map_note_' .. params:get('seq_note_map_1')](seq_pattern[active_seq_pattern][seq_pattern_position], params:get('seq_octave_1')) + 36
     
     to_player(player, note, dynamics, seq_duration)
 
-
-    -- if destination == 'Engine' then
-    --   local amp = params:get('seq_pp_amp_1') / 100
-    --   local cutoff = params:get('seq_pp_tracking_1') *.01
-    --   local tracking = params:get('seq_pp_cutoff_1')
-    --   local release = duration_sec(seq_duration)
-    --   local gain = params:get('seq_pp_gain_1') / 100
-    --   local pw = params:get('seq_pp_pw_1') / 100
-    --   to_engine(note, amp, cutoff, tracking, release, gain, pw)
-
-    -- elseif destination == 'MIDI' then
-    --   local channel = params:get('seq_midi_ch_1')
-    --   local port = params:get('seq_midi_out_port_1')
-    --   to_midi(note, params:get('seq_midi_velocity_1'), channel, seq_duration, port)
-    
-    -- elseif destination == 'Crow' then
-    --   if params:get('seq_tr_env_1') == 2 then  -- Trigger
-    --     to_crow(note,'pulse(.001,10,1)', params:get('seq_crow_slew_1') * .001) -- (time,level,polarity)
-    --   else -- envelope
-    --     local crow_attack = duration_sec(seq_duration) * params:get('seq_ad_skew_1') / 100
-    --     local crow_release = duration_sec(seq_duration) * (100 - params:get('seq_ad_skew_1')) / 100
-    --     to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('seq_crow_slew_1') * .001)  -- (attack,release,shape) SHAPE is bugged?
-    --   end
-    
-    -- elseif destination == 'ii-JF' then
-    --   to_jf(note, params:get('seq_jf_amp_1')/10)
-    -- elseif destination == 'Disting' then
-    --   to_disting(note, params:get('seq_disting_velocity_1'), seq_duration)
-    -- end
   end
   
   if seq_pattern_position >= seq_pattern_length[active_seq_pattern] then
@@ -2666,35 +2204,6 @@ function sample_crow(volts)
 
     to_player(player, note, dynamics, seq_duration)
     
-    -- local destination = params:string('crow_output')
-    -- if destination == 'Engine' then
-    --   local amp = params:get('crow_pp_amp') / 100
-    --   local cutoff = params:get('crow_pp_tracking') *.01
-    --   local tracking = params:get('crow_pp_cutoff')
-    --   local release = duration_sec(crow_duration)
-    --   local gain = params:get('crow_pp_gain') / 100
-    --   local pw = params:get('crow_pp_pw') / 100
-    --   to_engine(note, amp, cutoff, tracking, release, gain, pw)
-      
-    -- elseif destination == 'MIDI' then
-    --   local channel = params:get('crow_midi_ch')
-    --   local port = params:get('crow_midi_out_port')
-    --   to_midi(note, params:get('crow_midi_velocity'), channel, crow_duration, port)
-      
-    -- elseif destination == 'Crow' then
-    --   if params:get('crow_tr_env') == 2 then  -- Trigger
-    --     to_crow(note,'pulse(.001,10,1)', params:get('crow_crow_slew') * .001)
-    --   else -- envelope
-    --     local crow_attack = duration_sec(crow_duration) * params:get('crow_ad_skew') / 100
-    --     local crow_release = duration_sec(crow_duration) * (100 - params:get('crow_ad_skew')) / 100
-    --     to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('crow_crow_slew') * .001)  -- (attack,release,shape) SHAPE is bugged?
-    --   end
-      
-    -- elseif destination =='ii-JF' then
-    --   to_jf(note, params:get('crow_jf_amp')/10)
-    -- elseif destination == 'Disting' then
-    --   to_disting(note, params:get('crow_disting_velocity'), crow_duration)      
-    -- end
   end
   
   prev_note = note
@@ -2707,150 +2216,15 @@ midi_event = function(data)
   local d = midi.to_msg(data)
   if d.type == "note_on" then
 
-    local note = _G['map_note_' .. params:get('midi_note_map')](d.note - 35, params:get('midi_octave'), params:get('chord_preload') ~= 0) + 36 -- todo p1 -35+36 BS for all sources haha
+    local note = _G['map_note_' .. params:get('midi_note_map')](d.note - 35, params:get('midi_octave'), params:get('chord_preload') ~= 0) + 36 -- todo p1 octave validation for all sources
 
     local player = params:lookup_param("midi_voice_raw"):get_player()
     local dynamics = params:get('midi_dynamics') * .01 -- todo p1 velocity passthru (normalize to 0-1)
 
     to_player(player, note, dynamics, seq_duration)
     
-    
-    -- local destination = params:string('midi_output')
-    -- if destination == 'Engine' then
-    --   local amp = params:get('midi_pp_amp') / 100
-    --   local cutoff = params:get('midi_pp_tracking') *.01
-    --   local tracking = params:get('midi_pp_cutoff')
-    --   local release = duration_sec(midi_duration)
-    --   local gain = params:get('midi_pp_gain') / 100
-    --   local pw = params:get('midi_pp_pw') / 100
-    --   to_engine(note, amp, cutoff, tracking, release, gain, pw)
-    -- elseif destination == 'MIDI' then
-    --   local channel = params:get('midi_midi_ch')
-    --   local port = params:get('midi_midi_out_port')
-    --   to_midi(note, params:get('midi_velocity_passthru') == 2 and d.vel or params:get('midi_midi_velocity'), channel, midi_duration, port)
-    -- elseif destination == 'Crow' then
-    --   if params:get('crow_tr_env') == 2 then  -- Trigger
-    --     to_crow(note,'pulse(.001,10,1)', params:get('midi_crow_slew') * .001) -- (time,level,polarity)
-    --   else -- envelope
-    --     local crow_attack = duration_sec(midi_duration) * params:get('midi_ad_skew') / 100
-    --     local crow_release = duration_sec(midi_duration) * (100 - params:get('midi_ad_skew')) / 100
-    --     to_crow(note, 'ar(' .. crow_attack .. ',' .. crow_release .. ',10)', params:get('midi_crow_slew') * .001)  -- (attack,release,shape) SHAPE is bugged?
-    --   end
-    -- elseif destination =='ii-JF' then
-    --   to_jf(note, params:get('midi_jf_amp')/10)
-    -- elseif destination == 'Disting' then
-    --   to_disting(note, params:get('midi_disting_velocity'), midi_duration)      
-    -- end
-    
   end
 end
-  
-
--- function to_engine(note, amp, cutoff, tracking, release, gain, pw)
---   local note_on_time = util.time()
---   engine_play_note = true
---   engine_note_history_insert = true  
-
---   -- Check for duplicate notes and process according to dedupe_threshold setting
---   for i = 1, #engine_note_history do
---     if engine_note_history[i][2] == note then
---       engine_note_history_insert = false -- Don't insert or update note record since one is already there
---       if params:get('dedupe_threshold') > 1 and (note_on_time - engine_note_history[i][3]) < dedupe_threshold_s then
---         engine_play_note = false
---       end
---     end
---   end
-  
---   if engine_play_note == true then
---     -- PolyPerc crashes if sent >24000 hz!!!
---     note_hz = math.min(MusicUtil.note_num_to_freq(note + 36), 24000)
---     engine.amp(amp)
---     engine.cutoff(note_hz * cutoff + tracking)
---     engine.release(release)
---     engine.gain(gain)
---     engine.pw(pw)
---     engine.hz(note_hz)
---   end
-  
---   if engine_note_history_insert == true then
---     -- Subbing dedupe_threshold_int for duration for engine out. Only used to make sure record is kept long enough to do a dedupe check
---     table.insert(engine_note_history, {dedupe_threshold_int, note, note_on_time})    
---   end
--- end
-  
-  
--- function to_midi(note, velocity, channel, duration, port)
-
---   local midi_note = note + 36
---   local note_on_time = util.time()
---   midi_play_note = true
---   midi_note_history_insert = true
-  
---   -- Check for duplicate notes and process according to dedupe_threshold setting
---   for i = 1, #midi_note_history do
---     if midi_note_history[i][2] == midi_note and midi_note_history[i][5] == port and midi_note_history[i][3] == channel then
---       -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below which is not present in other destinations.
-      
---       midi_note_history[i][1] = math.max(duration, midi_note_history[i][1])
---       midi_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
-
---       if params:get('dedupe_threshold') > 1 and (note_on_time - midi_note_history[i][4]) < dedupe_threshold_s then
---         -- print(('Deduped ' .. note_on_time - midi_note_history[i][4]) .. ' | ' .. dedupe_threshold_s)
---         midi_play_note = false -- Prevent duplicate note from playing
---       end
-    
---       -- Always update any existing note_on_time, even if a note wasn't played. 
---       -- Otherwise the note duration may be extended but the gap between note_on_time and current time grows indefinitely and no dedupe occurs.
---       -- Alternative is to not extend the duration when dedupe_threshold > 0 and a duplicate is found
---       midi_note_history[i][4] = note_on_time
---     end
---   end
-
---   -- if note is already playing, send a note-off before note_on is sent again
---   -- else add note into midi_note_history_insert to be turned off later
---   if midi_note_history_insert == false then
---     midi_device[port]:note_off((midi_note), 0, channel)
---   else
---     table.insert(midi_note_history, {duration, midi_note, channel, note_on_time, port})
---   end
---   -- Play note
---   if midi_play_note == true then
---     midi_device[port]:note_on((midi_note), velocity, channel)
---   end
--- end
-
-
--- function to_crow(note, action, slew)
---   local note_on_time = util.time()
---   crow_play_note = true
---   crow_note_history_insert = true
-
---   -- Check for duplicate notes and process according to dedupe_threshold setting
---   for i = 1, #crow_note_history do
---     if crow_note_history[i][2] == note then
---       crow_note_history_insert = false -- Don't insert or update note record since one is already there
---       if params:get('dedupe_threshold') > 1 and (note_on_time - crow_note_history[i][3]) < dedupe_threshold_s then
---         crow_play_note = false
---       end
---     end
---   end
-
---   --Play the note
---   -- todo: revisit after Crow 4.x bugs are worked out, re: shape
---   if crow_play_note == true then
---     crow.output[1].slew = slew or 0
---     crow.output[1].volts = (note) / 12
---     crow.output[2].volts = 0  -- Needed or skew 100 AD gets weird
---     crow.output[2].action = action
---     crow.output[2]()
---   end
-  
---   -- Insert note-off into the queue
---   if crow_note_history_insert == true then
---     -- Subbing dedupe_threshold_int for duration for crow out. Only used to make sure record is kept long enough to do a dedupe check.
---     table.insert(crow_note_history, {dedupe_threshold_int, note, note_on_time})
---   end
--- end
 
 
 --todo p2 check with Trent to see if there is a calc we can use rather than the regression
@@ -2866,77 +2240,6 @@ function est_jf_time()
       end
   )
 end
-
-
--- function to_jf(note, amp)
---   local note_on_time = util.time()
---   jf_play_note = true
---   jf_note_history_insert = true 
-
---   -- Check for duplicate notes and process according to dedupe_threshold setting
---   for i = 1, #jf_note_history do
---     if jf_note_history[i][2] == note then
---       jf_note_history_insert = false -- Don't insert or update note record since one is already there
---       if params:get('dedupe_threshold') > 1 and (note_on_time - jf_note_history[i][3]) < dedupe_threshold_s then
---         jf_play_note = false
---       end
---     end
---   end
-  
---   if jf_play_note == true then
---     crow.ii.jf.play_note((note - 24)/12, amp)
---   end
-  
---   if jf_note_history_insert == true then
---     -- Subbing dedupe_threshold_int for duration for engine out. Only used to make sure record is kept long enough to do a dedupe check
---   table.insert(jf_note_history, {dedupe_threshold_int, note, note_on_time})    
---   end
--- end
-
-
--- function to_disting(note, velocity, duration)
---   local disting_note = note + 24
---   local note_on_time = util.time()
---   disting_play_note = true
---   disting_note_history_insert = true
-  
---   -- Check for duplicate notes and process according to dedupe_threshold setting
---   for i = 1, #disting_note_history do
---     if disting_note_history[i][2] == disting_note then
-
---       -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below.
---       disting_note_history[i][1] = math.max(duration, disting_note_history[i][1])
---       disting_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
-
---       if params:get('dedupe_threshold') > 1 and (note_on_time - disting_note_history[i][3]) < dedupe_threshold_s then
---         -- print(('Deduped ' .. note_on_time - midi_note_history[i][4]) .. ' | ' .. dedupe_threshold_s)
---         disting_play_note = false -- Prevent duplicate note from playing
---       end
-    
---       -- Always update any existing note_on_time, even if a note wasn't played. 
---       -- Otherwise the note duration may be extended but the gap between note_on_time and current time grows indefinitely and no dedupe occurs.
---       -- Alternative is to not extend the duration when dedupe_threshold > 0 and a duplicate is found
---       disting_note_history[i][3] = note_on_time
---     end
---   end
-
-
--- -- if note is already playing, send a note-off before note_on is sent again
---   -- else add note into midi_note_history_insert to be turned off later
---   if disting_note_history_insert == false then
---     table.insert(disting_note_history, {duration, disting_note,  note_on_time})
---   else
---     crow.ii.disting.note_off(disting_note)    
---   end
-
---   -- Play note
---   if disting_play_note == true then
---     -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
---     crow.ii.disting.note_pitch(disting_note, (disting_note-48)/12)
---     crow.ii.disting.note_velocity(disting_note, velocity/10)
---   end
-
--- end
 
 
 function grid_redraw()
