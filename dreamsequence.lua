@@ -1,6 +1,6 @@
 -- Dreamsequence
--- v1.2.3 @modularbeat
--- llllllll.co/t/dreamsequence
+-- v1.2.4 @modularbeat
+-- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
 -- arpeggiator, and harmonizer 
@@ -37,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.2.3'
+  version = 'v1.2.4'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -573,14 +573,15 @@ function init()
   ------------------
   params:add_group('cv_harmonizer', 'CV HARMONIZER', 24)
   
-  params:add_option("crow_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
-
   params:add_option("crow_output", "Output", {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
   params:set_action("crow_output", function() update_menus() end)
   
+  params:add_option("crow_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
+
+  params:add_option('crow_auto_rest', 'Auto-rest', {'Off', 'On'}, 1)
+  
   params:add_number('crow_duration_index', 'Duration', 1, 57, 10, function(param) return divisions_string(param:get()) end)
   params:set_action('crow_duration_index', function(val) crow_duration = division_names[val][1] end) -- pointless?
-  
   
   params:add_number('crow_octave', 'Octave', -2, 4, 0)
 
@@ -588,7 +589,6 @@ function init()
   params:add_separator ('cv_harmonizer_engine', 'Engine')
   
   params:add_number('crow_pp_amp', 'Amp', 0, 100, 80, function(param) return percent(param:get()) end)
-  params:add_option('crow_auto_rest', 'Auto-rest', {'Off', 'On'}, 1)
 
   params:add_control("crow_pp_cutoff","Cutoff",controlspec.new(50, 5000, 'exp', 0, 700, 'hz'))
   params:add_number('crow_pp_tracking', 'Fltr tracking', 0, 100, 50, function(param) return percent(param:get()) end)
@@ -1154,7 +1154,7 @@ end
 function build_scale()
   -- print('build_scale ' .. params:string('mode'))
   -- builds scale for quantization. 14 steps + diatonic transposition offset
-  notes_nums = MusicUtil.generate_scale_of_length(0, params:get('mode'), 28)
+  notes_nums = MusicUtil.generate_scale_of_length(0, params:get('mode'), 7)
   -- todo p2 might generate freqs for engine and use for chords too?
   -- notes_freq = MusicUtil.note_nums_to_freqs(notes_nums) -- converts note numbers to an array of frequencies
 end
@@ -2436,14 +2436,16 @@ end
 
 
 function map_note_3(note_num, octave, pre)  -- mode mapping + diatonic transposition
-  local diatonic_transpose = (pre == true and next_chord_x or current_chord_x) -1
-  local quantized_note = notes_nums[note_num + diatonic_transpose]
+  local diatonic_transpose = (pre == true and math.max(next_chord_x or current_chord_x, 1)) -1
+  local note_num = note_num + diatonic_transpose
+  local quantized_note = notes_nums[util.wrap(note_num, 1, 7)] + (math.floor((note_num -1) / 7) * 12)
   return(quantized_note + (octave * 12) + params:get('transpose'))
 end
 
 
 function map_note_4(note_num, octave) -- mode mapping
-  local quantized_note = notes_nums[note_num]
+  local note_num = note_num
+  local quantized_note = notes_nums[util.wrap(note_num, 1, 7)] + (math.floor((note_num -1) / 7) * 12)
   return(quantized_note + (octave * 12) + params:get('transpose'))
 end
 

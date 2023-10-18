@@ -24,7 +24,7 @@ While fun all by itself, Dreamsequence really opens up when you add friends (any
 
 For those looking to make experimental music that goes beyond randomization and LFOs (not that there's anything wrong with that), Dreamsequence features an Arranger and Event scheduling system that lets you create your own procedural layer for controlling (or ceding to chaos) every aspect of your creation over the course of time. If you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll be rewarded by spending some time with Events.
 
-I hope you have as much fun using Dreamsequence as I have had creating it, and I'd love to hear about how you're using it at https://llllllll.co/t/dreamsequence
+I hope you have as much fun using Dreamsequence as I have had creating it, and I'd love to hear about how you're using it at l.llllllll.co/dreamsequence
 
 Cheers,
 Dan
