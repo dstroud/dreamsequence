@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.3dev @modularbeat
+-- nb_dev 231019 1 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.3'
+  version = ''
   -----------------------------
 
   nb:init()
@@ -123,9 +123,14 @@ function init()
       crow.ii.jf.mode(preinit_jf_mode)
       print('Restoring jf.mode to ' .. preinit_jf_mode)
     end
+  
+      -- mod.hook.deregister("script_pre_init", "nb dreamsequence crow pre init")
+      -- nb.players["crow 1/2_ds"] = nil -- todo p0 update name
+      -- note_players["crow 1/2_ds"] = nil -- todo p0 update name
+      
   end
   
-    
+  
   -------------
   -- Read prefs
   -------------
@@ -303,9 +308,15 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
+  -- one approach to suppressing default nb_crow mod
+  nb.players["crow 1/2"] = nil
+  nb.players["crow 3/4"] = nil
+  nb.players["crow para"] = nil
+  
   nb:add_param("chord_voice_raw", "Voice raw")
-  params:hide("chord_voice_raw")
-
+  -- params:hide("chord_voice_raw")
+  
+  -- another one
   -- creates masked lookup table for all voice params, masking NB_CROW
   local voice_param_options = {}
   local voice_param_index = {}
@@ -322,7 +333,7 @@ function init()
 
   
   -- params:add_option('chord_output', 'Output', {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  -- params:set_action("chord_output",function() update_menus() end)
+  -- params:set_action("chord_output", function() update_menus() end)
 
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_duration_index',function(val) chord_duration = division_names[val][1] end) -- set global once vs lookup each time. Not sure if worth the trade-off
@@ -468,7 +479,7 @@ function init()
   ------------------
   -- CV HARMONIZER PARAMS --
   ------------------
-  params:add_group('cv_harmonizer', 'CV HARMONIZER', 7)
+  params:add_group('cv_harmonizer', 'CV HARMONIZER', 8)
   
   params:add_option("crow_note_map", "Notes", {'Triad', '7th', 'Mode+Transp.', 'Mode'}, 1)
 
@@ -491,7 +502,7 @@ function init()
   ------------------
   -- NB PARAMS --
   ------------------  
-  params:add_separator('Voices')
+  params:add_separator('VOICES')
   nb:add_player_params()
   
   
@@ -807,7 +818,7 @@ function update_menus()
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
-  menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
+  menus[2] = {'chord_voice_raw', 'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
  
   -- SEQ MENU
     menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_dynamics_1'}

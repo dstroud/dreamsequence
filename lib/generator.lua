@@ -25,13 +25,6 @@ function generator()
   params:set('seq_start_on_1', 1)
   params:set('seq_reset_on_1', 3)
   params:set('seq_note_map_1', math.random(1, 2))
-
-  --ENGINE BASED RANDOMIZATIONS
-  -- This kinda sucks and only works for PolyPerc. Need to rethink this approach. 
-  -- May be overwritten depending on algo type
-  params:set('chord_pp_amp', 50)
-  params:set('chord_pp_gain', math.random(0,350))
-  params:set('chord_pp_pw', math.random(10,90))
   params:set('chord_div_index', 15)
   params:set('chord_duration_index', params:get('chord_div_index'))
 
@@ -58,12 +51,6 @@ function chord_generator_lite()
   end
   
   params:set('mode', math.random(1,9))
-
-  --ENGINE BASED RANDOMIZATIONS
-  -- May be overwritten depending on algo type
-  params:set('chord_pp_amp', 50)
-  params:set('chord_pp_gain', math.random(0,350))
-  params:set('chord_pp_pw', math.random(10,90))
   params:set('chord_div_index', 15)
   params:set('chord_duration_index', params:get('chord_div_index'))
   
@@ -361,11 +348,6 @@ function seq_generator(mode)
     -- not really the best option but this is what the OG algos were built around
     params:set('seq_start_on_1', 1)
     params:set('seq_reset_on_1', 3)
-  
-    -- Engine randomizations
-    params:set('seq_pp_amp_1', 70)
-    params:set('seq_pp_gain_1', gain)
-    params:set('seq_pp_pw_1', pw)
   end 
     
   -- Table containing seq algos. This runs at init as well.
@@ -466,7 +448,7 @@ function seq_generator(mode)
 
     params:set('seq_start_on_1', 3) -- chord
     params:set('seq_reset_on_1', 2) -- chord
-    params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
+    -- params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
     params:set('seq_duration_index_1',15)
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
 
@@ -486,7 +468,7 @@ function seq_generator(mode)
     params:set('seq_octave_1', math.random(0,1))
     params:set('seq_start_on_1', 3) -- chord
     params:set('seq_reset_on_1', 2) -- chord
-    params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
+    -- params:set('seq_pp_amp_1',35) --Turn down amp since a lot of notes can clip
     params:set('seq_duration_index_1',15)
     params:set('seq_pattern_length_' .. active_seq_pattern, math.random(3,4) * 2)
 
