@@ -219,11 +219,11 @@ end
 function text_width(str)
 local extents = screen.text_extents(str) -- raw count that ain't great
 
-local symbols = "<>"
-local pattern = "[" .. symbols:gsub("[<>]", "%%%0") .. "]" -- character class to identify < and >
-local extents = extents - (select(2, string.gsub(str, pattern, ""))) -- subtract 1 for each < and >
+-- local symbols = "<>" -- seems to be working now so I guess something was fixed!!
+-- local pattern = "[" .. symbols:gsub("[<>]", "%%%0") .. "]" -- character class to identify < and >
+-- local extents = extents - (select(2, string.gsub(str, pattern, ""))) -- subtract 1 for each < and >
 
-local count = select(2, string.gsub(str, pattern, ""))
+-- local count = select(2, string.gsub(str, pattern, ""))
 local extents = extents + (string.len(string.gsub(str, "[^%s]", "")) * 3) -- spaces count as 3 pixels
 
 return extents

@@ -1,8 +1,7 @@
 -- ships with norns
 er = require("er")
 
--- musicutil = require("musicutil")
-engine.name = "PolyPerc"
+-- musicutil = require("musicutil") -- subbed
 
 local lib = "dreamsequence/lib/"
 

@@ -1,5 +1,5 @@
 -- Dreamsequence
--- nb_dev 231019 1 @modularbeat
+-- nb_dev 231020 01 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,9 +37,9 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = ''
+  version = '23102001'
   -----------------------------
-
+  nb.voice_count = 1  -- allows some nb mods to load multiple voices (like nb_midi if we need multiple channels)
   nb:init()
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -69,7 +69,7 @@ function init()
       -- TODO: could do a gate with "both" for ADSR envelope
       crow.input[2].mode("change", 2 , 0.1, "rising") -- voltage threshold, hysteresis, "rising", "falling", or “both"
       crow.input[2].change = crow_trigger
-      crow.output[3].slew = 0
+      -- crow.output[3].slew = 0
     end
   )
 
@@ -154,9 +154,9 @@ function init()
   init_generator()
   
   -- midi stuff
-  midi_device = {} -- container for connected MIDI devices
-  midi_device_names = {} -- container for their names
-  refresh_midi_devices()
+  -- midi_device = {} -- container for connected MIDI devices
+  -- midi_device_names = {} -- container for their names
+  -- refresh_midi_devices()
   
   -- events init
   local events_lookup_names = {}
@@ -308,32 +308,41 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
-  -- one approach to suppressing default nb_crow mod
+  -- one approach to suppressing default nb_crow mod but maybe this is shitty
   nb.players["crow 1/2"] = nil
   nb.players["crow 3/4"] = nil
   nb.players["crow para"] = nil
   
   nb:add_param("chord_voice_raw", "Voice raw")
-  -- params:hide("chord_voice_raw")
+  params:hide("chord_voice_raw")
   
-  -- another one
-  -- creates masked lookup table for all voice params, masking NB_CROW
+  midi_ports_lookup = {}
+  for i = 1, #midi.vports do
+    midi_ports_lookup[i] = midi.vports[i].name
+  end
+  
+  -- creates masked lookup table for all voice params (will be used to prevent crow outputs 3-4 being used, etc...)
   local voice_param_options = {}
   local voice_param_index = {}
   for i = 1, params:lookup_param("chord_voice_raw").count do
     local option = params:lookup_param("chord_voice_raw").options[i]
-    if option ~= "crow 1/2" and option ~= "crow 3/4" and option ~= "crow para" then
+    -- if option ~= "crow 1/2" and option ~= "crow 3/4" and option ~= "crow para" then  -- method of hiding players (like crow 3-4)
+    -- not enough room to have a nice MIDI device string so I have to butcher this a bit to return port
+    -- afaik .conn is only for MIDI but should verify and also check if we should validate connection status
+    if nb.players[option] ~= nil and nb.players[option].conn ~= nil then
+      -- simplify to return port (and voice # if voice_count is >1)
+      local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
       table.insert(voice_param_options, option)
       table.insert(voice_param_index, i)
+    else
+      table.insert(voice_param_options, option)
+      table.insert(voice_param_index, i)
+    -- end
     end
   end
   
   params:add_option("chord_voice", 'Voice', voice_param_options, 1)
   params:set_action("chord_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
-
-  
-  -- params:add_option('chord_output', 'Output', {'Mute', 'Engine', 'MIDI', 'Crow', 'ii-JF', 'Disting'},2)
-  -- params:set_action("chord_output", function() update_menus() end)
 
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_duration_index',function(val) chord_duration = division_names[val][1] end) -- set global once vs lookup each time. Not sure if worth the trade-off
@@ -673,6 +682,7 @@ function init()
 
 
   function params.action_read(filename,silent,number)
+    nb:stop_all() -- todo p0 untested but should stop hanging notes
     local filepath = norns.state.data..number.."/"
     if util.file_exists(filepath) then
       -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
@@ -818,13 +828,13 @@ function update_menus()
       'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
-  menus[2] = {'chord_voice_raw', 'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
+  menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
  
   -- SEQ MENU
     menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_dynamics_1'}
 
   -- MIDI HARMONIZER MENU
-  menus[4] = {'midi_voice', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_dynamics'}
+  menus[4] = {'midi_voice', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_duration_index', 'midi_dynamics'}
 
   -- CV HARMONIZER MENU
     menus[5] = {'crow_voice', 'crow_note_map', 'crow_auto_rest', 'crow_octave', 'crow_duration_index', 'crow_dynamics'}
@@ -1022,15 +1032,15 @@ function pattern_length(source)
 end
 
 
-function refresh_midi_devices()
-  for i = 1, #midi.vports do -- query all ports
-    midi_device[i] = midi.connect(i) -- connect each device
-    table.insert( -- register its name:
-      midi_device_names, -- table to insert to
-      "port "..i..": "..util.trim_string_to_width(midi_device[i].name, 80) -- value to insert
-    )
-  end
-end
+-- function refresh_midi_devices()
+--   for i = 1, #midi.vports do -- query all ports
+--     midi_device[i] = midi.connect(i) -- connect each device
+--     table.insert( -- register its name:
+--       midi_device_names, -- table to insert to
+--       "port "..i..": "..util.trim_string_to_width(midi_device[i].name, 80) -- value to insert
+--     )
+--   end
+-- end
 
 
 function div_to_index(string)
@@ -1555,10 +1565,11 @@ function sequence_clock(sync_val)
       
       if clock_step % crow_div == 0 then
       -- crow.output[3]() --pulse defined in init
+      crow.output[3].slew = 0
       crow.output[3].volts = 5
       crow.output[3].slew = 0.001 --Should be just less than 192 PPQN @ 300 BPM
       crow.output[3].volts = 0    
-      crow.output[3].slew = 0
+      -- crow.output[3].slew = 0  -- 2023-10-20 moved to font
       end
     end
     
@@ -1748,7 +1759,7 @@ function advance_chord_pattern()
 
     -- Play the chord
     if chord_pattern[active_chord_pattern][chord_pattern_position] > 0 then
-      play_chord()-- params:string('chord_output'), params:get('chord_midi_ch'))
+      play_chord()
       if seq_reset_on_1 == 2 then -- Chord
         seq_pattern_position = 0
         -- play_seq = true
@@ -2180,7 +2191,6 @@ function advance_seq_pattern()
 
   if seq_pattern[active_seq_pattern][seq_pattern_position] > 0 then
     
-    -- local destination = params:string('seq_output_1')
     local player = params:lookup_param("seq_voice_raw_1"):get_player()
     local dynamics = params:get('seq_dynamics_1') * .01
     local note = _G['map_note_' .. params:get('seq_note_map_1')](seq_pattern[active_seq_pattern][seq_pattern_position], params:get('seq_octave_1')) + 36
@@ -4096,6 +4106,68 @@ function redraw()
       -- UI elements placed here appear in all non-Events views
       ---------------------------
 
+
+      
+      
+      --------------------------------------------
+      -- Scrolling menus
+      --------------------------------------------
+      -- todo p1 move calcs out of redraw
+      local menu_offset = scroll_offset_locked(menu_index, 10, 3) -- index, height, locked_row
+      line = 1
+      for i = 1,#menus[page_index] do
+        screen.move(2, line * 10 + 8 - menu_offset)
+        screen.level(menu_index == i and 15 or 3)
+        
+        -- Generate menu and draw <> indicators for scroll range
+        session_menu_trunc = 16
+        if menu_index == i then
+          local range = params:get_range(menus[page_index][i])
+          local menu_value_suf = params:get(menus[page_index][i]) == range[1] and '>' or ''
+          local menu_value_pre = params:get(menus[page_index][i]) == range[2] and '<' or ' '
+          local session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
+
+          -- text extents and my attempt to fix it still are not reliable so we'll just chop it off with black rect LOL
+          -- while text_width(session_menu_txt) > 94 do -- screen.text_extents(session_menu_txt) > 90 do -
+          --   session_menu_trunc = session_menu_trunc - 1
+          --   session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
+          -- end
+          
+          local session_menu_txt = util.trim_string_to_width(session_menu_txt, 90)
+          
+          screen.text(session_menu_txt)
+        else  
+          screen.text(util.trim_string_to_width(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. ' ' .. string.sub(params:string(menus[page_index][i]), 1, 16), 90))
+          
+        end
+        line = line + 1
+      end
+
+      -- -- mask the area to the right of main menu since we can't rely on screen.text_extents
+      -- screen.level(0)
+      -- screen.rect(91, 0, 37, 64)
+      -- screen.fill()
+      
+      -- scrollbar
+      screen.level(10)
+      local offset = scrollbar(menu_index, #menus[page_index], 5, 3, 52) -- (index, total, in_view, locked_row, screen_height)
+      local bar_height = 5 / #menus[page_index] * 52
+      screen.rect(91, offset, 1, bar_height)
+      screen.fill()
+      
+      
+      --Sticky header
+      screen.level(menu_index == 0 and 15 or 4)
+      screen.rect(0,0,92,11)
+      screen.fill()
+      screen.move(2,8)
+      screen.level(0)
+      screen.text(page_name)
+      screen.fill()
+
+
+
+
       --------------------------------------------
       -- Transport state, pattern, chord readout
       --------------------------------------------
@@ -4251,54 +4323,6 @@ function redraw()
       screen.fill()
       
       
-      --------------------------------------------
-      -- Scrolling menus
-      --------------------------------------------
-      -- todo p1 move calcs out of redraw
-      local menu_offset = scroll_offset_locked(menu_index, 10, 3) -- index, height, locked_row
-      line = 1
-      for i = 1,#menus[page_index] do
-        screen.move(2, line * 10 + 8 - menu_offset)
-        screen.level(menu_index == i and 15 or 3)
-        
-        -- Generate menu and draw <> indicators for scroll range
-        session_menu_trunc = 16
-        if menu_index == i then
-          local range = params:get_range(menus[page_index][i])
-          local menu_value_suf = params:get(menus[page_index][i]) == range[1] and '>' or ''
-          local menu_value_pre = params:get(menus[page_index][i]) == range[2] and '<' or ' '
-          local session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
-
-          while screen.text_extents(session_menu_txt) > 90 do
-            session_menu_trunc = session_menu_trunc - 1
-            session_menu_txt = first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. menu_value_pre .. string.sub(params:string(menus[page_index][i]), 1, session_menu_trunc) .. menu_value_suf
-          end
-          
-          screen.text(session_menu_txt)
-        else  
-          screen.text(first_to_upper(param_formatter(param_id_to_name(menus[page_index][i]))) .. ' ' .. string.sub(params:string(menus[page_index][i]), 1, 16))
-        end
-        line = line + 1
-      end
-
-
-      -- scrollbar
-      screen.level(10)
-      local offset = scrollbar(menu_index, #menus[page_index], 5, 3, 52) -- (index, total, in_view, locked_row, screen_height)
-      local bar_height = 5 / #menus[page_index] * 52
-      screen.rect(91, offset, 1, bar_height)
-      screen.fill()
-      
-      
-      --Sticky header
-      screen.level(menu_index == 0 and 15 or 4)
-      screen.rect(0,0,92,11)
-      screen.fill()
-      screen.move(2,8)
-      screen.level(0)
-      screen.text(page_name)
-      screen.fill()
-
     end -- of event vs. non-event check
   end
   screen.update()
