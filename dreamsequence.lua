@@ -1,5 +1,5 @@
 -- Dreamsequence
--- nb_dev 231020 01 @modularbeat
+-- nb_dev 231021 01 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = '23102001'
+  version = '23102101'
   -----------------------------
   nb.voice_count = 1  -- allows some nb mods to load multiple voices (like nb_midi if we need multiple channels)
   nb:init()
@@ -111,6 +111,7 @@ function init()
   -- Reverts changes to crow and jf that might have been made by DS
   function cleanup()
     clock.link.stop()
+    
     if preinit_clock_source == 4 then 
       params:set('clock_source', preinit_clock_source)
       print('Restoring clock_source to ' .. preinit_clock_source)
@@ -124,10 +125,10 @@ function init()
       print('Restoring jf.mode to ' .. preinit_jf_mode)
     end
   
-      -- mod.hook.deregister("script_pre_init", "nb dreamsequence crow pre init")
-      -- nb.players["crow 1/2_ds"] = nil -- todo p0 update name
-      -- note_players["crow 1/2_ds"] = nil -- todo p0 update name
-      
+    -- clear the pseudomod players so they don't pop up in other scripts
+    for i = 1, 4 do
+      nb.players["crow_ds " .. i] = nil
+    end
   end
   
   
@@ -316,29 +317,24 @@ function init()
   nb:add_param("chord_voice_raw", "Voice raw")
   params:hide("chord_voice_raw")
   
-  midi_ports_lookup = {}
-  for i = 1, #midi.vports do
-    midi_ports_lookup[i] = midi.vports[i].name
-  end
-  
-  -- creates masked lookup table for all voice params (will be used to prevent crow outputs 3-4 being used, etc...)
+  -- creates masked lookup table for all voice params (will be used to prevent crow outputs 3-4 being used unless it's safe)
   local voice_param_options = {}
   local voice_param_index = {}
   for i = 1, params:lookup_param("chord_voice_raw").count do
     local option = params:lookup_param("chord_voice_raw").options[i]
     -- if option ~= "crow 1/2" and option ~= "crow 3/4" and option ~= "crow para" then  -- method of hiding players (like crow 3-4)
-    -- not enough room to have a nice MIDI device string so I have to butcher this a bit to return port
-    -- afaik .conn is only for MIDI but should verify and also check if we should validate connection status
-    if nb.players[option] ~= nil and nb.players[option].conn ~= nil then
-      -- simplify to return port (and voice # if voice_count is >1)
-      local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
-      table.insert(voice_param_options, option)
-      table.insert(voice_param_index, i)
-    else
-      table.insert(voice_param_options, option)
-      table.insert(voice_param_index, i)
+      -- not enough room to have a nice MIDI device string so I have to butcher this a bit to return port
+      -- afaik .conn is only for MIDI but should verify and also check if we should validate connection status
+      if nb.players[option] ~= nil and nb.players[option].conn ~= nil then -- afaik .conn is only for MIDI. Should confirm.
+        -- string includes mdi port (and voice # if voice_count is >1)
+        local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
+        table.insert(voice_param_options, option)
+        table.insert(voice_param_index, i)
+      else
+        table.insert(voice_param_options, option)
+        table.insert(voice_param_index, i)
+      end
     -- end
-    end
   end
   
   params:add_option("chord_voice", 'Voice', voice_param_options, 1)
@@ -4106,7 +4102,159 @@ function redraw()
       -- UI elements placed here appear in all non-Events views
       ---------------------------
 
+      -- --------------------------------------------
+      -- -- Transport state, pattern, chord readout
+      -- --------------------------------------------
 
+      -- screen.level(9)
+      -- screen.rect(dash_x+1,11,33,12)
+      -- screen.stroke()
+      
+      -- screen.level(menu_index == 0 and 15 or 13)
+      -- screen.rect(dash_x,0,34,11)
+      -- screen.fill()
+
+      -- -- Draw transport status glyph
+      -- screen.level(((transport_state == 'starting' or transport_state == 'pausing') and fast_blinky or 0) * 2)
+      -- local x_offset = dash_x + 27
+      -- local y_offset = 3
+
+      -- -- simplify intermediate states for the glyph selection
+      -- local transport_state = transport_state == 'starting' and 'playing' or transport_state == 'pausing' and 'paused' or transport_state
+      -- for i = 1, #glyphs[transport_state] do
+      --   screen.pixel(glyphs[transport_state][i][1] + x_offset, glyphs[transport_state][i][2] + y_offset)
+      -- end
+      -- screen.fill()
+    
+      -- --------------------------------------------    
+      -- -- Pattern position readout
+      -- --------------------------------------------      
+      -- screen.level(0)
+      -- screen.move(dash_x + 2, y_offset + 5)
+      -- if chord_pattern_position == 0 then
+      --   screen.text(pattern_name[active_chord_pattern].. '.RST')
+      -- else
+      --   screen.text(pattern_name[active_chord_pattern] ..'.'.. chord_pattern_position)
+      --   -- screen.text(pattern_name[active_chord_pattern] ..'.'.. chord_pattern_position .. '/' .. chord_pattern_length[active_chord_pattern])
+      -- end
+      
+      -- --------------------------------------------
+      -- -- Chord readout
+      -- --------------------------------------------
+      -- screen.level(15)
+      -- if chord_no > 0 then
+      --   screen.move(dash_x + 17,y_offset + 16)
+      --   screen.text_center(chord_readout)
+      -- end
+      
+      
+      -- --------------------------------------------
+      -- -- Arranger dash
+      -- --------------------------------------------
+      -- local arranger_dash_y = 24
+      
+      -- -- Axis reference marks
+      -- for i = 1,4 do
+      --   screen.level(1)
+      --   screen.rect(dash_x + 3, arranger_dash_y + 12 + i * 3, 1, 2)
+      -- end  
+      -- screen.pixel(dash_x + 3, arranger_dash_y + 27)
+      -- screen.fill()
+      
+      -- local arranger_dash_x = dash_x + (arranger_position == 0 and 5 or 3) -- If arranger is reset, add an initial gap to the x position
+      
+      -- -- Draw arranger patterns and events timeline straight from x_dash_flat
+      -- for i = 1, dash_steps do -- alternative to #dash_patterns. This is faster at the cost of a global var which I guess is okay?
+      --   screen.level(dash_levels[i] or 1)
+      --   -- arranger segment patterns
+      --   if dash_patterns[i] ~= 0 then
+      --     screen.rect(arranger_dash_x, arranger_dash_y + 12 + (dash_patterns[i] * 3), 1, 2)
+      --     screen.fill()
+      --   end
+      --   -- events pips
+      --   screen.level(dash_events[i] or 0)
+      --   screen.pixel(arranger_dash_x, 51)
+      --   screen.fill()
+
+      --   arranger_dash_x = arranger_dash_x + 1
+      -- end
+
+      -- -- Arranger dash rect (rendered after chart to cover chart edge overlap)
+      -- screen.level(params:get('arranger') == 2 and 9 or 2)
+      
+      -- screen.rect(dash_x+1, arranger_dash_y+2,33,38)
+      -- screen.stroke()
+      
+      -- -- Header
+      -- screen.level(params:get('arranger') == 2 and 10 or 2)
+      -- screen.rect(dash_x, arranger_dash_y+1,34,11)
+      -- screen.fill()
+
+      -- --------------------------------------------
+      -- -- Arranger countdown timer readout
+      -- --------------------------------------------
+    
+      -- -- Arranger time
+      -- screen.level(params:get('arranger') == 2 and 15 or 3)
+
+      -- -- Bottom left
+      -- screen.move(dash_x +3, arranger_dash_y + 36)
+      -- screen.text(seconds_remaining)
+      
+      -- -- Arranger mode glyph
+      -- local x_offset = dash_x + 27
+      -- local y_offset = arranger_dash_y + 4
+
+      -- if params:string('playback') == 'Loop' then
+      --   screen.level(((
+      --     arranger_position == arranger_length 
+      --     and (arranger_queue == nil or arranger_queue > arranger_length)) -- if arranger is jumped on the last seg
+      --   and fast_blinky or 0) * 2)
+      --   for i = 1, #glyphs.loop do
+      --     screen.pixel(glyphs.loop[i][1] + x_offset, glyphs.loop[i][2] + y_offset)
+      --   end
+      -- else 
+      --   screen.level(((arranger_position == arranger_length 
+      --     and arranger_one_shot_last_pattern) -- if arranger is jumped on the last seg
+      --   and fast_blinky or 0) * 2)
+
+      --   for i = 1, #glyphs.one_shot do
+      --     screen.pixel(glyphs.one_shot[i][1] + x_offset, glyphs.one_shot[i][2] + y_offset)
+      --   end
+      -- end
+      -- screen.fill()
+      
+      -- --------------------------------------------
+      -- -- Arranger position readout
+      -- --------------------------------------------      
+      -- screen.level(0)
+      -- screen.move(dash_x + 2,arranger_dash_y + 9)
+
+      -- if arranger_position == 0 then
+      --   if arranger_queue == nil then
+      --     screen.text('RST')
+      --   elseif arranger_active == false then
+      --     screen.text((arranger_queue or util.wrap(arranger_position + 1, 1, arranger_length)) .. '.'.. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
+      --   else
+      --     screen.text(arranger_queue .. '.0')
+      --   end
+      -- elseif arranger_active == false then
+      --   if chord_pattern_position == 0 then -- condition for when pattern is reset to position 0 and is in-between segments
+      --     screen.text(arranger_position .. '.0')
+      --   elseif arranger_position == arranger_length then
+      --     if params:string('playback') == "Loop" then
+      --       screen.text('LP.' .. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
+      --     else
+      --       screen.text('EN.' .. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
+      --     end
+      --   else
+      --     screen.text((arranger_queue or util.wrap(arranger_position + 1, 1, arranger_length)) .. '.'.. math.min(chord_pattern_position - chord_pattern_length[active_chord_pattern], 0))
+      --   end
+      -- else
+      --   screen.text(arranger_position .. '.' .. chord_pattern_position)
+        
+      -- end      
+      -- screen.fill()
       
       
       --------------------------------------------
