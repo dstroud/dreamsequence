@@ -1,5 +1,5 @@
 -- Dreamsequence
--- nb_dev 231020 01 @modularbeat
+-- nb_dev 231022 01 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = '23102001'
+  version = '23102201'
   -----------------------------
   nb.voice_count = 1  -- allows some nb mods to load multiple voices (like nb_midi if we need multiple channels)
   nb:init()
@@ -69,7 +69,6 @@ function init()
       -- TODO: could do a gate with "both" for ADSR envelope
       crow.input[2].mode("change", 2 , 0.1, "rising") -- voltage threshold, hysteresis, "rising", "falling", or “both"
       crow.input[2].change = crow_trigger
-      -- crow.output[3].slew = 0
     end
   )
 
@@ -111,6 +110,7 @@ function init()
   -- Reverts changes to crow and jf that might have been made by DS
   function cleanup()
     clock.link.stop()
+    
     if preinit_clock_source == 4 then 
       params:set('clock_source', preinit_clock_source)
       print('Restoring clock_source to ' .. preinit_clock_source)
@@ -124,10 +124,11 @@ function init()
       print('Restoring jf.mode to ' .. preinit_jf_mode)
     end
   
-      -- mod.hook.deregister("script_pre_init", "nb dreamsequence crow pre init")
-      -- nb.players["crow 1/2_ds"] = nil -- todo p0 update name
-      -- note_players["crow 1/2_ds"] = nil -- todo p0 update name
-      
+    -- todo p0 prerelease update!
+    -- clear the pseudomod players so they don't pop up in other scripts
+    -- for i = 1, 4 do
+    --   nb.players["crow_ds " .. i] = nil
+    -- end
   end
   
   
@@ -165,6 +166,7 @@ function init()
     events_lookup_names[i] = events_lookup[i].name
     events_lookup_ids[i] = events_lookup[i].id
   end
+  
   
   -- key = event_id, value = index
   events_lookup_index = tab.invert(events_lookup_ids)
@@ -228,7 +230,7 @@ function init()
   ------------------
   -- GLOBAL PARAMS --
   ------------------
-  params:add_group('global', 'GLOBAL', 7)
+  params:add_group('global', 'GLOBAL', 8)
   
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end) -- post-bang action
   
@@ -237,8 +239,10 @@ function init()
   -- Tempo and clock source appear in Global menu but are actually system parameters so aren't here
   -- todo p2 would be nice to replicate these and have a version of clock_source that handles the crow clock situation...
   
+  params:add_option('crow_clock', 'Crow clock', {'Off', 'On'}, 1) -- todo p0 prerelease reset
+  
   -- Crow clock uses hybrid notation/PPQN
-  params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
+  params:add_number('crow_clock_index', 'Rate', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
   params:set_action('crow_clock_index',function() set_crow_clock() end)  
 
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
@@ -308,7 +312,7 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
-  -- one approach to suppressing default nb_crow mod but maybe this is shitty
+  -- one approach to suppressing default nb_crow mod but maybe this is shitty? They come back on next nb init.
   nb.players["crow 1/2"] = nil
   nb.players["crow 3/4"] = nil
   nb.players["crow para"] = nil
@@ -316,29 +320,24 @@ function init()
   nb:add_param("chord_voice_raw", "Voice raw")
   params:hide("chord_voice_raw")
   
-  midi_ports_lookup = {}
-  for i = 1, #midi.vports do
-    midi_ports_lookup[i] = midi.vports[i].name
-  end
-  
-  -- creates masked lookup table for all voice params (will be used to prevent crow outputs 3-4 being used, etc...)
-  local voice_param_options = {}
-  local voice_param_index = {}
+  -- creates masked lookup table for all voice params (will be used to prevent crow outputs 3-4 being used unless it's safe)
+local voice_param_options = {}
+local voice_param_index = {}
   for i = 1, params:lookup_param("chord_voice_raw").count do
     local option = params:lookup_param("chord_voice_raw").options[i]
-    -- if option ~= "crow 1/2" and option ~= "crow 3/4" and option ~= "crow para" then  -- method of hiding players (like crow 3-4)
-    -- not enough room to have a nice MIDI device string so I have to butcher this a bit to return port
-    -- afaik .conn is only for MIDI but should verify and also check if we should validate connection status
-    if nb.players[option] ~= nil and nb.players[option].conn ~= nil then
-      -- simplify to return port (and voice # if voice_count is >1)
-      local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
-      table.insert(voice_param_options, option)
-      table.insert(voice_param_index, i)
-    else
-      table.insert(voice_param_options, option)
-      table.insert(voice_param_index, i)
+    -- if string.sub(option, 1, 8) ~= "crow env" then -- method of hiding players (like crow 3-4)
+      -- not enough room to have a nice MIDI device string so I have to butcher this a bit to return port
+      -- afaik .conn is only for MIDI but should verify and also check if we should validate connection status
+      if nb.players[option] ~= nil and nb.players[option].conn ~= nil then -- afaik .conn is only for MIDI. Should confirm.
+        -- string includes mdi port (and voice # if voice_count is >1)
+        local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
+        table.insert(voice_param_options, option)
+        table.insert(voice_param_index, i)
+      else
+        table.insert(voice_param_options, option)
+        table.insert(voice_param_index, i)
+      end
     -- end
-    end
   end
   
   params:add_option("chord_voice", 'Voice', voice_param_options, 1)
@@ -824,8 +823,7 @@ end
   -- UPDATE_MENUS. todo p2: can be optimized by only calculating the current view+page or when certain actions occur
 function update_menus()
   -- GLOBAL MENU 
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
-      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'crow_clock', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
   menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
@@ -1563,13 +1561,13 @@ function sequence_clock(sync_val)
         end
       end
       
-      if clock_step % crow_div == 0 then
-      -- crow.output[3]() --pulse defined in init
-      crow.output[3].slew = 0
-      crow.output[3].volts = 5
-      crow.output[3].slew = 0.001 --Should be just less than 192 PPQN @ 300 BPM
-      crow.output[3].volts = 0    
-      -- crow.output[3].slew = 0  -- 2023-10-20 moved to font
+      if params:get("crow_clock") == 2 and clock_step % crow_div == 0 then
+        -- crow.output[3]() --pulse defined in init
+        crow.output[3].slew = 0
+        crow.output[3].volts = 5
+        crow.output[3].slew = 0.001 --Should be just less than 192 PPQN @ 300 BPM
+        crow.output[3].volts = 0    
+        -- crow.output[3].slew = 0  -- 2023-10-20 moved to font
       end
     end
     
@@ -2010,7 +2008,7 @@ function to_player(player, note, dynamics, duration)
   -- -- Check for duplicate notes and process according to dedupe_threshold setting
   for i = 1, #player_note_history do
     if player_note_history[i].player == player and player_note_history[i].note == note then
-      -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first. This does require some special handling below which is not present in other destinations.
+      -- Preserves longer note-off duration to avoid weirdness around a which-note-was first race condition. Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about which came first.
       
       player_note_history[i].step = math.max(duration, player_note_history[i].step)
       player_note_history_insert = false -- Don't insert a new note-off record since we just updated the duration
@@ -2068,7 +2066,7 @@ function play_chord()
   local y_scaled_delta = 0
   local note_sequence = 0
   local player = params:lookup_param("chord_voice_raw"):get_player()
-  
+
   clock.run(function()
     for i = start, finish, step do
       
@@ -2080,7 +2078,7 @@ function play_chord()
       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12) + 36 -- todo octave
       
       to_player(player, note, dynamics, chord_duration)
-      
+
       if playback ~= 'Off' and note_qty ~= 1 then
         local prev_y_scaled = y_scaled
         y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
@@ -2196,6 +2194,7 @@ function advance_seq_pattern()
     local note = _G['map_note_' .. params:get('seq_note_map_1')](seq_pattern[active_seq_pattern][seq_pattern_position], params:get('seq_octave_1')) + 36
     
     to_player(player, note, dynamics, seq_duration)
+
 
   end
   
@@ -4105,9 +4104,6 @@ function redraw()
       ---------------------------
       -- UI elements placed here appear in all non-Events views
       ---------------------------
-
-
-      
       
       --------------------------------------------
       -- Scrolling menus

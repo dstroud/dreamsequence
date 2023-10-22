@@ -27,4 +27,4 @@ include(lib .. "glyphs")
 nb = include("lib/nb/lib/nb")
 
 -- bundled crow nb voice
--- include("lib/mod")
+include("lib/crow")
