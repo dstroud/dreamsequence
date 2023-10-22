@@ -28,6 +28,6 @@ nb = include("lib/nb/lib/nb")
 
 -- bundled crow nb voice
 -- include("lib/mod")
--- include("lib/pseudomod")
-include("lib/crow_cv")
-include("lib/crow_env")
+include("lib/pseudomod")
+-- include("lib/crow_cv")
+-- include("lib/crow_env")

@@ -69,7 +69,6 @@ function init()
       -- TODO: could do a gate with "both" for ADSR envelope
       crow.input[2].mode("change", 2 , 0.1, "rising") -- voltage threshold, hysteresis, "rising", "falling", or “both"
       crow.input[2].change = crow_trigger
-      -- crow.output[3].slew = 0
     end
   )
 
@@ -125,10 +124,11 @@ function init()
       print('Restoring jf.mode to ' .. preinit_jf_mode)
     end
   
+    -- todo p0 prerelease update!
     -- clear the pseudomod players so they don't pop up in other scripts
-    for i = 1, 4 do
-      nb.players["crow_ds " .. i] = nil
-    end
+    -- for i = 1, 4 do
+    --   nb.players["crow_ds " .. i] = nil
+    -- end
   end
   
   
@@ -166,6 +166,7 @@ function init()
     events_lookup_names[i] = events_lookup[i].name
     events_lookup_ids[i] = events_lookup[i].id
   end
+  
   
   -- key = event_id, value = index
   events_lookup_index = tab.invert(events_lookup_ids)
@@ -229,7 +230,7 @@ function init()
   ------------------
   -- GLOBAL PARAMS --
   ------------------
-  params:add_group('global', 'GLOBAL', 7)
+  params:add_group('global', 'GLOBAL', 8)
   
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end) -- post-bang action
   
@@ -238,8 +239,10 @@ function init()
   -- Tempo and clock source appear in Global menu but are actually system parameters so aren't here
   -- todo p2 would be nice to replicate these and have a version of clock_source that handles the crow clock situation...
   
+  params:add_option('crow_clock', 'Crow clock', {'Off', 'On'}, 1) -- todo p0 prerelease reset
+  
   -- Crow clock uses hybrid notation/PPQN
-  params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
+  params:add_number('crow_clock_index', 'Rate', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
   params:set_action('crow_clock_index',function() set_crow_clock() end)  
 
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
@@ -309,7 +312,7 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
-  -- one approach to suppressing default nb_crow mod but maybe this is shitty
+  -- one approach to suppressing default nb_crow mod but maybe this is shitty? They come back on next nb init.
   nb.players["crow 1/2"] = nil
   nb.players["crow 3/4"] = nil
   nb.players["crow para"] = nil
@@ -318,13 +321,11 @@ function init()
   params:hide("chord_voice_raw")
   
   -- creates masked lookup table for all voice params (will be used to prevent crow outputs 3-4 being used unless it's safe)
-  voice_param_options = {}  -- todo p0 local
-  voice_param_index = {}    -- todo p0 local
-  voice_env_param_options = {}  -- todo p0 local
-  voice_env_param_index = {}    -- todo p0 local
+local voice_param_options = {}
+local voice_param_index = {}
   for i = 1, params:lookup_param("chord_voice_raw").count do
     local option = params:lookup_param("chord_voice_raw").options[i]
-    if string.sub(option, 1, 8) ~= "crow env" then -- method of hiding players (like crow 3-4)
+    -- if string.sub(option, 1, 8) ~= "crow env" then -- method of hiding players (like crow 3-4)
       -- not enough room to have a nice MIDI device string so I have to butcher this a bit to return port
       -- afaik .conn is only for MIDI but should verify and also check if we should validate connection status
       if nb.players[option] ~= nil and nb.players[option].conn ~= nil then -- afaik .conn is only for MIDI. Should confirm.
@@ -336,24 +337,12 @@ function init()
         table.insert(voice_param_options, option)
         table.insert(voice_param_index, i)
       end
-    end
-    --second table used to generate masked list of crow_env out voices
-    if option == "none" or string.sub(option, 1, 8) == "crow env" then
-      table.insert(voice_env_param_options, option)
-      table.insert(voice_env_param_index, i)
-    end
+    -- end
   end
   
   params:add_option("chord_voice", 'Voice', voice_param_options, 1)
   params:set_action("chord_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
 
-  -- secondary voice for sending crow env independent of cv which is on primary voice
-  nb:add_param("chord_voice_env_raw", "Voice env raw")
-  params:hide("chord_voice_env_raw")
- 
-  params:add_option("chord_voice_env", 'Env. out', voice_env_param_options, 1)
-  params:set_action("chord_voice_env", function(index) params:set("chord_voice_env_raw", voice_env_param_index[index]) end)
-  
   params:add_number('chord_duration_index', 'Duration', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_duration_index',function(val) chord_duration = division_names[val][1] end) -- set global once vs lookup each time. Not sure if worth the trade-off
   
@@ -444,13 +433,6 @@ function init()
 
   params:add_option("seq_voice_1", 'Voice', voice_param_options, 1)
   params:set_action("seq_voice_1", function(index) params:set("seq_voice_raw_1", voice_param_index[index]) end)
-  
-  -- secondary voice for sending crow env independent of cv which is on primary voice
-  nb:add_param("seq_voice_env_raw_1", "Voice env raw")
-  params:hide("seq_voice_env_raw_1")
- 
-  params:add_option("seq_voice_env_1", 'Env. out', voice_env_param_options, 1)
-  params:set_action("seq_voice_env_1", function(index) params:set("seq_voice_env_raw_1", voice_env_param_index[index]) end)
   
   params:add_number('seq_duration_index_1', 'Duration', 1, 57, 8, function(param) return divisions_string(param:get()) end)
   params:set_action('seq_duration_index_1', function(val) seq_duration = division_names[val][1] end)
@@ -841,14 +823,13 @@ end
   -- UPDATE_MENUS. todo p2: can be optimized by only calculating the current view+page or when certain actions occur
 function update_menus()
   -- GLOBAL MENU 
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source',
-      'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'crow_clock', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
-  menus[2] = {'chord_voice', 'chord_voice_env', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
+  menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
  
   -- SEQ MENU
-    menus[3] = {'seq_voice_1', 'seq_voice_env_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_dynamics_1'}
+    menus[3] = {'seq_voice_1', 'seq_note_map_1', 'seq_start_on_1', 'seq_reset_on_1', 'seq_octave_1', 'seq_rotate_1','seq_shift_1', 'seq_div_index_1', 'seq_duration_index_1', 'seq_dynamics_1'}
 
   -- MIDI HARMONIZER MENU
   menus[4] = {'midi_voice', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_duration_index', 'midi_dynamics'}
@@ -1580,13 +1561,13 @@ function sequence_clock(sync_val)
         end
       end
       
-      if clock_step % crow_div == 0 then
-      -- crow.output[3]() --pulse defined in init
-      crow.output[3].slew = 0
-      crow.output[3].volts = 5
-      crow.output[3].slew = 0.001 --Should be just less than 192 PPQN @ 300 BPM
-      crow.output[3].volts = 0    
-      -- crow.output[3].slew = 0  -- 2023-10-20 moved to font
+      if params:get("crow_clock") == 2 and clock_step % crow_div == 0 then
+        -- crow.output[3]() --pulse defined in init
+        crow.output[3].slew = 0
+        crow.output[3].volts = 5
+        crow.output[3].slew = 0.001 --Should be just less than 192 PPQN @ 300 BPM
+        crow.output[3].volts = 0    
+        -- crow.output[3].slew = 0  -- 2023-10-20 moved to font
       end
     end
     
@@ -2085,8 +2066,7 @@ function play_chord()
   local y_scaled_delta = 0
   local note_sequence = 0
   local player = params:lookup_param("chord_voice_raw"):get_player()
-  local player_env = params:lookup_param("chord_voice_env_raw"):get_player()
-  
+
   clock.run(function()
     for i = start, finish, step do
       
@@ -2098,8 +2078,7 @@ function play_chord()
       local note = chord_transformed[i] + params:get('transpose') + 12 + (params:get('chord_octave') * 12) + 36 -- todo octave
       
       to_player(player, note, dynamics, chord_duration)
-      to_player(player_env, note, dynamics, chord_duration)
-      
+
       if playback ~= 'Off' and note_qty ~= 1 then
         local prev_y_scaled = y_scaled
         y_scaled = curve_get_y(note_sequence * .1, curve) / max_pre_scale
@@ -2211,12 +2190,10 @@ function advance_seq_pattern()
   if seq_pattern[active_seq_pattern][seq_pattern_position] > 0 then
     
     local player = params:lookup_param("seq_voice_raw_1"):get_player()
-    local player_env = params:lookup_param("seq_voice_env_raw_1"):get_player()
     local dynamics = params:get('seq_dynamics_1') * .01
     local note = _G['map_note_' .. params:get('seq_note_map_1')](seq_pattern[active_seq_pattern][seq_pattern_position], params:get('seq_octave_1')) + 36
     
     to_player(player, note, dynamics, seq_duration)
-    to_player(player_env, note, dynamics, seq_duration)
 
 
   end
