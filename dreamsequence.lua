@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2.4 @modularbeat
+-- v1.2.5 @modularbeat
 -- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.2.4'
+  version = 'v1.2.5'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -2436,7 +2436,7 @@ end
 
 
 function map_note_3(note_num, octave, pre)  -- mode mapping + diatonic transposition
-  local diatonic_transpose = (pre == true and math.max(next_chord_x or current_chord_x, 1)) -1
+  local diatonic_transpose = (math.max(pre == true and next_chord_x or current_chord_x, 1)) -1
   local note_num = note_num + diatonic_transpose
   local quantized_note = notes_nums[util.wrap(note_num, 1, 7)] + (math.floor((note_num -1) / 7) * 12)
   return(quantized_note + (octave * 12) + params:get('transpose'))
