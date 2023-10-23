@@ -246,19 +246,19 @@ function init()
   params:add_number("transpose", "Key", -12, 12, 0, function(param) return transpose_string(param:get()) end)
   
   params:add_option('crow_out_1', 'Crow out 1', {'Off', 'CV', 'Env'}, 2)
-  params:set_action('crow_out_1',function() update_voice_options(); update_voice_params() end)  
+  params:set_action('crow_out_1',function() gen_voice_lookups(); update_voice_params() end)  
   
   params:add_option('crow_out_2', 'Crow out 2', {'Off', 'CV', 'Env'}, 3)
-  params:set_action('crow_out_2',function() update_voice_options(); update_voice_params() end)
+  params:set_action('crow_out_2',function() gen_voice_lookups(); update_voice_params() end)
   
   params:add_option('crow_out_3', 'Crow out 3', {'Off', 'CV', 'Env', 'Clock'}, 4)
-  params:set_action('crow_out_3',function() update_voice_options(); update_voice_params() end)  
+  params:set_action('crow_out_3',function() gen_voice_lookups(); update_voice_params() end)  
 
   params:add_option('crow_out_4', 'Crow out 4', {'Off', 'CV', 'Env', 'Events'}, 4)
-  params:set_action('crow_out_4',function() update_voice_options(); update_voice_params() end)  
+  params:set_action('crow_out_4',function() gen_voice_lookups(); update_voice_params() end)  
   
   -- Crow clock uses hybrid notation/PPQN
-  params:add_number('crow_clock_index', 'Rate', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
+  params:add_number('crow_clock_index', 'Crow clock', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
   params:set_action('crow_clock_index',function() set_crow_clock() end)  
 
   params:add_number('dedupe_threshold', 'Dedupe <', 0, 10, div_to_index('1/32'), function(param) return divisions_string(param:get()) end)
@@ -331,73 +331,7 @@ function init()
   nb:add_param("chord_voice_raw", "Voice raw")
   params:hide("chord_voice_raw")
 
-  
-  -- front-end voice selector param that dynamically serves up players to be passed to _voice_raw param:
-  -- 1. shortens MIDI player names to port # and voice_count (sorry, outta space!)
-  -- 2. only serves up valid crow cv/env options based on crow_out_ param config
-  function update_voice_options()
-    voice_param_options = {}    -- todo p0 local
-    voice_param_index = {}      -- same
-      for i = 1, params:lookup_param("chord_voice_raw").count do
-        local option = params:lookup_param("chord_voice_raw").options[i]
-
-          -- identify connected MIDI players and rename
-          if nb.players[option] ~= nil and nb.players[option].conn ~= nil then
-            local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
-            table.insert(voice_param_options, option)
-            table.insert(voice_param_index, i)
-            
-          -- mask any unwanted crow_ds players  
-          elseif string.sub(option, 1, 7) == "crow_ds" then
-            local length = string.len(option)
-            local cv = tonumber(string.sub(option, length - 2, length - 2))
-            local env = tonumber(string.sub(option, length, length))
-            
-            if env == 0 then
-              if params:string('crow_out_'..cv) == "CV" then
-                table.insert(voice_param_options, 'crow '..cv)
-                table.insert(voice_param_index, i)
-              end
-            elseif params:string('crow_out_'..cv) == "CV" and params:string('crow_out_'..env) == "Env" then
-              table.insert(voice_param_options, 'crow '..cv..'/'..env)
-              table.insert(voice_param_index, i)            
-            end
-            
-          -- other players pass through as-is
-          else
-            table.insert(voice_param_options, option)
-            table.insert(voice_param_index, i)
-          end
-          
-      end
-  end
-  
-  update_voice_options()
-  
-  
-  -- updates voice selector options and sets (or resets) new param index after crow_out param changes
-  function update_voice_params()
-    -- todo p0 hit all voice params
-    local sources = {'chord', 'seq', 'crow', 'midi'}
-    for i = 1, #sources do
-      local param_string = sources[i]..'_voice'
-      local param_string = param_string == 'seq_voice' and 'seq_voice_1' or param_string
-      local prev_param_name = params:string(param_string)
-      params:lookup_param(param_string).options = voice_param_options
-      params:lookup_param(param_string).count = #voice_param_options
-      local iterations = #params:lookup_param(param_string).options + 1
-      for j = 1, iterations do
-        if j == iterations then
-          params:set(param_string, 1)
-        elseif prev_param_name == params:lookup_param(param_string).options[j] then
-          params:set(param_string, j)
-          break
-        end
-      end
-    end
-  end  
-  
-  
+  gen_voice_lookups() -- required to build front-end voice selectors (chord_voice_raw dependency)
   params:add_option("chord_voice", 'Voice', voice_param_options, 1)
   params:set_action("chord_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
 
@@ -898,6 +832,74 @@ function update_menus()
 end
 
 
+-----------------------------------------------
+-- Assorted functions junkdrawer
+-----------------------------------------------
+
+-- front-end voice selector param that dynamically serves up players to be passed to _voice_raw param:
+-- 1. shortens MIDI player names to port # and voice_count (sorry, outta space!)
+-- 2. only serves up valid crow cv/env options based on crow_out_ param config
+function gen_voice_lookups()
+  voice_param_options = {}
+  voice_param_index = {}
+  for i = 1, params:lookup_param("chord_voice_raw").count do
+    local option = params:lookup_param("chord_voice_raw").options[i]
+
+      -- identify connected MIDI players and rename
+      if nb.players[option] ~= nil and nb.players[option].conn ~= nil then
+        local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
+        table.insert(voice_param_options, option)
+        table.insert(voice_param_index, i)
+        
+      -- mask any unwanted crow_ds players  
+      elseif string.sub(option, 1, 7) == "crow_ds" then
+        local length = string.len(option)
+        local cv = tonumber(string.sub(option, length - 2, length - 2))
+        local env = tonumber(string.sub(option, length, length))
+        
+        if env == 0 then
+          if params:string('crow_out_'..cv) == "CV" then
+            table.insert(voice_param_options, 'crow '..cv)
+            table.insert(voice_param_index, i)
+          end
+        elseif params:string('crow_out_'..cv) == "CV" and params:string('crow_out_'..env) == "Env" then
+          table.insert(voice_param_options, 'crow '..cv..'/'..env)
+          table.insert(voice_param_index, i)            
+        end
+        
+      -- other players pass through as-is
+      else
+        table.insert(voice_param_options, option)
+        table.insert(voice_param_index, i)
+      end
+      
+  end
+end
+
+
+-- updates voice selector options and sets (or resets) new param index after crow_out param changes
+function update_voice_params()
+  -- todo p0 hit all voice params
+  local sources = {'chord', 'seq', 'crow', 'midi'}
+  for i = 1, #sources do
+    local param_string = sources[i]..'_voice'
+    local param_string = param_string == 'seq_voice' and 'seq_voice_1' or param_string
+    local prev_param_name = params:string(param_string)
+    params:lookup_param(param_string).options = voice_param_options
+    params:lookup_param(param_string).count = #voice_param_options
+    local iterations = #params:lookup_param(param_string).options + 1
+    for j = 1, iterations do
+      if j == iterations then
+        params:set(param_string, 1)
+      elseif prev_param_name == params:lookup_param(param_string).options[j] then
+        params:set(param_string, j)
+        break
+      end
+    end
+  end
+end
+  
+  
 -- return first number from a string
 function find_number(string)
   return tonumber(string.match (string, "%d+"))
