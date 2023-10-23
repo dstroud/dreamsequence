@@ -1,6 +1,7 @@
--- nb voice for Crow that provides a player for each of the 4 outs, 
--- with the envelope being selectable via param
--- pretty much wholesale ripped off from https://github.com/sixolet/nb_crow
+-- nb voice for Crow that provides every configuration of cv+env output pair
+-- called by Dreamsequence; does not get registered with mod hook and is removed on script cleanup
+-- params are shared across voices
+-- derivative of https://github.com/sixolet/nb_crow
 
 local mod = require 'core/mods'
 local music = require 'lib/musicutil'
@@ -37,7 +38,7 @@ local function add_player(cv, env)
         for i = 1, 4 do
             if params.lookup["nb_crow_cv_"..i] == nil then
                 params:add_group("nb_crow_cv_"..i, "crow "..i.." (cv)", 3)
-                params:add_control("nb_crow_portomento_"..i, "portomento", controlspec.new(0.0, 1, 'lin', 0, 0.0, "s"))
+                params:add_control("nb_crow_portamento_"..i, "portamento", controlspec.new(0.0, 1, 'lin', 0, 0.0, "s"))
                 params:add_control("nb_crow_freq_"..i, "tuned to", controlspec.new(20, 4000, 'exp', 0, 440, 'Hz', 0.0003))
                 params:add_binary("nb_crow_tune_"..i, "tune", "trigger")
                 params:set_action("nb_crow_tune_"..i, function()
@@ -63,40 +64,6 @@ local function add_player(cv, env)
         end
     end
     
-    -- function player:note_on(note, vel)
-    --     if self.tuning then return end
-    --     -- I have zero idea why I have to add 50 cents to the tuning for it to sound right.
-    --     -- But I do. WTF.
-    --     local halfsteps = note - freq_to_note_num_float(params:get("nb_crow_freq_"..cv))
-    --     local v8 = halfsteps/12
-    --     local v_vel = vel * 10
-    --     local portomento = params:get("nb_crow_portomento_"..cv)
-    --     if env > 0 then
-    --       local attack = params:get("nb_crow_attack_time_"..env)
-    --       local attack_shape = ASL_SHAPES[params:get("nb_crow_attack_shape_"..env)]
-    --       local decay = params:get("nb_crow_decay_time_"..env)
-    --       local decay_shape = ASL_SHAPES[params:get("nb_crow_decay_shape_"..env)]
-    --       local sustain = params:get("nb_crow_sustain_"..env)
-    --       local legato = params:get("nb_crow_legato_"..env)
-    --     end
-    --     if self.count > 0 then
-    --         crow.output[cv].action = string.format("{ to(%f,%f,sine) }", v8, portomento)
-    --         crow.output[cv]()
-    --     else
-    --         crow.output[cv].volts = v8
-    --     end
-    --     local action
-    --     if env > 0 then
-    --         if self.count > 0 and legato > 0 then
-    --             action = string.format("{ to(%f,%f,'%s') }", v_vel*sustain, decay, decay_shape)
-    --         else
-    --             action = string.format("{ to(%f,%f,'%s'), to(%f,%f,'%s') }", v_vel, attack, attack_shape, v_vel*sustain, decay, decay_shape)
-    --         end
-    --         crow.output[env].action = action
-    --         crow.output[env]()
-    --     end
-    --     self.count = self.count + 1
-    -- end
 
     function player:note_on(note, vel)
         if self.tuning then return end
@@ -105,10 +72,10 @@ local function add_player(cv, env)
         local halfsteps = note - freq_to_note_num_float(params:get("nb_crow_freq_"..cv))
         local v8 = halfsteps/12
         local v_vel = vel * 10
-        local portomento = params:get("nb_crow_portomento_"..cv)
+        local portamento = params:get("nb_crow_portamento_"..cv)
         
         if self.count > 0 then
-            crow.output[cv].action = string.format("{ to(%f,%f,sine) }", v8, portomento)
+            crow.output[cv].action = string.format("{ to(%f,%f,sine) }", v8, portamento)
             crow.output[cv]()
         else
             crow.output[cv].volts = v8
@@ -150,12 +117,12 @@ local function add_player(cv, env)
     end
 
     function player:set_slew(s)
-        params:set("nb_crow_portomento_"..cv, s)
+        params:set("nb_crow_portamento_"..cv, s)
     end
 
     function player:describe(note)
         return {
-            name = "crow "..cv.."/"..env,   -- todo rename
+            name = "crow_ds "..cv.."/"..env,
             supports_bend = false,
             supports_slew = true,
             modulate_description = "unsupported",
@@ -174,15 +141,15 @@ local function add_player(cv, env)
     end
 
     function player:inactive()
-        crow_ports["cv_"..cv] = crow_ports["cv_"..cv] - 1     -- max 0 as a precaution?
+        crow_ports["cv_"..cv] = crow_ports["cv_"..cv] - 1
         if crow_ports["cv_"..cv] == 0 then
             params:hide("nb_crow_cv_"..cv)
         end
         
         if env > 0 then
-            crow_ports["env_"..env] = crow_ports["env_"..env] - 1 -- max 0 as a precaution
+            crow_ports["env_"..env] = crow_ports["env_"..env] - 1
             if crow_ports["env_"..env] == 0 then
-                params:hide("nb_crow_env_"..env)  -- what about nils
+                params:hide("nb_crow_env_"..env)
             end
             _menu.rebuild_params()
         end
@@ -210,12 +177,12 @@ local function add_player(cv, env)
              self.tuning = false
         end)
     end
-    note_players["crow_"..cv.."_"..env] = player
+    note_players["crow_ds "..cv.."/"..env] = player
 end
 
 for i = 1, 4 do               -- cv
-    for j = 0, 4 do           -- env todo include off somehow
-        if i ~= j then        -- how to handle in script ui? may leave this
+    for j = 0, 4 do           -- env
+        if i ~= j then
             add_player(i, j)
         end
     end

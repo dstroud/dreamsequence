@@ -1,5 +1,5 @@
 -- Dreamsequence
--- nb_dev 231022 01 @modularbeat
+-- nb_dev 231023 01 @modularbeat
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,10 +37,16 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = '23102201'
+  version = '23102301'
   -----------------------------
   nb.voice_count = 1  -- allows some nb mods to load multiple voices (like nb_midi if we need multiple channels)
   nb:init()
+    -- suppress default nb_crow mod players-- they come back on next nb init
+  nb.players["crow 1/2"] = nil
+  nb.players["crow 3/4"] = nil
+  nb.players["crow para"] = nil
+  nb.players["jf kit"] = nil
+  nb.players["jf mpe"] = nil
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
   norns.crow.events.version = function(...)
@@ -123,12 +129,15 @@ function init()
       crow.ii.jf.mode(preinit_jf_mode)
       print('Restoring jf.mode to ' .. preinit_jf_mode)
     end
-  
-    -- todo p0 prerelease update!
-    -- clear the pseudomod players so they don't pop up in other scripts
-    -- for i = 1, 4 do
-    --   nb.players["crow_ds " .. i] = nil
-    -- end
+
+    -- clear our weirdo crow players so they don't persist to other scripts
+    for i = 1, 4 do             -- cv
+      for j = 0, 4 do           -- env
+        if i ~= j then
+            nb.players["crow_ds "..i.."/"..j] = nil
+        end
+      end
+    end
   end
   
   
@@ -230,16 +239,23 @@ function init()
   ------------------
   -- GLOBAL PARAMS --
   ------------------
-  params:add_group('global', 'GLOBAL', 8)
+  params:add_group('global', 'GLOBAL', 11)
   
   params:add_number('mode', 'Mode', 1, 9, 1, function(param) return mode_index_to_name(param:get()) end) -- post-bang action
   
   params:add_number("transpose", "Key", -12, 12, 0, function(param) return transpose_string(param:get()) end)
   
-  -- Tempo and clock source appear in Global menu but are actually system parameters so aren't here
-  -- todo p2 would be nice to replicate these and have a version of clock_source that handles the crow clock situation...
+  params:add_option('crow_out_1', 'Crow out 1', {'Off', 'CV', 'Env'}, 2)
+  params:set_action('crow_out_1',function() update_voice_options(); update_voice_params() end)  
   
-  params:add_option('crow_clock', 'Crow clock', {'Off', 'On'}, 1) -- todo p0 prerelease reset
+  params:add_option('crow_out_2', 'Crow out 2', {'Off', 'CV', 'Env'}, 3)
+  params:set_action('crow_out_2',function() update_voice_options(); update_voice_params() end)
+  
+  params:add_option('crow_out_3', 'Crow out 3', {'Off', 'CV', 'Env', 'Clock'}, 4)
+  params:set_action('crow_out_3',function() update_voice_options(); update_voice_params() end)  
+
+  params:add_option('crow_out_4', 'Crow out 4', {'Off', 'CV', 'Env', 'Events'}, 4)
+  params:set_action('crow_out_4',function() update_voice_options(); update_voice_params() end)  
   
   -- Crow clock uses hybrid notation/PPQN
   params:add_number('crow_clock_index', 'Rate', 1, 65, 18,function(param) return crow_clock_string(param:get()) end)
@@ -312,33 +328,75 @@ function init()
   params:add_number('chord_div_index', 'Step length', 1, 57, 15, function(param) return divisions_string(param:get()) end)
   params:set_action('chord_div_index',function(val) chord_div = division_names[val][1] end)
 
-  -- one approach to suppressing default nb_crow mod but maybe this is shitty? They come back on next nb init.
-  nb.players["crow 1/2"] = nil
-  nb.players["crow 3/4"] = nil
-  nb.players["crow para"] = nil
-  
   nb:add_param("chord_voice_raw", "Voice raw")
   params:hide("chord_voice_raw")
+
   
-  -- creates masked lookup table for all voice params (will be used to prevent crow outputs 3-4 being used unless it's safe)
-local voice_param_options = {}
-local voice_param_index = {}
-  for i = 1, params:lookup_param("chord_voice_raw").count do
-    local option = params:lookup_param("chord_voice_raw").options[i]
-    -- if string.sub(option, 1, 8) ~= "crow env" then -- method of hiding players (like crow 3-4)
-      -- not enough room to have a nice MIDI device string so I have to butcher this a bit to return port
-      -- afaik .conn is only for MIDI but should verify and also check if we should validate connection status
-      if nb.players[option] ~= nil and nb.players[option].conn ~= nil then -- afaik .conn is only for MIDI. Should confirm.
-        -- string includes mdi port (and voice # if voice_count is >1)
-        local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
-        table.insert(voice_param_options, option)
-        table.insert(voice_param_index, i)
-      else
-        table.insert(voice_param_options, option)
-        table.insert(voice_param_index, i)
+  -- front-end voice selector param that dynamically serves up players to be passed to _voice_raw param:
+  -- 1. shortens MIDI player names to port # and voice_count (sorry, outta space!)
+  -- 2. only serves up valid crow cv/env options based on crow_out_ param config
+  function update_voice_options()
+    voice_param_options = {}    -- todo p0 local
+    voice_param_index = {}      -- same
+      for i = 1, params:lookup_param("chord_voice_raw").count do
+        local option = params:lookup_param("chord_voice_raw").options[i]
+
+          -- identify connected MIDI players and rename
+          if nb.players[option] ~= nil and nb.players[option].conn ~= nil then
+            local option = "midi port " .. nb.players[option].conn.device.port .. (nb.voice_count > 1 and ("(" .. string.match(option, "(%d+)$") .. ")") or "")
+            table.insert(voice_param_options, option)
+            table.insert(voice_param_index, i)
+            
+          -- mask any unwanted crow_ds players  
+          elseif string.sub(option, 1, 7) == "crow_ds" then
+            local length = string.len(option)
+            local cv = tonumber(string.sub(option, length - 2, length - 2))
+            local env = tonumber(string.sub(option, length, length))
+            
+            if env == 0 then
+              if params:string('crow_out_'..cv) == "CV" then
+                table.insert(voice_param_options, 'crow '..cv)
+                table.insert(voice_param_index, i)
+              end
+            elseif params:string('crow_out_'..cv) == "CV" and params:string('crow_out_'..env) == "Env" then
+              table.insert(voice_param_options, 'crow '..cv..'/'..env)
+              table.insert(voice_param_index, i)            
+            end
+            
+          -- other players pass through as-is
+          else
+            table.insert(voice_param_options, option)
+            table.insert(voice_param_index, i)
+          end
+          
       end
-    -- end
   end
+  
+  update_voice_options()
+  
+  
+  -- updates voice selector options and sets (or resets) new param index after crow_out param changes
+  function update_voice_params()
+    -- todo p0 hit all voice params
+    local sources = {'chord', 'seq', 'crow', 'midi'}
+    for i = 1, #sources do
+      local param_string = sources[i]..'_voice'
+      local param_string = param_string == 'seq_voice' and 'seq_voice_1' or param_string
+      local prev_param_name = params:string(param_string)
+      params:lookup_param(param_string).options = voice_param_options
+      params:lookup_param(param_string).count = #voice_param_options
+      local iterations = #params:lookup_param(param_string).options + 1
+      for j = 1, iterations do
+        if j == iterations then
+          params:set(param_string, 1)
+        elseif prev_param_name == params:lookup_param(param_string).options[j] then
+          params:set(param_string, j)
+          break
+        end
+      end
+    end
+  end  
+  
   
   params:add_option("chord_voice", 'Voice', voice_param_options, 1)
   params:set_action("chord_voice", function(index) params:set("chord_voice_raw", voice_param_index[index]) end)
@@ -807,6 +865,7 @@ local voice_param_index = {}
   
   -- Some actions need to be added post-bang. I forget why but something to do with setting the chord readout?
   params:set_action('mode', function() build_scale(); update_chord_action() end)
+
   
   countdown_timer = metro.init()
   countdown_timer.event = countdown -- call the 'countdown' function below,
@@ -823,7 +882,7 @@ end
   -- UPDATE_MENUS. todo p2: can be optimized by only calculating the current view+page or when certain actions occur
 function update_menus()
   -- GLOBAL MENU 
-    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'crow_clock', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
+    menus[1] = {'mode', 'transpose', 'clock_tempo', 'clock_source', 'crow_out_1', 'crow_out_2', 'crow_out_3', 'crow_out_4', 'crow_clock_index', 'dedupe_threshold', 'chord_preload', 'chord_generator', 'seq_generator'}
   
   -- CHORD MENU
   menus[2] = {'chord_voice', 'chord_type', 'chord_octave', 'chord_range', 'chord_max_notes', 'chord_inversion', 'chord_style', 'chord_strum_length', 'chord_timing_curve', 'chord_div_index', 'chord_duration_index', 'chord_dynamics', 'chord_dynamics_ramp'}
@@ -1561,7 +1620,7 @@ function sequence_clock(sync_val)
         end
       end
       
-      if params:get("crow_clock") == 2 and clock_step % crow_div == 0 then
+      if params:get("crow_out_3") == 4 and clock_step % crow_div == 0 then
         -- crow.output[3]() --pulse defined in init
         crow.output[3].slew = 0
         crow.output[3].volts = 5
@@ -2166,7 +2225,7 @@ end
 
 
 function map_note_3(note_num, octave, pre)  -- mode mapping + diatonic transposition
-  local diatonic_transpose = (pre == true and math.max(next_chord_x or current_chord_x, 1)) -1
+  local diatonic_transpose = (math.max(pre == true and next_chord_x or current_chord_x, 1)) -1
   local note_num = note_num + diatonic_transpose
   local quantized_note = notes_nums[util.wrap(note_num, 1, 7)] + (math.floor((note_num -1) / 7) * 12)
   return(quantized_note + (octave * 12) + params:get('transpose'))
