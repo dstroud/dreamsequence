@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2.5 @modularbeat
+-- v1.2.6 @modularbeat
 -- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.2.5'
+  version = 'v1.2.6'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -2645,17 +2645,19 @@ function to_midi(note, velocity, channel, duration, port)
     end
   end
 
-  -- if note is already playing, send a note-off before note_on is sent again
-  -- else add note into midi_note_history_insert to be turned off later
-  if midi_note_history_insert == false then
-    midi_device[port]:note_off((midi_note), 0, channel)
-  else
-    table.insert(midi_note_history, {duration, midi_note, channel, note_on_time, port})
-  end
-  -- Play note
+
   if midi_play_note == true then
+  
+    if midi_note_history_insert == false then
+      midi_device[port]:note_off((midi_note), 0, channel)
+    else
+      table.insert(midi_note_history, {duration, midi_note, channel, note_on_time, port})
+    end
+  
+  -- Play note
     midi_device[port]:note_on((midi_note), velocity, channel)
   end
+  
 end
 
 
@@ -2760,16 +2762,17 @@ function to_disting(note, velocity, duration)
   end
 
 
- -- if note is already playing, send a note-off before note_on is sent again
-  -- else add note into midi_note_history_insert to be turned off later
-  if disting_note_history_insert == false then
-    table.insert(disting_note_history, {duration, disting_note,  note_on_time})
-  else
-    crow.ii.disting.note_off(disting_note)    
-  end
+  if disting_play_note == true then
+    -- if note is already playing, send a note-off before note_on is sent again
+    -- else add note into midi_note_history_insert to be turned off later
+    if disting_note_history_insert == false then
+      table.insert(disting_note_history, {duration, disting_note,  note_on_time})
+    else
+      crow.ii.disting.note_off(disting_note)    
+    end
 
   -- Play note
-  if disting_play_note == true then
+
     -- print('disting_note ' .. disting_note .. '  |  velocity ' .. velocity)
     crow.ii.disting.note_pitch(disting_note, (disting_note-48)/12)
     crow.ii.disting.note_velocity(disting_note, velocity/10)
