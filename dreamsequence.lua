@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.2.6 @modularbeat
+-- v1.2.7 @modularbeat
 -- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -37,7 +37,7 @@ norns.version.required = 230526 -- update when new musicutil lib drops
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  version = 'v1.2.6'
+  version = 'v1.2.7'
   -----------------------------
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
@@ -984,25 +984,25 @@ function update_menus()
   
   -- MIDI HARMONIZER MENU
   if params:string('midi_output') == 'Mute' then
-    menus[4] = {'midi_output'}
+    menus[4] = {'midi_output', 'midi_harmonizer_in_port'}
   elseif params:string('midi_output') == 'Engine' then
-    menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
+    menus[4] = {'midi_output', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_duration_index', 'midi_pp_amp', 'midi_pp_cutoff', 'midi_pp_tracking', 'midi_pp_gain', 'midi_pp_pw'}
   elseif params:string('midi_output') == 'MIDI' then
     if params:get('midi_velocity_passthru') == 2 then
-      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index','midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_duration_index', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_cc_1_val'}
     else
-      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_harmonizer_in_port', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_duration_index', 'midi_midi_out_port', 'midi_midi_ch', 'midi_velocity_passthru', 'midi_midi_velocity', 'midi_midi_cc_1_val'}
     end
   elseif params:string('midi_output') == 'Crow' then
     if params:string('midi_tr_env') == 'Trigger' then
-      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_crow_slew', 'midi_tr_env'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_crow_slew', 'midi_tr_env'}
     else -- AD envelope
-      menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_crow_slew', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
+      menus[4] = {'midi_output', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_crow_slew', 'midi_tr_env', 'midi_duration_index', 'midi_ad_skew'}
     end
   elseif params:string('midi_output') == 'ii-JF' then
-    menus[4] = {'midi_output', 'midi_note_map', 'midi_octave',  'midi_jf_amp'}
+    menus[4] = {'midi_output', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave',  'midi_jf_amp'}
  elseif params:string('midi_output') == 'Disting' then
-    menus[4] = {'midi_output', 'midi_note_map', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
+    menus[4] = {'midi_output', 'midi_note_map', 'midi_harmonizer_in_port', 'midi_octave', 'midi_duration_index', 'midi_disting_velocity'}
   end
   
   -- CV HARMONIZER MENU
@@ -2553,7 +2553,6 @@ end
 midi_event = function(data)
   local d = midi.to_msg(data)
   if d.type == "note_on" then
-
     local note = _G['map_note_' .. params:get('midi_note_map')](d.note - 35, params:get('midi_octave'), params:get('chord_preload') ~= 0) 
     local destination = params:string('midi_output')
     if destination == 'Engine' then
