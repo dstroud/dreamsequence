@@ -2,9 +2,9 @@
 
 Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid
 
-Required: Monome Norns (**v2.7.6 or later**) and Grid
+Required: Monome Norns (**240221 or later**) and Grid (16x8 or 16x16)
 
-Optional: Crow, Just Friends, Disting EX, MIDI sequencers/controllers
+Optional: Supports MIDI and Crow by default. Installation of additional [NB voices](https://llllllll.co/t/n-b-et-al-v0-1/60374) is highly recommended!
 
 [![Watch the video](https://img.youtube.com/vi/Z6plHOHKwdg/0.jpg)](https://youtu.be/Z6plHOHKwdg)
 
@@ -16,13 +16,11 @@ Optional: Crow, Just Friends, Disting EX, MIDI sequencers/controllers
 
 Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid.
 
-Depending on your need, it can be your primary live performance tool, a compositional assistant, a generative sequencing playground, or just some thing you poke at that happens to make nice-sounding beeps.
+It can be a live performance tool, a composition assistant, or a generative sequencing playground.
 
-The joy of using Dreamsequence is in its intuitive, theory-informed interactivity that allows us to explore various ways of reinterpreting simple musical patterns. Dreamsequence does not aim to be a fully-featured sequencer that can do anything and everything. In fact, sequences are limited to just 8 steps at the moment. But I think you will be delighted by what can be done with these simple inputs.
+While fun all by itself, Dreamsequence opens up when you add friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader capable of processing external musical data streams through its harmonizers. Sequences and harmonies can be intelligently merged with natural sounding results.
 
-While fun all by itself, Dreamsequence really opens up when you add friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader capable of processing external musical data streams through its harmonizers. Sequences and harmonies can be intelligently merged with natural sounding results.
-
-For those looking to make experimental music that goes beyond randomization and LFOs (not that there's anything wrong with that), Dreamsequence features an Arranger and Event scheduling system that lets you create your own procedural layer for controlling (or ceding to chaos) every aspect of your creation over the course of time. If you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll be rewarded by spending some time with Events.
+Dreamsequence features an Arranger and Event scheduling system that lets you create your own procedural layer for controlling (or ceding to chaos) every aspect of your composition. If you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll be rewarded by spending some time with Events.
 
 I hope you have as much fun using Dreamsequence as I have had creating it, and I'd love to hear about how you're using it at l.llllllll.co/dreamsequence
 
@@ -33,8 +31,8 @@ Dan
 
 # Overview
 
+This Overview will explain how the components that make up Dreamsequence operate. It's a bit dry and technical, so if you are more of the skim-the-manual type, feel free to [install some NB voices](https://llllllll.co/t/n-b-et-al-v0-1/60374) to get you started, then skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#grid-interface) guide. You'll likely want to keep the [Norns interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#norns-interface) guide handy for reference.
 
-This Overview will explain how the components that make up Dreamsequence operate. It's a bit dry and technical, so if you are more of the skim-the-manual type, feel free to skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#grid-interface) guide and keep the [Norns interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#norns-interface) guide handy for reference.
 
 > **_NOTE:_** Dreamsequence supports saving/loading of your song through the system PARAMETERS>>PSET menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but things will be missed and I recommend you wrap up any work before updating.
 >
@@ -45,14 +43,13 @@ This Overview will explain how the components that make up Dreamsequence operate
 - The active chord can be sent to an output for playback (MIDI, Norns engine, i2c, etc...) or it can be muted.
 - Chord patterns are references to chord degrees (I-VII) across two octaves. If you're not a music theory nerd, this just means that the palette of chords that Grid offers will always sound nice together and we can change the mood of the song by simply switching to a different mode which will change all the chords for us and cascade those changes to everything else using the active chord.
 - 4 chord patterns (A, B, C, D) can be saved then switched between in a quantized manner using Grid (sort of like Ableton Live's Session mode) or the Arranger.
-- New patterns and some basic song/engine randomizations can be procedurally generated by holding down the Chord view key on Grid (last column, row 7) and pressing K3. Or hold rows 7 and 8 then press K3 to generate Chords and Seq together.
+- New patterns and some basic song/engine randomizations can be procedurally generated by holding down the Chord view key on Grid (last column, row 7/15) and pressing K3. Or hold rows 7/15 and 8/16 then press K3 to generate Chords and Seq together.
 - See the [Chord](https://github.com/dstroud/dreamsequence/blob/main/README.md#chord-menu) menu documentation for more details.
 
 ## Seq (sequencer/arp)
 *Grid-based monophonic pattern sequencer (formerly ARP)*
 - Seq can be configured as a chord-based arpeggiator, step sequencer, or various hybrids of the two.
-- Seq currently has just 8 notes. This may seem limiting at first, but the idea is see how much juice we can squeeze out of the sequence by using techniques like sequence triggering, resetting, pattern transformation, note mapping, etc...
-- New patterns and some basic engine randomizations can be procedurally generated by holding down the Seq view key on Grid (last column, row 8) and pressing K3. Or hold rows 7 and 8 then press K3 to generate Chord and Seq patterns together.
+- New patterns and some basic engine randomizations can be procedurally generated by holding down the Seq view key on Grid (last column, row 8/16) and pressing K3. Or hold rows 7/15 and 8/16 then press K3 to generate Chord and Seq patterns together.
 - See the [Seq](https://github.com/dstroud/dreamsequence/blob/main/README.md#seq-menu) menu documentation for more details.
 
 
@@ -68,7 +65,8 @@ This Overview will explain how the components that make up Dreamsequence operate
 
 ## CV Harmonizer
 *Magical sample and hold + quantizer + chord/mode remapping (requires Crow)*
-- A trigger received at Crow input 2 will sample the voltage at input 1 and use this to play a notes from the selected chord or mode.
+- A trigger received at Crow input 1 will sample the voltage at input 2 and use this to play a notes from the selected chord or mode.
+- Alternately, voltage sampling can be triggered on a fixed schedule using the Trigger setting.
 - Rests can be inserted by enabling the "Auto-rest" menu option and triggering the same voltage repeatedly within a chord step.  
 - Ideas:
   - Process CV from your eurorack sequencer then send it back out via Crow outputs 1-2, like a chord quantizer. 
@@ -91,7 +89,7 @@ This Overview will explain how the components that make up Dreamsequence operate
 
 The Chord view is used to program chord patterns A-D. Since the Seq and harmonizers can create notes based on the active chord, this is typically where you'll begin composing.
 
-- Sequence plays from top to bottom and sequence length is set using column 15.
+- Sequence plays from top to bottom and sequence length is set using column 15. On 16x8 Grids, E1 can be used to scroll up and down the full 16 pattern steps.
 
 - Chords are selected using columns 1-14 which represent chord degrees I-VII across two octaves. Pressing and holding a key will display the corresponding chord on the Norns screen Pattern Dashboard (upper right). A setting is available via K1>>PARAMETERS>>EDIT>>PREFERENCES to change that readout to show chord names or Roman numeral chord degrees.
 
@@ -118,7 +116,7 @@ The Seq view is used to program the notes in the monophonic sequence/arpeggio/st
 	- Mode+transp.: columns 1-7 play notes from the selected mode and apply a diatonic transposition based on the active chord degree. Columns 8-14 play the same one octave up. Example: In C Major degree I, columns 1-7 would be C, D, E, F, G, A, B. Degree ii would result in D, E, F, G, A, B, C.
 	- Mode: columns 1-7 play notes from the selected mode, columns 8-14 play the same one octave up.
 
-- Seq plays from top to bottom and sequence length is set using column 15. After completing the sequence, the playhead will reset to the beginning and wait to start playback again based on the Seq "Start on" setting.
+- Seq plays from top to bottom and sequence length is set using column 15. On 16x8 Grids, E1 can be used to scroll up and down the full 16 pattern steps. After completing the sequence, the playhead will reset to the beginning and wait to start playback again based on the Seq "Start on" setting.
 
 - The last three keys on the bottom of the rightmost column switch between Arranger, Chord, and Seq views.
   - Holding the Seq view key enables alternate functions:
@@ -154,7 +152,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
 - Events view is entered by holding down a segment on the Arranger Timeline (row 5) then pressing K3. Think of it as zooming in on that segment- and thus the chord pattern (A-D).
 
 - Grid displays a view of events in the Arranger segment, where events fire left-to-right then top-to-bottom (like reading in English).
-  - Rows 1-8 represent each step in the segment's chord pattern, just like on the Grid chord view. We don't show a playhead moving from top to bottom but it might help to imagine it. Grid keys will be dimly-illuminated to indicate the length of the assigned pattern (A-D). Note that you can create events beyond the range of the chord pattern's length- they just won't fire.
+  - Rows 1-16 represent each step in the segment's chord pattern, just like on the Grid chord view. We don't show a playhead moving from top to bottom but it might help to imagine it. Grid keys will be dimly-illuminated to indicate the length of the assigned pattern (A-D). Note that you can create events beyond the range of the chord pattern's length- they just won't fire.
   - Columns 1-16 are event 'lanes' that fire left-to-right just before the chord on that step plays.
     
 > **_TIP:_** To make it easier to keep track of your events, consider dedicating one lane/column to a certain type of event, such as having chord velocity changes in lane 1, pattern manipulations in lane 2, etc.. or just embrace chaos.
@@ -180,15 +178,19 @@ The Events view is used to manage the scheduling of parameter changes and functi
 
 - Key 2 (K2): Pause/Stop(2x)
 	- Default K2 behavior is to pause playback on a single press and stop on a second press.
-	- Pausing is quantized to occur at the end of a chord step, based on the current Step Length setting.
+	- Pausing is only available when using Internal clock source.
 	- Stopping resets the active chord pattern and will reset the Arranger if it is enabled.
   	- Under certain conditions, alternate functions are enabled and will be shown in the footer section at the bottom of the Norns screen:
     		- While holding down an Arranger Timeline key: cue the playhead to jump to the selected segment after the current segment is finished.
     		- While in the Events view screen: delete selected event or hold to delete all events in the segment.
 
 - Key 3 (K3): Play
-	- Default K3 behavior K3 starts playback (except when syncing to Link clock)
- 	- This can also cancel a pending pause if you catch it before the end of the current chord step.
+	- Default K3 behavior K3 starts playback.
+   	- When using Internal clock source, K3 continues after pausing. Settings are available for each MIDI clock port via K3>>PARAMETERS>>EDIT>>PREFERENCES:
+   		- The “song” option will send out MIDI Song Position Pointer (SPP) and ‘continue’ messages which should work well for things like DAWs.
+		- The “pattern” setting will cause Dreamsequence to continue playback and then send a ’start’ message at the beginning of the next measure. This works well for devices that don’t support SPP: drum machines, loopers, Ableton live’s “Session” view, etc…
+		- In order for ‘pattern’ mode to work as expected, you must set a time signature via GLOBAL>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires restarting playback.
+
 	- Under certain conditions, alternate functions are enabled and will be shown in the footer section at the bottom of the Norns screen:
 		- While holding down an Arranger Timeline key: enter Event view.
     		- While in the Events view screen: save event or return back to Arranger.
@@ -196,7 +198,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
 
 
 - Encoder 1 (E1): Scroll pattern
-  - For 16x8 Grids, extends the Chord and Seq pattern view up to 16 steps.
+  - For 16x8 Grids, extends the Chord and Seq pattern views up to 16 steps.
 
 - Encoder 2 (E2): Select menu
   - Scroll up/down to select a menu.
@@ -264,21 +266,22 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Tempo: sets Norns system clock tempo in BPM.
 
+- Beats per bar: Time signature numerator. Used when syncing MIDI devices using "pattern" mode (K3>>PARAMETERS>>EDIT>>PREFERENCES).
+
+- Beats length: Time signature denominator. Used when syncing MIDI devices using "pattern" mode (K3>>PARAMETERS>>EDIT>>PREFERENCES).
+ 
 - Clock: System clock setting.
-	- Internal and MIDI clock sources work and have full transport support. MIDI clock out ports must be set via K1>>PARAMETERS>>CLOCK
+	- System clock source; MIDI clock out ports must be set via K1>>PARAMETERS>>CLOCK
 
-	> **_TIP:_** It’s possible to finagle a sort of count-in when syncing to MIDI by sending an external start, stopping on Dreamsequence (K2 2x), then scheduling a clean punch-in on the next beat using K3. This avoids the age-old issue of timing being a little off on the first beat when MIDI devices sync.
-	> 
+	- Internal clock source allows pause/continue with "song" or "pattern" modes available to sync MIDI devices. Other clock sources will stop/start but not continue.
 
-	- Link works but using K3 to start transport is disabled due to a bug with clock.link.start() clobbering running clocks. Code wizards: please contact me if you'd like to poke around in the Norns code to help troubleshoot.
+- Crow outs: Outs 1-3 have options for "Off", "CV", "Env", and "Events". Out 4 also includes Dreamsequence's custom clock out option. Unlike the system Crow clock, this clock only runs when transport is playing, and has an option for swing. For best results, make sure the system Crow clock is disabled in PARAMETERS>>CLOCK.
+  
+- Crow clk: Frequency of the pulses from Crow out port 4. Frequency is conveyed as fractions of a measure, with Pulses Per Quarter Note (PPQN) in parenthesis.
 
-	- Crow clock source is not supported at this time.
-
-- Crow clock: Frequency of the pulses from Crow out port 3. Defaults to note-style divisions but Pulses Per Quarter Note (PPQN) are also available by scrolling left. Note that higher PPQN settings are likely to result in instability. _At launch, Dreamsequence sets the Norns system clock "crow out" parameter to "off" since Dreamsequence generates its own clock pulses for Crow that only runs when the script's transport is playing. It will revert changes upon quitting the script._
+- Crow swing: Amount of swing applied to the outgoing Crow clock. 50% is 0 swing and 99% is the maximum swing.
 
 - Dedupe <: This enables and sets the threshold for detecting and de-duplicating repeat notes at each output. This can be particularly helpful when merging sequences from different sources (say combining harmonizer with chords). Rather than trying to send the same note twice (potentially resulting in truncated notes or phase cancellation issues), this will let the initial note pass and filter out the second note if it arrives within the specified period of time.
-
-- Chord preload: This setting enables the sequencer to fetch upcoming chord changes slightly early for processing the harmonizer inputs. This compensates for situations where the incoming note may arrive slightly before the chord change it's intended to harmonize with, such as when playing on a keyboard and hitting a note just before the chord change. This does not affect the timing of Chord and Seq playback.
 
 - C-gen: Which algorithm is used for generating _Chord_ patterns. The default value picks an algorithm randomly.
 
@@ -286,17 +289,11 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 #### CHORD menu
 
-- Output: Where the output of the chord sequence is sent for playback. Some menu items are output-specific.
-  - Mute: Still sends active chords to the Seq and harmonizers, they just won't play directly. 
-  - Engine: Norns PolyPerc engine.
-  - MIDI: Output on the selected MIDI port.
-  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. For best results, enable a Strum direction or set "Max notes" to 1. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching). 
-  - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
-  - Disting: Disting EX Eurorack module requires Crow connected via i2c.
+- Voice: Where the output of the chord sequence is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
 
 - Chord type: Selects between triads and 7th chords and displays the chord readout as such. Note that each sequence source can set this independently so it's possible for the Chord sequencer to output triads while the other sources output 7ths (and vice versa).
 
-- Octave: Shifts output from -2 to +4 octaves.
+- Octave: Shifts output from -4 to +4 octaves.
 
 - Range: Expands or shrinks the chord's pitch range, measured in note intervals. An asterisk (*) will appear if this value is less than the "Max notes" parameter, indicating that the value shown here is limiting the number of notes played. Note that a Range of 3 will effectively play 7th chords as triads.
 
@@ -310,39 +307,19 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Strum curve: Bipolar control (-100% to +100%) over note timing where negative values will cause note timing to slow down over time and positive values will cause note timing to speed up over time. A value of 0% will result in linear timing.
 
-- Ramp: Bipolar control (-100% to +100%) of the Velocity/Amp values for each note. When Strum is off, this will change the dynamic balance of low and high pitched notes in the chord. When strumming, negative values will lower dynamics over time and positive values will raise dynamics over time.
-
 - Step length: The length of each step/row in the chord pattern, relative to 1 measure. Values ending in T are tuplets.
 
-- Duration (_Engine, MIDI Disting_): Chord note duration relative to 1 measure. Values ending in T are tuplets.
+- Duration: Chord note duration relative to 1 measure. Values ending in T are tuplets. The first option, "Step" will always adjust note length to match step length.
 
-- Amp: (_Engine, Just Friends_): Either Norns sound engine amplitude in percent or Just Friends amplitude in volts (0-5v).
+- Swing: Amount of swing applied. 50% is 0 swing and 99% is the maximum swing.
 
-- Cutoff (_Engine_): Norns sound engine filter frequency offset.
+- Dynamics: Volume or amplitude of voice.
 
-- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns sound engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept).
-
-- Gain (_Engine_): Norns sound engine gain setting.
-
-- Pulse width (_Engine_): Norns sound engine square-wave based pulse width.
-
-- Port (_MIDI_): Port for MIDI output.
-
-- Channel (_MIDI_): Channel for MIDI output.
-
-- Velocity (_MIDI, Disting_): Note velocity.
-
-- Mod wheel: (_MIDI_): Send MIDI control change 1 value out to the configured MIDI port and channel.
-
+- Ramp: Bipolar control (-100% to +100%) of the Velocity/Amp values for each note. When Strum is off, this will change the dynamic balance of low and high pitched notes in the chord. When strumming, negative values will lower dynamics over time and positive values will raise dynamics over time.
+ 
 #### SEQ menu
 
-- Output: Where the output of the Seq is sent for playback. Some menu items are output-specific.
-  - Mute: Seq still plays but there is no sound output.
-  - Engine: Norns PolyPerc engine.
-  - MIDI: Output on the selected MIDI port.
-  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching). 
-  - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
-  - Disting: Disting EX Eurorack module requires Crow connected via i2c.
+- Voice: Where the output of the Seq is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
   
 - Notes: Four ways of configuring Grid's note mapping are available:
   - Triad: columns 1-3 map to notes 1-3 from the active chord interpreted as a triad. Columns 4-6 play the same notes one octave up, etc..
@@ -378,43 +355,21 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
   For the sake of simplicity, these examples have one chord repeated 3 times. In practice, chord changes will also be influencing the sequence notes, which can produce mesmerizing results. Also, remember that it's possible to use events to switch between the above settings and/or directly trigger starts and resets, allowing for significantly more complex sequences than are shown here.
   
-- Octave: Shifts output from -2 to +4 octaves.
+- Octave: Shifts output from -4 to +4 octaves.
 
 - Step length: The length of each step/row in the Seq pattern, relative to 1 measure. Values ending in T are tuplets.
 
-- Duration (_Engine, Crow, MIDI, Disting_): Seq note duration relative to 1 measure. Values ending in T are tuplets.
+- Duration: Note duration relative to 1 measure. Values ending in T are tuplets. The first option, "Step" will always adjust note length to match step length.
 
-- Amp: (_Engine, Just Friends_): Either Norns sound engine amplitude in percent or Just Friends amplitude in volts (0-5v).
-
-- Cutoff (_Engine_): Norns sound engine filter frequency offset.
-
-- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns sound engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept).
-
-- Gain (_Engine_): Norns sound engine gain setting.
-
-- Pulse width (_Engine_): Norns sound engine square-wave based pulse width.
-
-- Port (_MIDI_): Port for MIDI output.
-
-- Channel (_MIDI_): Channel for MIDI output.
-
-- Velocity (_MIDI, Disting_): Note velocity.
-
-- Mod wheel: (_MIDI_): Send MIDI control change 1 value out to the configured MIDI port and channel.
-
-- Output (_Crow_): Select between trigger or Attack Decay (AD) envelope to be sent from Crow out 2.
-
-- AD env. skew: Amount the AD envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only.
+- Swing: Amount of swing applied. 50% is 0 swing and 99% is the maximum swing.
+  
+- Accent: Bipolar modulation of note dynamics on upbeats.
+  
+- Dynamics: Volume or amplitude of voice.
 
 #### MIDI HARMONIZER menu
 
-- Output: Where the output of the harmonizer is sent for playback. Some menu items are output-specific.
-  - Mute: No sound is output.
-  - Engine: Norns PolyPerc engine.
-  - MIDI: Output on the selected MIDI port.
-  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching). 
-  - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
-  - Disting: Disting EX Eurorack module requires Crow connected via i2c.
+- Voice: Where the output of the harmonizer is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
   
 - Notes: Four ways of mapping incoming MIDI notes to output notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming note value starting from C1.
     - Triad: notes C1-D1 map to notes 1-3 from the active chord interpreted as a triad. Notes D#1-F1 play the same notes one octave up, etc..
@@ -422,45 +377,15 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 	  - Mode+transp.: beginning with note C1, incoming notes are mapped to the mode configured in GLOBAL>>Mode, then a diatonic transposition based on the active chord degree is applied.
 	  - Mode: beginning with note C1, incoming notes are mapped to the mode configured in GLOBAL>>Mode.
    
-- Octave: Shifts output from -2 to +4 octaves.
+- Octave: Shifts output from -4 to +4 octaves.
 
-- Duration (_Engine, Crow, MIDI_): Note duration relative to 1 measure. Values ending in T are tuplets. _Currently, Dreamsequence always uses this value regardless of how long the source note is sustained._
-
-- Amp: (_Engine, Just Friends_): Either Norns sound engine amplitude in percent or Just Friends amplitude in volts (0-5v).
-
-- Cutoff (_Engine_): Norns sound engine filter frequency offset.
-
-- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns sound engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept).
-
-- Gain (_Engine_): Norns sound engine gain setting.
-
-- Pulse width (_Engine_): Norns sound engine square-wave based pulse width.
-
-- Port in (_MIDI): MIDI port used for the MIDI Harmonizer (accepts all channels).
-
-- Port out (_MIDI_): Port for MIDI output.
-
-- Channel (_MIDI_): Channel for MIDI output.
-
-- Pass velocity (_MIDI_): Option to use the incoming MIDI velocity for the outgoing note.
-
-- Velocity (_MIDI, Disting_): Note velocity (only available for MIDI output when pass velocity = false).
-
-- Mod wheel: (_MIDI_): Send MIDI control change 1 value out to the configured MIDI port and channel.
-
-- Output (_Crow_): Select between trigger or Attack Decay (AD) envelope to be sent from Crow out 2.
-
-- AD env. skew: Amount the AD envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only.
+- Duration: Note duration relative to 1 measure. Values ending in T are tuplets.
+  
+- Dynamics: Volume or amplitude of voice.
 
 #### CV HARMONIZER menu
 
-- Output: Where the output of the harmonizer is sent for playback. Some menu items are output-specific.
-  - Mute: No sound is output.
-  - Engine: Norns PolyPerc engine.
-  - MIDI: Output on the selected MIDI port.
-  - Crow: Outputs a monophonic sequence via Crow for Eurorack and other CV-capable gear. See [Crow Patching](https://github.com/dstroud/dreamsequence/blob/main/README.md#crow-patching). 
-  - ii-JF: Just Friends Eurorack module requires Crow connected via i2c.
-  - Disting: Disting EX Eurorack module requires Crow connected via i2c.
+- Voice: Where the output of the harmonizer is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
   
 - Notes: Four ways of mapping voltage send to Crow input 1 to notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming voltage which is then quantized to 1v/oct or 1 semitone increments.
     - Triad: voltage of 0v, 1/12v, 2/12v map to notes 1-3 from the active chord interpreted as a triad. Voltage of 3/12v, 4/12v, 5/12v play the same notes one octave up, etc..
@@ -470,31 +395,13 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
   
 - Auto-rest: When true, this option will suppress the same note when it is repeated consecutively within one chord step, resulting in a rest. This can be a useful way of adding rest functionality into analog sequencers that don't support such a feature.
 
-- Octave: shifts output from -2 to +4 octaves.
+- Octave: shifts output from -4 to +4 octaves.
 
-- Duration (_Engine, Crow, MIDI_): Note duration relative to 1 measure. Values ending in T are tuplets.
+- Duration: Note duration relative to 1 measure. Values ending in T are tuplets. The first option, "Step" will always adjust note length to match step length.
 
-- Amp: (_Engine, Just Friends_): Either Norns sound engine amplitude in percent or Just Friends amplitude in volts (0-5v).
-
-- Cutoff (_Engine_): Norns sound engine filter frequency offset.
-
-- Fltr tracking (_Engine_): Amount of "Keyboard tracking" applied to the Norns sound engine filter. Higher values will result in a higher filter cutoff for higher pitched notes. Final filter frequency = note frequency * filter tracking + cutoff. (y = mx + b slope-intercept).
-
-- Gain (_Engine_): Norns sound engine gain setting.
-
-- Pulse width (_Engine_): Norns sound engine square-wave based pulse width.
-
-- Port (_MIDI_): Port for MIDI output.
-
-- Channel (_MIDI_): Channel for MIDI output.
-
-- Velocity (_MIDI, Disting_): Note velocity.
-
-- Mod wheel: (_MIDI_): Send MIDI control change 1 value out to the configured MIDI port and channel.
-
-- Output (_Crow_): Select between trigger or Attack Decay (AD) envelope to be sent from Crow out 2.
-
-- AD env. skew: Amount the AD envelope will be skewed, where 0 = Decay only, 50 = triangle, and 100 = Attack only.
+- Swing: Amount of swing applied. 50% is 0 swing and 99% is the maximum swing.
+    
+- Dynamics: Volume or amplitude of voice.
 
 ---
 
@@ -503,15 +410,19 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 	- Default pset: Automatically load the last-saved pset (and data) on script launch. 
 	- Chords as: Global menu option selects between displaying chords names (Gmaj) or as chord degrees (VII).
 	- Crow pullup: i2c pullup resistors can be set On (default) or Off.
+ 	- MIDI Clock Out: Determines behavior of synced MIDI devices when pausing/continuing:
+   		- The “song” option will send out MIDI Song Position Pointer (SPP) and ‘continue’ messages which should work well for things like DAWs.
+		- The “pattern” setting will cause Dreamsequence to continue playback and then send a ’start’ message at the beginning of the next measure. This works well for devices that don’t support SPP: drum machines, loopers, Ableton live’s “Session” view, etc…
+		- In order for ‘pattern’ mode to work as expected, you must set a time signature via GLOBAL>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires restarting playback. 
  
 ---
 
 # Crow Patching
 
-Dreamsequence supports using Crow to send and receive CV and triggers:
-- Crow IN 1: CV used to determine note pitch of the CV Harmonizer. Can be unquantized or quantized. Attenuation recommended
-- Crow IN 2: Trigger (rising past 2 volts) in will sample the CV on Crow IN 1 and send a note from the CV Harmonizer
-- Crow OUT 1: "Crow" output V/oct out
-- Crow OUT 2: "Crow" output trigger or 10v attack/decay envelope out
-- Crow OUT 3: Clock out (beat-division or PPQN) set in "Global:Crow clock" menu item
-- Crow OUT 4: A trigger can be sent from this output by scheduling an [Arranger Event](https://github.com/dstroud/dreamsequence/blob/main/README.md#events-view). More to come.
+Dreamsequence supports using Crow to send and receive CV and triggers. Outputs are configurable via Global>> Crow out x, defaulting to the following:
+- Crow IN 1: Trigger in (rising past 2 volts) will sample the CV on Crow IN 2 and send a note from the CV Harmonizer
+- Crow IN 2: CV used to determine note pitch of the CV Harmonizer. Can be unquantized or quantized. Attenuation recommended.
+- Crow OUT 1: Default "Crow" output V/oct out
+- Crow OUT 2: Default "Crow" output trigger or 10v attack/decay envelope out
+- Crow OUT 3: Default used by [Arranger Events](https://github.com/dstroud/dreamsequence/blob/main/README.md#events-view).
+- Crow OUT 4: Default clock out (beat-division or PPQN) set in "Global:Crow clock" menu item
