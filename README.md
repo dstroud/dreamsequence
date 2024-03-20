@@ -14,13 +14,7 @@ Optional: Supports MIDI and Crow by default. Installation of additional [NB voic
 
 # Intro
 
-Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid.
-
-It can be a live performance tool, a composition assistant, or a generative sequencing playground.
-
-While fun all by itself, Dreamsequence opens up when you add friends (anything that can send CV or MIDI notes), in which case it becomes a Voltronesque band leader capable of processing external musical data streams through its harmonizers. Sequences and harmonies can be intelligently merged with natural sounding results.
-
-Dreamsequence features an Arranger and Event scheduling system that lets you create your own procedural layer for controlling (or ceding to chaos) every aspect of your composition. If you've ever enjoyed the feeling of creating a monster modular synth patch that may or may not have become sentient at some point along the way, you'll be rewarded by spending some time with Events.
+Dreamsequence is a chord-based sequencer, arpeggiator, harmonizer, and arranger for Monome Norns+Grid. It employs bit of music theory magic to quickly create harmonious compositions from simple inputs like Grid patterns, MIDI, and CV.
 
 I hope you have as much fun using Dreamsequence as I have had creating it, and I'd love to hear about how you're using it at l.llllllll.co/dreamsequence
 
@@ -31,7 +25,7 @@ Dan
 
 # Overview
 
-This Overview will explain how the components that make up Dreamsequence operate. It's a bit dry and technical, so if you are more of the skim-the-manual type, feel free to [install some NB voices](https://llllllll.co/t/n-b-et-al-v0-1/60374) to get you started, then skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#grid-interface) guide. You'll likely want to keep the [Norns interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#norns-interface) guide handy for reference.
+This Overview will explain how the components that make up Dreamsequence operate. It's a bit dry and technical, so if you are more of the skim-the-manual type, feel free to [install some NB voices](https://llllllll.co/t/n-b-et-al-v0-1/60374) then skip ahead to the [Grid interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#grid-interface) guide. You'll likely want to keep the [Norns interface](https://github.com/dstroud/dreamsequence/blob/main/README.md#norns-interface) guide handy for reference.
 
 
 > **_NOTE:_** Dreamsequence supports saving/loading of your song through the system PARAMETERS>>PSET menu but you should expect these saves to break when doing updates. I'll do my best to notify of breaking changes in patch notes, but things will be missed and I recommend you wrap up any work before updating.
@@ -65,7 +59,7 @@ This Overview will explain how the components that make up Dreamsequence operate
 
 ## CV Harmonizer
 *Magical sample and hold + quantizer + chord/mode remapping (requires Crow)*
-- A trigger received at Crow input 1 will sample the voltage at input 2 and use this to play a notes from the selected chord or mode.
+- A trigger received at Crow input 2 will sample the voltage at input 1 and use this to play a notes from the selected chord or mode.
 - Alternately, voltage sampling can be triggered on a fixed schedule using the Trigger setting.
 - Rests can be inserted by enabling the "Auto-rest" menu option and triggering the same voltage repeatedly within a chord step.  
 - Ideas:
@@ -115,6 +109,7 @@ The Seq view is used to program the notes in the monophonic sequence/arpeggio/st
 	- 7th: columns 1-4 map to notes 1-4 from the active chord interpreted as a 7th chord. Columns 5-8 play the same notes one octave up, etc..
 	- Mode+transp.: columns 1-7 play notes from the selected mode and apply a diatonic transposition based on the active chord degree. Columns 8-14 play the same one octave up. Example: In C Major degree I, columns 1-7 would be C, D, E, F, G, A, B. Degree ii would result in D, E, F, G, A, B, C.
 	- Mode: columns 1-7 play notes from the selected mode, columns 8-14 play the same one octave up.
+	- Chromatic: columns 1-14 play chromatic semitones.
 
 - Seq plays from top to bottom and sequence length is set using column 15. On 16x8 Grids, E1 can be used to scroll up and down the full 16 pattern steps. After completing the sequence, the playhead will reset to the beginning and wait to start playback again based on the Seq "Start on" setting.
 
@@ -321,12 +316,13 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Voice: Where the output of the Seq is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
   
-- Notes: Four ways of configuring Grid's note mapping are available:
+- Notes: Five ways of configuring Grid's note mapping are available:
   - Triad: columns 1-3 map to notes 1-3 from the active chord interpreted as a triad. Columns 4-6 play the same notes one octave up, etc..
   - 7th: columns 1-4 map to notes 1-4 from the active chord interpreted as a 7th chord. Columns 5-8 play the same notes one octave up, etc..
   - Mode+transp.: columns 1-7 play notes from the selected mode and apply a diatonic transposition based on the active chord degree. Columns 8-14 play the same one octave up. Example: In C Major degree I, columns 1-7 would be C, D, E, F, G, A, B. Degree ii would result in D, E, F, G, A, B, C.
   - Mode: columns 1-7 play notes from the selected mode, columns 8-14 play the same one octave up.
-
+  - Chromatic: columns 1-14 play chromatic semitones.
+    
 - Start on and Reset on menus: The sequence always tries to play until it completes, at which point it loops to be the beginning and is ready to start again as soon as it receives the signal to do so. These menu options determine what can send that signal to start and what can force a restart before the end of the sequence.
   - Start on:
     - Seq end: as soon as the sequence ends, it will start itself in a loop.
@@ -371,11 +367,12 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Voice: Where the output of the harmonizer is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
   
-- Notes: Four ways of mapping incoming MIDI notes to output notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming note value starting from C1.
+- Notes: Five ways of mapping incoming MIDI notes to output notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming note value starting from C1.
     - Triad: notes C1-D1 map to notes 1-3 from the active chord interpreted as a triad. Notes D#1-F1 play the same notes one octave up, etc..
 	  - 7th: columns C1-D#1 map to notes 1-4 from the active chord interpreted as a 7th chord. Columns E1-G1 play the same notes one octave up, etc..
 	  - Mode+transp.: beginning with note C1, incoming notes are mapped to the mode configured in GLOBAL>>Mode, then a diatonic transposition based on the active chord degree is applied.
 	  - Mode: beginning with note C1, incoming notes are mapped to the mode configured in GLOBAL>>Mode.
+       	  - Chromatic: beginning with note C1, incoming notes are mapped to chromatic semitones.
    
 - Octave: Shifts output from -4 to +4 octaves.
 
@@ -387,11 +384,12 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 
 - Voice: Where the output of the harmonizer is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
   
-- Notes: Four ways of mapping voltage send to Crow input 1 to notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming voltage which is then quantized to 1v/oct or 1 semitone increments.
+- Notes: Five ways of mapping voltage send to Crow input 1 to notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming voltage which is then quantized to 1v/oct or 1 semitone increments.
     - Triad: voltage of 0v, 1/12v, 2/12v map to notes 1-3 from the active chord interpreted as a triad. Voltage of 3/12v, 4/12v, 5/12v play the same notes one octave up, etc..
 	  - 7th: columns voltage of 0v, 1/12v, 2/12v, 3/12v map to notes 1-4 from the active chord interpreted as a 7th chord. Voltage of 4/12v, 5/12v, 6/12v play the same notes one octave up, etc..
 	  - Mode+transp.: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode, then a diatonic transposition based on the active chord degree is applied.
 	  - Mode: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode.
+    	  - Chromatic: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to chromatic semitones.
   
 - Auto-rest: When true, this option will suppress the same note when it is repeated consecutively within one chord step, resulting in a rest. This can be a useful way of adding rest functionality into analog sequencers that don't support such a feature.
 
@@ -420,8 +418,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 # Crow Patching
 
 Dreamsequence supports using Crow to send and receive CV and triggers. Outputs are configurable via Global>> Crow out x, defaulting to the following:
-- Crow IN 1: Trigger in (rising past 2 volts) will sample the CV on Crow IN 2 and send a note from the CV Harmonizer
-- Crow IN 2: CV used to determine note pitch of the CV Harmonizer. Can be unquantized or quantized. Attenuation recommended.
+- Crow IN 1: CV used to determine note pitch of the CV Harmonizer. Can be unquantized or quantized. Attenuation recommended.
+- Crow IN 2: Trigger in (rising past 2 volts) will sample the CV on Crow IN 1 and send a note from the CV Harmonizer
 - Crow OUT 1: Default "Crow" output V/oct out
 - Crow OUT 2: Default "Crow" output trigger or 10v attack/decay envelope out
 - Crow OUT 3: Default used by [Arranger Events](https://github.com/dstroud/dreamsequence/blob/main/README.md#events-view).
