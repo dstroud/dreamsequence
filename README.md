@@ -65,6 +65,7 @@
 
 ### Known issues
 
+- Breaks compatibility with earlier .psets. May need to clear dust/data/dreamsequence/prefs.data
 - At the end of a 1-shot arrangement, a MIDI/Link stop message is sent. This technically occurs at the start of the next measure which may cause synced devices to stop late (Link in particular as there's no latency compensation).
 - Live time signature changes probably will break something.
 </details>
