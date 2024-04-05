@@ -1,3 +1,257 @@
+# Changelog
+
+<details>
+<summary>v1.3</summary>
+	
+### Features
+- Nota Bene (NB) voice support. MIDI and Crow are supported by default and additional voices can be installed via the following Maiden commands. See [the NB topic on Lines](https://llllllll.co/t/60374) for details.
+
+	Soft synths:
+
+	`;install https://github.com/sixolet/doubledecker`	2-layer synth a la CS-80
+
+	`;install https://github.com/sixolet/emplaitress`	Polyphonic MI Plaits
+
+  	`;install https://github.com/dstroud/nb_polyperc`	Norns PolyPerc
+
+	`;install https://github.com/entzmingerc/nb_rudiments`	Rudiments percussion
+
+
+ 	i2c devices:
+
+	`;install https://github.com/sixolet/nb_wsyn`	Whimsical Raps W/synth
+
+	`;install https://github.com/sixolet/nb_jf`	Whimsical Raps Just Friends
+
+	`;install https://github.com/sixolet/nb_ex`	Expert Sleepers Disting EX
+
+	`;install https://github.com/sixolet/nb_ansible`	Monome Ansible
+- Swing settings for Chord, Seq, CV harmonizer, and Crow clock out.
+- Seq ‘Accent’ param applies a positive or negative dynamics offset to swing steps.
+- "Step" duration setting adjusts note duration to always match the step length (Chord and Seq) or Trigger division (CV harmonizer).
+- Pressing a Grid pattern key when transport is stopped will play that chord or note.
+- Chromatic mapping option added to `Notes` parameter.
+- The SONG menu now has settings for configuring Crow's outputs which will result in various CV or CV/Env pair options appearing in Voice parameters. All outs can send CV, Env, and Events while out 4 can send also send a Clock pulse when transport is running.
+- `Crow events` event category has been created with subcategories for outputs 1-4. There's also a new event "5v 8-steps" event for driving a sequential switch (i.e. Vice Virga) that maybe works with similar devices (0.31v, 0.94v, 1.56v, 2.19v, 2.81v, 3.44v, 4.06v, 4.69v).
+
+
+### Changes and FYI
+- Requires Norns 240221
+- An event category is created for each NB voice at script launch, allowing script control over each voice's sound. Event verification occurs on .pset load. _WARNING: if a pset is loaded that includes events for a NB voice mod that has since been disabled, those events will be deleted._
+- Events now respect controlspec/taper parameter mappings. E.g. Increment/Wander will result in the same values as if performing a parameter change via encoders.
+- Chord preload setting is disabled. I’m not sure how necessary this feature was (it was intended to allow jamming on a keyboard into the MIDI/CV harmonizers, even if the notes were hit a little before the chord change). I never really used it and it’s a bit complicated to implement with Lattice so I’m just turning it off for now. LMK if you need this and I can look into bringing it back.
+- MIDI device names may be shortened to fit (acronym-based) and will appear alphabetically as if they have an invisible prefix of "MIDI". The numbers at the end are `port.instance` where port is the assigned MIDI port in `system>>devices` and instance is the number of instances of the NB voice (default 1).
+- Chord division change events will now occur before the chord plays rather than on the next step.
+- Important transport changes (depending on clock source):
+
+  - Internal clock source (preferred)
+    - Pressing K2 will immediately pause Dreamsequence and send a stop message out to synced devices.
+    - New `MIDI CLOCK OUT` settings are available for each MIDI clock port via `K3>>PARAMETERS>>EDIT>>PREFERENCES` and determine behavior when continuing after pausing. 
+      - The “song” option will send out MIDI Song Position Pointer (SPP) and ‘continue’ messages which should work well for things like DAWs.
+      - The “pattern” setting will cause Dreamsequence to continue playback and then send a ’start’ message at the beginning of the next measure. This works well for devices that don’t support SPP: drum machines, loopers, Ableton live’s “Session” view, etc…
+      - In order for pattern mode to work as expected, you must set a time signature via SONG>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires a stop and restart, I think.
+	
+	
+  - Link clock source (limited support)
+    - The good news: the issue with starting Link from Norns is addressed in update [240221](/t/norns-update-240221/66241)!
+    - The bad news: the way the Link issue is being addressed prevents pause/continue from working at all. I’ve raised an [issue](https://github.com/monome/norns/issues/1756) about this and hopefully a solution can be found. For now, K2 or a stop message from a synced device will result in a full stop.
+	
+  - MIDI clock source
+    - K2/K3 are disabled.
+    - No pause/continue (full stop/start only).
+
+  - Crow clock source (not supported)
+
+
+### Known issues
+
+- At the end of a 1-shot arrangement, a MIDI/Link stop message is sent. This technically occurs at the start of the next measure which may cause synced devices to stop late (Link in particular as there's no latency compensation).
+- Live time signature changes probably will break something.
+</details>
+
+<details>
+<summary>v1.2</summary>
+	
+## New Chord menu options:
+
+- Output: Crow is now enabled as an output destination for Chords. For best results, enable a Strum direction or set "Max notes" to 1.
+
+- Range: Expands or shrinks the chord's pitch range, measured in note intervals. An asterisk (*) will appear if this value is less than the "Max notes" parameter, indicating that the value shown here is limiting the number of notes played. Note that a Range of 3 will effectively play 7th chords as triads.
+
+- Max notes: Applied after Range has been set, this parameter limits the number of notes in the chord using a note thinning algorithm. The algorithm prioritizes the first and last notes in the chord, after which the intermediate notes are thinned out and evenly distributed. The resulting chord voicing depends on Range, Max notes, and Inversion. It's possible to end up with some false "chords" like the same note repeated across multiple octaves.
+
+- Strum: Determines if the chord's notes will play all at once (Off), or strum notes in one of two directions (Low-high or High-low).
+
+- Strum length: Length of the strum as a fraction of the chord Step length. The timing of the individual notes is adaptive, depending on the number of notes being strummed.
+
+- Strum curve: Bipolar control (-100% to +100%) over note timing where negative values will cause note timing to slow down over time and positive values will cause note timing to speed up over time. A value of 0% will result in linear timing.
+
+- Ramp: Bipolar control (-100% to +100%) of the Velocity/Amp values for each note. When Strum is off, this will change the dynamic balance of low and high pitched notes in the chord. When strumming, negative values will lower dynamics over time and positive values will raise dynamics over time.
+
+
+## Breaking changes:
+
+- Chord Spread has been removed. Similar functionality is available using the Range parameter (although higher values are required to achieve the same result). Saved songs with Chord Spread events will probably break on load. Let me know if this is a problem and I’ll work out a patch to address this.
+
+- By default, chords will now play 4 notes rather than Triads playing 3 notes and 7ths playing 4 notes. Triads will simply repeat the root note one octave up. This change was made for the benefit of consistent strum patterns regardless of chord type.	
+</details>
+
+<details>
+<summary>v1.1</summary>
+	
+# Highlights
+
+- K3 plays, K2 pauses on a single tap and stops on a double tap.
+
+- Saving/ loading via system PARAMETERS>>PSET menu works but saves will break when I do updates.
+
+- A few persistent settings now live in K1>>PARAMETERS>>PREFERENCES.
+
+- "Arp" is now "Seq" and has 3 new options that enable it to operate independently from the chord sequencer in terms of pitch and start/reset synchronization. It can also be controlled via Events and param triggers. It's going to blow your freaking mind, maybe.
+
+- Arranger Events have new settings like probability, range limits, and two new operations that can randomize values or cause them to increment up or down based on a coin-toss.
+
+- Arranger extended from 16 to 64 segments.
+
+-  Crow v4.0.4 support
+
+---
+
+# New features
+
+
+### Utilities
+
+- Save/load of parameters, patterns, arrangement, and events can be performed through the system PARAMETERS>>PSET menu. Data is stored in /home/we/dust/data/dreamsequence/*pset no*.  
+
+  > **_UH OH:_** SAVES ARE 1000% GOING TO BREAK WHEN FUTURE UPDATES COME OUT. Wrap up your work before updating,  folks!
+
+- Persistent preferences can be set for the following parameters via K1>>PARAMETERS>>EDIT>>PREFERENCES
+	- Default pset: Automatically load the last-saved pset (and data) on script launch. 
+	- Chords as: Displaying chords names (Gmaj) or as chord degrees (VII). DS 1.1 temporarily has a missing half dim chord symbol, see “ISSUES” section for more info.
+	- Crow pullup: On (default) or Off.
+
+- Version checks at system load for Norns and Crow. Crow v4 is cleared for flight and Dreamsequence will reconfigure itself depending on which version is installed.
+
+- Pre-initialization Crow clock settings and Just Friends mode are restored on script exit.
+
+### Seq
+- “Arp” has emerged from its chrysalis as “Seq” and is much more flexible (both as a step sequencer and as an arpeggiator). 
+
+- "Notes” menu offers four ways of configuring note mapping:
+  - Triad: columns 1-3 map to notes 1-3 from the active chord interpreted as a triad. Columns 4-6 play the same notes one octave up, etc..
+  - 7th: columns 1-4 map to notes 1-4 from the active chord interpreted as a 7th chord. Columns 5-8 play the same notes one octave up, etc..
+  - Mode+transp.: columns 1-7 play notes from the selected mode and apply a diatonic transposition based on the active chord degree. Columns 8-14 play the same one octave up. Example: In C Major degree I, columns 1-7 would be C, D, E, F, G, A, B. Degree ii would result in D, E, F, G, A, B, C.
+  - Mode: columns 1-7 play notes from the selected mode, columns 8-14 play the same one octave up.
+
+- "Start on" menu option. Seq always tries to play until it completes, at which point it loops to be the beginning and is ready to start again as soon as it receives the signal to do so. The "Start on" menu option determines what can send that signal to start:
+  - Seq end: as soon as the sequence ends, it will start itself in a loop.
+   - Step: start Seq when the chord sequencer advances a step.
+   - Chord: start Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored). Useful for turning Seq into a chord strummer, or to layer notes on top of the chord, building alternative chord types and voicings.
+   - Cue: start Seq when it recieves a "Start" event or the "Start" param is triggered via K1>>PARAMETERS>>EDIT>>SEQ (also MIDI/OSC mappable so this can be called by external sources). 
+
+- “Reset on” menu option. Seq can be forced to reset before its normal end using this setting. Depending on when the reset occurs, this can prevent the sequence from reaching its end, keeping it in a suspended loop.
+  - Step: reset Seq when the chord sequencer advances a step.
+  - Chord: reset Seq when the chord sequencer advances to a step containing a chord (empty steps are ignored).
+  - Stop: reset Seq when the transport is stopped and patterns are reset (not on pause).
+  - Can also reset Seq using the "Reset" event or the "Reset" param is triggered via K1>>PARAMETERS>>EDIT>>SEQ (also MIDI/OSC mappable so this can be called by external sources). 
+- “Pattern shift” and “Pattern rotate” parameters allow the Seq pattern to be shifted using a menu option (and LFO mod for those so inclined). These also have corresponding events that replace the previous “transpose” event type. Once advantage of these new events is that they have more operation types available to them and can be reset back to their default position whereas the old transposition was not very smart and could only increment by a set amount. The old transpose functionality still remains (holding down the chord or arp grid key and turning E3) if you’re just looking for a way to adjust your patterns in a set-and-forget manner. Not yet available for chord patterns.
+
+- “Pattern length” parameter available via K1>>PARAMETERS>>SEQ allows setting Seq pattern length via PMAP or Event.
+
+
+### Chord sequencer
+  - “Pattern length” parameter available via K1>>PARAMETERS>>CHORD allows setting length of active chord pattern via PMAP or Event.
+
+### Arranger & Events
+
+- Arranger length is extended from 16 segments to 64 segments and can be navigated using the four pagination keys at the bottom of the Grid view.
+
+- Event probability setting in event editor determines how likely it is for the event to fire.
+
+- New Event operation types:
+  - ‘Random’ operation picks a random value (within range) for the selected event.
+  - ‘Wander’ operation increments the current event’s value by either the value as provided or its inverse (determined by a tiny coin-tosser that lives inside Norns!). Example: a ‘Tempo’ event with the Wander operation applied at a value of 5 would mean a tempo of 120 BPM would change to either 115 or 125 when the event fires. 
+
+- Event ‘Limit’ options allow you to set a min and max value range that can either be clamped or wrapped. Clamp = values will stop once they reach the limit. Wrap = values will wrap around once they reach the limit. Example: a value of 8 with a Limit of -10 to 10 incremented by 5 will result in a clamped value of 10 or a wrapped value of -8.
+
+### Quality of life improvements
+- Event editor menus are now broken down into Category and Subcategory.
+
+- Event editor displays the state of the selected event in the header: New, Edited, or Saved. 
+
+- Transport state indicator displays a flashing play symbol when waiting to sync with an Ableton Link clock, and a flashing pause symbol when waiting to pause until the end of the current chord. Accidental pause can be canceled if you press play before the end of the chord step.
+
+### Clock improvements
+- Ableton Link:
+  - Sync now uses the ‘link quantum’ parameter in Parameters>>Clock to determine when to start after receiving a start message. 
+  - Pause can be performed from Dreamsequence and will be quantized with the chord step length (pausing synced devices as well).
+  - Pattern/arranger reset can be performed from Dreamsequence once paused.
+  - See ISSUES section for more info on what doesn’t quite work yet.
+
+- MIDI: transport controls now work when syncing to MIDI clock. Pause can be performed from Dreamsequence and will be quantized with the chord step length (sending out a MIDI stop as well, depending on clock config).
+
+  > **_TIP:_** It’s possible to finagle a sort of count-in by sending an external start, stopping on Dreamsequence (K2 2x), then scheduling a clean punch-in on the next beat using K3. This avoids the age-old issue of timing being a little off on the first beat when MIDI devices sync.
+
+### Misc features
+
+- ‘Mod wheel’ menu option and corresponding event for MIDI destinations sends control change 1 messages.
+- CV/MIDI harmonizers also have the same 4 “Notes” mapping styles as Seq.
+
+---
+
+# Fixes
+- Misconfigured 7th chords have been fixed and chord naming has been much improved due to the tireless work of @dewb who has loaned Dreamsequence a preproduction version MusicUtil to take for a spin :raised_hands:
+- Shifting arranger (holding a section of the events strip and turning E3) no longer causes playback to lag. The segment/events shift isn’t applied until the Grid key is released; Grid display is just a visual preview.
+- Harmonizer input after script load but before hitting play no longer results in hanging notes.
+- Enthusiastic knob twiddling no longer causes playback to lag. Commence enthusement.
+- First beat of MIDI clock sync is 1/192nd note faster.
+- 1-shot arranger can now be started again from external transport calls after initial run.
+- Issue preventing Crow AD envelope parameter from working.
+- Disting EX now allows re-triggering of sustained notes.
+- Seq generator algorithms won't produce off-grid results.
+
+---
+# Changes
+
+- Transport controls have changed. K2 pauses playback on a single press and stops on a second press (stopping resets the active chord pattern and will reset the Arranger if playback is enabled). K3 now starts playback (except when syncing to Link clock— see ISSUES section) and can also cancel a pending pause if you catch it in time.
+I know many (most?) scripts put play on K2 so if you are having trouble with this config after spending some time with it, let me know. I’m open to providing a setting to swap K2 and K3 for transport controls. But a hybrid pause/stop button makes a lot more sense than a separate reset button that is like the LAUNCH-NUKES button during live performance
+
+- While transport is playing, it is no longer possible to force the active chord pattern to change by double-tapping a chord pattern key (or tapping the active pattern again). You must stop playback first. It was just an accident waiting to happen.
+
+- Deleting all events now requires holding K2 down until the onscreen countdown completes.
+
+- Current chord pattern position readout (top right on screen) now displays pattern, current step, and pattern length. Example: “B.2/8” means pattern B, step 2 of 8 total. ‘RST’ appears when pattern has been reset.
+
+- Arranger mini dashboard (bottom right on screen) has some tweaks:
+	- Loop/1-shot glyph blinks when on the last step of arranger as a heads-up.
+	- Interrupting arranger playback (by disabling arranger manually or changing chord patterns, then re-enabling the arranger) will now freeze the interrupted segment in the chart and the segment position readout above will now show the upcoming segment (instead of a kind useless “T-”).
+	- The countdown until the arranger resumes now counts backwards through zero because it felt wrong to jump from -1 to 1. IDK.
+	- Interrupting arranger playback will now show the remaining time in arrangement upon arranger resume. It doesn’t count the active pattern because it’s technically not part of the arrangement.
+	- Special states may appear:
+		- RST = arranger reset
+		- LP = resuming arranger on last segment which will result in looping to beginning (loop mode)
+		- EN = resuming arranger on last segment which will result in arrangement ending (1-shot mode)
+
+- Culled some of the more awful Seq generator algorithms, added a variant ER 2-note with no rests. Added a repeat note check function for the ‘Dual seq’ algo.
+
+---
+
+# Issues
+- Half-diminished 7th chords will show a blank rectangle pending the addition of a [new ø glyph](https://github.com/monome/norns/pull/1688#event-9828652834).
+
+- Sending a ludicrous amount of triggers to Crow input 2 for a sustained amount of time can cause Crow to throw nonsensical errors in Maiden and bog down Norns to the point of unresponsiveness until CV cables are unplugged. I haven’t really found this to be an issue in normal usage with either Crow v3.0.1 or v4.0.4, but YMMV.
+
+- Starting Link from K3 is not yet supported due to an issue with Norns clock.link.start() function clobbering running clocks. If anyone smart wants to poke around the C clock code, please reach out so I can explain the issue!
+
+- Latency offset is not yet supported. I’ve worked out a nifty solution for this but it requires changes to Dreamsequence’s clocking architecture and is not a *high* priority while the Link clock issue exists.
+
+- Quantized stop may tick over into the first beat of the next measure on synced devices. This can be addressed with MIDI clock offset in DAWs but a solution for Link requires further research.
+
+- Loading PSETs while transport is active and synced to MIDI or Link can result in chord and arp getting out of sync. Stopping transport or resetting after load will resolve this. If you want to demo PSETs from the system menu, switch to internal clock for now.
+</details>
+
+
 # Dreamsequence
 
 Chord-based sequencer, arpeggiator, and harmonizer for Monome Norns+Grid
@@ -6,9 +260,9 @@ Required: Monome Norns (**240221 or later**) and Grid (16x8 or 16x16)
 
 Optional: Supports MIDI and Crow by default. Installation of additional [NB voices](https://llllllll.co/t/n-b-et-al-v0-1/60374) is highly recommended!
 
-[![Watch the video](https://img.youtube.com/vi/Z6plHOHKwdg/0.jpg)](https://youtu.be/Z6plHOHKwdg)
+[![Watch the video](https://img.youtube.com/vi/MztashV-zaI/0.jpg)](https://youtu.be/MztashV-zaI)
 
-[Dreamsequence demo and basics on YouTube](https://youtu.be/Z6plHOHKwdg)
+[Dreamsequence demo and basics on YouTube](https://youtu.be/MztashV-zaI)
 
 ---
 
@@ -184,7 +438,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
    	- When using Internal clock source, K3 continues after pausing. Settings are available for each MIDI clock port via K3>>PARAMETERS>>EDIT>>PREFERENCES:
    		- The “song” option will send out MIDI Song Position Pointer (SPP) and ‘continue’ messages which should work well for things like DAWs.
 		- The “pattern” setting will cause Dreamsequence to continue playback and then send a ’start’ message at the beginning of the next measure. This works well for devices that don’t support SPP: drum machines, loopers, Ableton live’s “Session” view, etc…
-		- In order for ‘pattern’ mode to work as expected, you must set a time signature via GLOBAL>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires restarting playback.
+		- In order for ‘pattern’ mode to work as expected, you must set a time signature via SONG>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires restarting playback.
 
 	- Under certain conditions, alternate functions are enabled and will be shown in the footer section at the bottom of the Norns screen:
 		- While holding down an Arranger Timeline key: enter Event view.
@@ -210,7 +464,7 @@ The Events view is used to manage the scheduling of parameter changes and functi
 
 ![dreamsequence](doc/dreamsequence.png)
 
-Most of your work on Norns will be done through 5 main menus that look like the example above. Scrolling to the top menu (GLOBAL in the example above) with E2 will allow you to browse using E3. Before taking a closer look at the contents of these menus, let's take a look at the mini dashboards on the right side of the screen.
+Most of your work on Norns will be done through 5 main menus that look like the example above. Scrolling to the top menu (SONG in the example above) with E2 will allow you to browse using E3. Before taking a closer look at the contents of these menus, let's take a look at the mini dashboards on the right side of the screen.
 
 ----------------------------------------------------------------------------------------------------------------------
  
@@ -219,9 +473,9 @@ Most of your work on Norns will be done through 5 main menus that look like the 
 ![dreamsequence](doc/pattern_dash.png)
 
 - This dashboard gives us a summary of transport status, the current chord pattern (A-D) and active chord.
-- The numbers in the top left of the dash provide information about the current pattern in the format 'PATTERN'.'CURRENT STEP'/'PATTERN LENGTH'. Example: “A.3/4” means pattern A, step 3 of 4 total. ‘RST’ appears when pattern has been reset.
-- Play/pause/stop symbols in the upper right will flash when a status change is pending, such as when waiting for Link sync to start or waiting for the current chord step to complete before pausing. Pressing pause/start can cancel pending changes.
-- In the center of the dash, the active chord will be displayed. Holding down a chord sequence key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key. The chord readout can be changed from chord name to chord degree using K1>>PARAMETERS>>EDIT>>PREFERENCES>>"Chords as"
+- The values in the top left of the dash provide information about the current pattern in the format 'PATTERN'.'CURRENT STEP'. Example: “A.3” means pattern A, step 3. ‘RST’ appears when pattern has been reset.
+- Play/pause/stop symbols in the upper right convey the current transport state.
+- In the center of the dash, the active chord will be displayed. Holding down a chord sequence key on the Chord Grid view will temporarily overwrite this to indicate the chord that corresponds to the held key. The chord readout can be changed from chord name to chord degree using K1>>PARAMETERS>>EDIT>>PREFERENCES>>"Chords as".
 
 > **_TIP:_** Active chord reflects the CHORD>>"Chord type" menu option (Triad or 7th) but each sequencer/harmonizer can override this with the similar "Notes" menu.
 > 
@@ -246,18 +500,18 @@ Most of your work on Norns will be done through 5 main menus that look like the 
 ----------------------------------------------------------------------------------------------------------------------
 
 ### Menus
-![dreamsequence](doc/global_menu.png)
+![dreamsequence](doc/menu.png)
 
 The left portion of the Norns screen displays one of the following "pages" and associated menu items:
-  - GLOBAL <> CHORD <> SEQ <> MIDI HARMONIZER <> CV HARMONIZER
+  - SONG <> CHORD <> SEQ <> MIDI HARMONIZER <> CV HARMONIZER
  
 To navigate between pages, use E2 to scroll to the top of the list of menu items until the page name is highlighted, then use E3 to change the page. To change a menu item, simply scroll down the list using E2 and change its value using E3. < and > symbols will appear when you are at the end of the range of possible values. Descriptions of each page and menu options follow.
 
-#### GLOBAL menu
+#### SONG menu
 
 - Mode: 9 modes: Major, Natural Minor, Harmonic Minor, Melodic Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian.
 
-- Key: Global transposition of +/- 12 semitones.
+- Key: Song transposition of +/- 12 semitones.
 
 - Tempo: sets Norns system clock tempo in BPM.
 
@@ -370,8 +624,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - Notes: Five ways of mapping incoming MIDI notes to output notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming note value starting from C1.
     - Triad: notes C1-D1 map to notes 1-3 from the active chord interpreted as a triad. Notes D#1-F1 play the same notes one octave up, etc..
 	  - 7th: columns C1-D#1 map to notes 1-4 from the active chord interpreted as a 7th chord. Columns E1-G1 play the same notes one octave up, etc..
-	  - Mode+transp.: beginning with note C1, incoming notes are mapped to the mode configured in GLOBAL>>Mode, then a diatonic transposition based on the active chord degree is applied.
-	  - Mode: beginning with note C1, incoming notes are mapped to the mode configured in GLOBAL>>Mode.
+	  - Mode+transp.: beginning with note C1, incoming notes are mapped to the mode configured in SONG>>Mode, then a diatonic transposition based on the active chord degree is applied.
+	  - Mode: beginning with note C1, incoming notes are mapped to the mode configured in SONG>>Mode.
        	  - Chromatic: beginning with note C1, incoming notes are mapped to chromatic semitones.
    
 - Octave: Shifts output from -4 to +4 octaves.
@@ -387,8 +641,8 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 - Notes: Five ways of mapping voltage send to Crow input 1 to notes are available. This works just like the Seq but instead of choosing a column on Grid, we use the incoming voltage which is then quantized to 1v/oct or 1 semitone increments.
     - Triad: voltage of 0v, 1/12v, 2/12v map to notes 1-3 from the active chord interpreted as a triad. Voltage of 3/12v, 4/12v, 5/12v play the same notes one octave up, etc..
 	  - 7th: columns voltage of 0v, 1/12v, 2/12v, 3/12v map to notes 1-4 from the active chord interpreted as a 7th chord. Voltage of 4/12v, 5/12v, 6/12v play the same notes one octave up, etc..
-	  - Mode+transp.: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode, then a diatonic transposition based on the active chord degree is applied.
-	  - Mode: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in GLOBAL>>Mode.
+	  - Mode+transp.: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in SONG>>Mode, then a diatonic transposition based on the active chord degree is applied.
+	  - Mode: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to the mode configured in SONG>>Mode.
     	  - Chromatic: beginning with note 0v and increasing with each 1/12v increment, incoming voltage is mapped to chromatic semitones.
   
 - Auto-rest: When true, this option will suppress the same note when it is repeated consecutively within one chord step, resulting in a rest. This can be a useful way of adding rest functionality into analog sequencers that don't support such a feature.
@@ -406,21 +660,21 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
 # Preferences
 - Persistent preferences can be set for the following parameters via K1>>PARAMETERS>>EDIT>>PREFERENCES
 	- Default pset: Automatically load the last-saved pset (and data) on script launch. 
-	- Chords as: Global menu option selects between displaying chords names (Gmaj) or as chord degrees (VII).
+	- Chords as: displays chords names (Gmaj) or chord degrees (VII).
 	- Crow pullup: i2c pullup resistors can be set On (default) or Off.
  	- MIDI Clock Out: Determines behavior of synced MIDI devices when pausing/continuing:
    		- The “song” option will send out MIDI Song Position Pointer (SPP) and ‘continue’ messages which should work well for things like DAWs.
 		- The “pattern” setting will cause Dreamsequence to continue playback and then send a ’start’ message at the beginning of the next measure. This works well for devices that don’t support SPP: drum machines, loopers, Ableton live’s “Session” view, etc…
-		- In order for ‘pattern’ mode to work as expected, you must set a time signature via GLOBAL>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires restarting playback. 
+		- In order for ‘pattern’ mode to work as expected, you must set a time signature via SONG>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires restarting playback. 
  
 ---
 
 # Crow Patching
 
-Dreamsequence supports using Crow to send and receive CV and triggers. Outputs are configurable via Global>> Crow out x, defaulting to the following:
+Dreamsequence supports using Crow to send and receive CV and triggers. Outputs are configurable via Song>> Crow out x, defaulting to the following:
 - Crow IN 1: CV used to determine note pitch of the CV Harmonizer. Can be unquantized or quantized. Attenuation recommended.
 - Crow IN 2: Trigger in (rising past 2 volts) will sample the CV on Crow IN 1 and send a note from the CV Harmonizer
 - Crow OUT 1: Default "Crow" output V/oct out
 - Crow OUT 2: Default "Crow" output trigger or 10v attack/decay envelope out
 - Crow OUT 3: Default used by [Arranger Events](https://github.com/dstroud/dreamsequence/blob/main/README.md#events-view).
-- Crow OUT 4: Default clock out (beat-division or PPQN) set in "Global:Crow clock" menu item
+- Crow OUT 4: Default clock out (beat-division or PPQN) set in "Song:Crow clk" menu item
