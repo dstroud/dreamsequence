@@ -28,7 +28,6 @@ clock.link.stop() -- transport won't start if external link clock is already run
 -- locals
 local latest_strum_coroutine = coroutine.running()
 
-  
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
@@ -235,9 +234,13 @@ function init()
   ------------------
   -- Persistent settings saved to prefs.data and managed outside of .pset files
 
-  params:add_group("preferences", "PREFERENCES", 5 + 16)
+  params:add_group("preferences", "PREFERENCES", 6 + 16)
 
-  params:add_option("default_pset", "Load pset", {"Off", "Last"}, 1)
+  params:add_trigger("save_template", "Save template")
+  params:set_save("save_template", false)
+  params:set_action("save_template", function() params:write(00,"template") end)
+
+  params:add_option("default_pset", "Load pset", {"Off", "Last", "Template"}, 1)
   params:set_save("default_pset", false)
   params:set("default_pset", param_option_to_index("default_pset", prefs.default_pset) or 1)
   params:set_action("default_pset", function() save_prefs() end)
@@ -659,17 +662,27 @@ function init()
   
   
   -----------------------------
-  -- INIT STUFF
+  -- POST-PARAM INIT STUFF
   -----------------------------
   -- globals
-  if type(g.device) == "table" then
-    rows = g.device.rows or 8
-    print(rows .. "-row Grid detected")
-  else
-    rows = 8
-    print("No Grid detected")
+  
+  function grid_size()
+    if g.cols >= 16 then
+      rows = g.rows >= 16 and 16 or 8
+      print("Configured for 16x" .. rows .. " Grid")
+    else
+      rows = 8
+      print("16x8 or 16x16 Grid required. Add in SYSTEM >> DEVICES >> GRID")
+    end
+    extra_rows = rows - 8
+  end 
+
+  function grid.add(dev)
+    grid_size()
   end
-  extra_rows = rows - 8
+
+  grid_size()
+
   -- pre_sync_val = nil
   debug_change_count = 0 -- todo remove
   start = false
@@ -798,6 +811,7 @@ function init()
   -- PSET callback functions --   
   -----------------------------
   function params.action_write(filename,name,number)
+    local number = number or "00" -- template
     local filepath = norns.state.data..number.."/"
     os.execute("mkdir -p "..filepath)
     -- Make table with version (for backward compatibility checks) and any useful system params
@@ -828,6 +842,7 @@ function init()
 
 
   function params.action_read(filename,silent,number)
+    local number = number or "00" -- template
     nb:stop_all()
     local filepath = norns.state.data..number.."/"
     if util.file_exists(filepath) then
@@ -1010,6 +1025,8 @@ function init()
   -- Optional: load most recent pset on init
   if params:string("default_pset") == "Last" then
     params:default()
+  elseif params:string("default_pset") == "Template" then
+    params:read(00)
   end
   
   params:bang()
@@ -1140,7 +1157,7 @@ params:set_action("ts_numerator",
 
   sprocket_16th = seq_lattice:new_sprocket{
     division = 1/16, -- SPP quantum, also used for start pre-sync
-    order = 1,  -- todo p0 think about this
+    order = 1,
     enabled = true,
     action = function(t)
 
@@ -1396,7 +1413,7 @@ params:set_action("ts_numerator",
         
       end,
       action = function(t)
-          -- get_next_chord()  -- todo p0 Deprecate or move to new sprocket. How to fire early?
+          -- get_next_chord()  -- Deprecated
           advance_chord_pattern()
         grid_dirty = true
       end,
@@ -2168,8 +2185,6 @@ function calc_seconds_remaining()
 function countdown()
   calc_seconds_remaining()
   fast_blinky = fast_blinky ~ 1
-  -- todo p0 performance: big grid redraw driver.
-  -- maybe flag if 128-key grid has pattern length >8 steps
   grid_dirty = true -- for fast_blinky scrolling pattern indicator.
 end
 
@@ -2970,10 +2985,8 @@ function play_chord()
     latest_strum_coroutine = coroutine.running() -- sets coroutine each time a new strum occurs
     for i = start, finish, step do
 
-      -- Strums will interrupt one another by default. TODO p0 make this a param because overlap is p sweet
+      -- Strums will interrupt one another by default. TODO p2 make this a param because overlap is p sweet
       if coroutine.running() == latest_strum_coroutine then
-        -- print(i .. " " .. tostring(latest_strum_coroutine))
-
         local note_sequence = playback == "High-low" and (note_qty + 1 - i) or i  -- force counting upwards
         local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get("chord_dynamics") * .01
@@ -3559,7 +3572,6 @@ function g.key(x,y,z)
         table.insert(grid_view_keys, y - extra_rows)
         if view_key_count == 1 then
           grid_view_name = grid_views[y - extra_rows - 5]
-        --todo p0 check if grid_view_keys are being set correctly for all sizes
         elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
           screen_view_name = "Chord+seq"
         end
