@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.3 @modularbeat
+-- v1.3.1 @modularbeat
 -- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -28,11 +28,10 @@ clock.link.stop() -- transport won't start if external link clock is already run
 -- locals
 local latest_strum_coroutine = coroutine.running()
 
-  
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = "v1.3.0"
+  local version = "v1.3.1"
   -----------------------------
 
   function read_prefs()  
@@ -85,32 +84,6 @@ function init()
     transport_midi_update()
   end
 
-  -- -- called by crow.input[1].change when clock_source == crow
-  -- -- passes through original event for crow clock
-  -- function process_crow_cv_1_change(v)
-  --   -- bit to start transport but stopping is a question. Prob need high/low start/stop on Crow IN 2
-  --   -- if transport_state ~= "playing" then
-  --   --   transport_state = "playing"
-  --   --   print(transport_state)
-  --   --   enable_sprockets()
-  --   --   seq_lattice:start()
-  --   -- end
-  --   norns.crow.send[[tell("change",1,1)]]
-  --   crow_trigger_in()
-  -- end
-
-  -- -- modifies norns.crow.clock_enable to also call crow_trigger_in()
-  -- -- this way we can send a swung clock into Crow CV1 to get swing notes
-  -- -- from the CV harmonizer while also driving the system clock
-  -- function redefine_crow_input_1()
-  --   if params:string("clock_source") == "crow" then
-  --     norns.crow.clock_enable = function()
-  --       crow.input[1].change = process_crow_cv_1_change
-  --       crow.input[1].mode("change",2,0.1,"rising")
-  --     end
-  --     norns.crow.clock_enable()
-  --   end
-  -- end
 
   -- thanks @dndrks for this little bit of magic to check ^^crow^^ version!!
   norns.crow.events.version = function(...)
@@ -146,7 +119,6 @@ function init()
         crow.input[2].mode("change", 2 , 0.1, "rising") -- voltage threshold, hysteresis, "rising", "falling", or “both"
         crow.input[2].change = crow_trigger_in
       end
-      -- redefine_crow_input_1()
     end
   )
 
@@ -196,17 +168,6 @@ function init()
         end
       end
     end
-    
-    -- -- revert changes made to clock_enable
-    -- norns.crow.clock_enable = function()
-    --   -- directly set the change event on crow so it conforms to old-style event names
-    --   norns.crow.send[[
-    --     input[1].change = function()
-    --       tell("change",1,1)
-    --     end
-    --     input[1].mode("change",2,0.1,"rising")
-    --   ]]
-    -- end
 
   end
   
@@ -261,6 +222,7 @@ function init()
     --  event_indices: key = conctat category_subcategory with first_index and last_index values
   end
   
+
   --------------------
   -- PARAMS
   --------------------
@@ -272,9 +234,13 @@ function init()
   ------------------
   -- Persistent settings saved to prefs.data and managed outside of .pset files
 
-  params:add_group("preferences", "PREFERENCES", 5 + 16)
+  params:add_group("preferences", "PREFERENCES", 6 + 16)
 
-  params:add_option("default_pset", "Load pset", {"Off", "Last"}, 1)
+  params:add_trigger("save_template", "Save template")
+  params:set_save("save_template", false)
+  params:set_action("save_template", function() params:write(00,"template") end)
+
+  params:add_option("default_pset", "Load pset", {"Off", "Last", "Template"}, 1)
   params:set_save("default_pset", false)
   params:set("default_pset", param_option_to_index("default_pset", prefs.default_pset) or 1)
   params:set_action("default_pset", function() save_prefs() end)
@@ -431,32 +397,6 @@ function init()
   -- params:hide(params.lookup["seq_start_on_1"])
     
   params:add_option("seq_reset_on_1", "Reset on", {"Step", "Chord", "Stop"}, 3)
-  -- params:set_save("seq_reset_on_1", false)
-  -- params:hide(params.lookup["seq_reset_on_1"])
-
-  -- option combo style way of setting the above  
-  -- local seq_modes = 
-  --   {
-  --   "Loop/step",
-  --   "Loop/chord",
-  --   "Loop/stop",
-  --   "Step/step",
-  --   "Step/chord",
-  --   "Step/stop",
-  --   "Chord/step",
-  --   "Chord/chord",
-  --   "Chord/stop",
-  --   "1-shot/step",
-  --   "1-shot/chord",
-  --   "1-shot/stop",
-  --   }
-    
-  -- params:add_option("seq_mode_combo_1", "Mode", seq_modes, 1)
-  -- params:set_action("seq_mode_combo_1",function(val) set_seq_mode_1(val) end)
-  -- function set_seq_mode_1(val)
-  --   params:set("seq_start_on_1", math.ceil(val/3))
-  --   params:set("seq_reset_on_1", (val - 1) % 3 + 1)
-  -- end
   
   -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
   params:add_binary("seq_start_1","Start", "trigger")
@@ -662,10 +602,6 @@ function init()
   ------------------
   -- EVENT PARAMS --
   ------------------
-  
-  -- params:add_number("formatter", "formatter", 1, 1, 1) -- clones event_name for event menu formatting
-  -- params:add_control("formatter", "formatter", controlspec.new(50, 5000, 'exp', 0, 800, "hz"))
-  -- params:hide("formatter")
 
   params:add_option("event_category", "Category", event_categories_unique, 1)
   params:hide("event_category")
@@ -676,7 +612,6 @@ function init()
   params:hide("event_subcategory")
  
   params:add_option("event_name", "Event", events_lookup_names, 1) -- Default value overwritten later in Init
-  -- params:set_action("event_name",function() clone_param() end) -- moved to change_event() in case dynamic swapping affects this param (IDK)
   params:hide("event_name")
   
   -- options will be dynamically swapped out based on the current event_name param
@@ -727,30 +662,37 @@ function init()
   
   
   -----------------------------
-  -- INIT STUFF
+  -- POST-PARAM INIT STUFF
   -----------------------------
   -- globals
-  if type(g.device) == "table" then
-    rows = g.device.rows or 8
-    print(rows .. "-row Grid detected")
-  else
-    rows = 8
-    print("No Grid detected")
+  
+  function grid_size()
+    if g.cols >= 16 then
+      rows = g.rows >= 16 and 16 or 8
+      print("Configured for 16x" .. rows .. " Grid")
+    else
+      rows = 8
+      print("16x8 or 16x16 Grid required. Add in SYSTEM >> DEVICES >> GRID")
+    end
+    extra_rows = rows - 8
+  end 
+
+  function grid.add(dev)
+    grid_size()
   end
-  extra_rows = rows - 8
+
+  grid_size()
+
   -- pre_sync_val = nil
   debug_change_count = 0 -- todo remove
-  
   start = false
   send_continue = false
   transport_state = "stopped"
   clock_start_method = "start"
-  link_start_mode = "reset" -- might just use clock_start_method??
-  link_stop_source = nil
+  -- link_start_mode = "reset" -- might just use clock_start_method??
+  -- link_stop_source = nil
   global_clock_div = 48 -- todo replace with ppqn and update div lookup to be fractional
-
   build_scale()
-
   -- Send out MIDI stop on launch if clock ports are enabled
   transport_multi_stop()  
   arranger_active = false
@@ -766,7 +708,7 @@ function init()
   grid_view_name = grid_views[2]
   math.randomseed(os.time()) -- doesn't seem like this is needed but not sure why
   fast_blinky = 1
-  pages = {"SONG>", "CHORD", "SEQ", "MIDI HARMONIZER", "<CV HARMONIZER"}
+  pages = {"SONG►", "CHORD", "SEQ", "MIDI HARMONIZER", "◀CV HARMONIZER"}
   page_index = 1
   page_name = pages[page_index]
   menus = {}
@@ -826,7 +768,7 @@ function init()
   chord_key_count = 0
   view_key_count = 0
   event_key_count = 0
-  keys = {}
+  -- keys = {}
   key_count = 0
   chord_pattern = {{},{},{},{}}
   seq_pattern = {{},{},{},{}}
@@ -869,6 +811,7 @@ function init()
   -- PSET callback functions --   
   -----------------------------
   function params.action_write(filename,name,number)
+    local number = number or "00" -- template
     local filepath = norns.state.data..number.."/"
     os.execute("mkdir -p "..filepath)
     -- Make table with version (for backward compatibility checks) and any useful system params
@@ -899,6 +842,7 @@ function init()
 
 
   function params.action_read(filename,silent,number)
+    local number = number or "00" -- template
     nb:stop_all()
     local filepath = norns.state.data..number.."/"
     if util.file_exists(filepath) then
@@ -1081,6 +1025,8 @@ function init()
   -- Optional: load most recent pset on init
   if params:string("default_pset") == "Last" then
     params:default()
+  elseif params:string("default_pset") == "Template" then
+    params:read(00)
   end
   
   params:bang()
@@ -1211,7 +1157,7 @@ params:set_action("ts_numerator",
 
   sprocket_16th = seq_lattice:new_sprocket{
     division = 1/16, -- SPP quantum, also used for start pre-sync
-    order = 1,  -- todo p0 think about this
+    order = 1,
     enabled = true,
     action = function(t)
 
@@ -1264,7 +1210,7 @@ params:set_action("ts_numerator",
             transport_active = false
             transport_state = "stopped"
             print(transport_state)
-            link_stop_source = nil
+            -- link_stop_source = nil
 
             if arranger_active then
               reset_arrangement()
@@ -1467,7 +1413,7 @@ params:set_action("ts_numerator",
         
       end,
       action = function(t)
-          -- get_next_chord()  -- todo p0 Deprecate or move to new sprocket. How to fire early?
+          -- get_next_chord()  -- Deprecated
           advance_chord_pattern()
         grid_dirty = true
       end,
@@ -2098,8 +2044,10 @@ end
 
 
 function transpose_string(x)
-  local keys = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C"}
-  return(keys[x + 13] .. (x == 0 and "" or " ") ..  (x >= 1 and "+" or "") .. (x ~= 0 and x or "") )
+  return(
+    modes.keys[params:get("mode")][util.wrap(x, 0, 11)].key
+    .. (x == 0 and "" or " ") ..  (x >= 1 and "+" or "") .. (x ~= 0 and x or "")
+  )
 end
 
 
@@ -2237,8 +2185,6 @@ function calc_seconds_remaining()
 function countdown()
   calc_seconds_remaining()
   fast_blinky = fast_blinky ~ 1
-  -- todo p0 performance: big grid redraw driver.
-  -- maybe flag if 128-key grid has pattern length >8 steps
   grid_dirty = true -- for fast_blinky scrolling pattern indicator.
 end
 
@@ -2418,7 +2364,7 @@ function advance_chord_pattern()
         -- print("DEBUG arranger_one_shot_last_pattern")
         
         -- 24-02-13 instant stop after one-shot arranger
-        link_stop_source = "norns"  -- obsolete?
+        -- link_stop_source = "norns"  -- obsolete?
         clock.link.stop() -- no stop quantization for sending Link stop out
 
         transport_multi_stop()
@@ -2865,15 +2811,12 @@ function do_events()
 end
 
 
--- todo p2: More thoughtful selection of chord_name and sharp/flat depending on mode and key
 function gen_chord_readout()
   if chord_no > 0 then
     if params:string("chord_readout") == "Degree" then
       chord_readout = chord_lookup[params:get("mode")]["chords"][chord_no]
     else -- chord name
-      local chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[params:get("mode")]["intervals"][util.wrap(chord_no, 1, 7)] + 1) + params:get("transpose"), 1, 12)]
-      local modifier = chord_lookup[params:get("mode")]["quality"][chord_no]
-      chord_readout = (chord_name .. modifier)
+      chord_readout = modes.keys[params:get("mode")][util.wrap(params:get("transpose"), 0, 11)][chord_no]
     end
   end
 end
@@ -3042,10 +2985,8 @@ function play_chord()
     latest_strum_coroutine = coroutine.running() -- sets coroutine each time a new strum occurs
     for i = start, finish, step do
 
-      -- Strums will interrupt one another by default. TODO p0 make this a param because overlap is p sweet
+      -- Strums will interrupt one another by default. TODO p2 make this a param because overlap is p sweet
       if coroutine.running() == latest_strum_coroutine then
-        -- print(i .. " " .. tostring(latest_strum_coroutine))
-
         local note_sequence = playback == "High-low" and (note_qty + 1 - i) or i  -- force counting upwards
         local elapsed = note_qty == 1 and 0 or (note_sequence - 1) / (note_qty - 1)
         local dynamics = params:get("chord_dynamics") * .01
@@ -3631,7 +3572,6 @@ function g.key(x,y,z)
         table.insert(grid_view_keys, y - extra_rows)
         if view_key_count == 1 then
           grid_view_name = grid_views[y - extra_rows - 5]
-        --todo p0 check if grid_view_keys are being set correctly for all sizes
         elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
           screen_view_name = "Chord+seq"
         end
@@ -3944,7 +3884,7 @@ end
 ----------------------
 function key(n,z)
   if z == 1 then
-    keys[n] = 1
+    -- keys[n] = 1
     key_count = key_count + 1
     -- KEY 1 just increments keys and key_count for alt functions
     -- if n == 1 then
@@ -4057,7 +3997,7 @@ function key(n,z)
             -----------------------------
             -- full stop for the time being
             clock.link.stop() -- no stop quantization for sending Link stop out
-            link_stop_source = "norns"
+            -- link_stop_source = "norns"
             stop = true -- will trigger DS to do 1/16 quantized stop
             clock_start_method = "start"
 
@@ -4430,7 +4370,7 @@ function key(n,z)
             -- seq_lattice.transport = 0 -- -1 -- probably a better place for this
             -- --------------------------
 
-            link_start_mode = "resume"  -- resume/continue only supported with K3 for now
+            -- link_start_mode = "resume"  -- resume/continue only supported with K3 for now
             clock.link.start()
 
 
@@ -4455,7 +4395,7 @@ function key(n,z)
         
     end
   elseif z == 0 then
-    keys[n] = nil
+    -- keys[n] = nil
     key_count = key_count - 1
     if n == 2 then
       -- reset this for event segment delete countdown
@@ -4865,16 +4805,6 @@ function chord_steps_to_seconds(steps)
 end
 
 
--- -- Truncates hours. Requires integer.
--- function s_to_min_sec(s)
---   local m = math.floor(s/60)
---   -- local h = math.floor(m/60)
---   m = m%60
---   s = s%60
---   return string.format("%02d",m) ..":".. string.format("%02d",s)
--- end
-
-
 -- Alternative for more digits up to 9 hours LETSGOOOOOOO
 function s_to_min_sec(seconds)
   local seconds = tonumber(seconds)
@@ -5227,8 +5157,8 @@ function redraw()
               or event_range -- if all else fails, slap -9999 to 9999 on it from set_event_range lol
 
             local single = menu_index == range[1] and (range[1] == range[2]) or false
-            local menu_value_pre = single and ">" or menu_index == range[2] and "<" or " "
-            local menu_value_suf = single and "<" or menu_index == range[1] and ">" or ""
+            local menu_value_pre = single and "\u{25ba}" or menu_index == range[2] and "\u{25c0}" or " "
+            local menu_value_suf = single and "\u{25c0}" or menu_index == range[1] and "\u{25ba}" or ""
             local events_menu_txt = first_to_upper(param_id_to_name(menu_id)) .. ":" .. menu_value_pre .. first_to_upper(string.sub(event_val_string, 1, events_menu_trunc)) .. menu_value_suf
 
             if debug and menu_id == "event_value" then print("menu_id = " .. (menu_id or "nil")) end
@@ -5304,8 +5234,8 @@ function redraw()
         -- Generate menu and draw <> indicators for scroll range
         if menu_index == i then
           local range = params:get_range(menus[page_index][i])
-          local menu_value_suf = params:get(menus[page_index][i]) == range[1] and ">" or ""
-          local menu_value_pre = params:get(menus[page_index][i]) == range[2] and "<" or " "
+          local menu_value_suf = params:get(menus[page_index][i]) == range[1] and "\u{25ba}" or ""
+          local menu_value_pre = params:get(menus[page_index][i]) == range[2] and "\u{25c0}" or " "
           local session_menu_txt = first_to_upper(param_id_to_name(menus[page_index][i])) .. ":" .. menu_value_pre .. params:string(menus[page_index][i]) .. menu_value_suf
           screen.text(session_menu_txt)
         else  
