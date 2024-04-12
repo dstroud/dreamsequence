@@ -171,7 +171,7 @@ local function gen_keys()
           local chord_letter = string.sub(chord_name, 1, 1)
           local equivalent = chord_equivalent[chord_name]
           local new_chord_name = chord_name
-          local quality = chord_lookup[mode]["quality"][util.wrap(chord_no, 1, 7)] -- Currently displaying chord for triad. 7th: [chord_no]
+          local quality = chord_lookup[mode]["quality"][chord_no]
 
           if prev_chord_name then
             if prev_letter == chord_letter then
