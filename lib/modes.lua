@@ -144,7 +144,6 @@ end
 
 
 -- enforces the "alphabet rule" for chords and picks whichever key has fewer nonstandard chords (##, bb, B#, Cb, E#, Fb)
--- todo: might also do a secondary ranking on number of accidentals for a tie-breaker
 local function gen_keys()
   modes.keys = {}
   local chords_renamed = {}
@@ -161,8 +160,8 @@ local function gen_keys()
         local prev_letter = nil
         local key = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[mode]["intervals"][1] + 1) + transpose, 1, 12)] -- for debug
         
-        for chord_no = 1, 7 do
-          local chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[mode]["intervals"][chord_no] + 1) + transpose, 1, 12)]
+        for chord_no = 1, 14 do
+          local chord_name = musicutil.NOTE_NAMES[util.wrap((musicutil.SCALES[mode]["intervals"][util.wrap(chord_no, 1, 7)] + 1) + transpose, 1, 12)]
         
           if chord_no == 1 and option == "flat" and string.sub(chord_name, 2, 2) == "#" then
             chords_renamed[option .. "_rank"] = (chords_renamed[option .. "_rank"] or 0) + chord_equivalent[chord_name].rank_flat
@@ -172,7 +171,7 @@ local function gen_keys()
           local chord_letter = string.sub(chord_name, 1, 1)
           local equivalent = chord_equivalent[chord_name]
           local new_chord_name = chord_name
-          local quality = chord_lookup[mode]["quality"][chord_no]
+          local quality = chord_lookup[mode]["quality"][util.wrap(chord_no, 1, 7)] -- Currently displaying chord for triad. 7th: [chord_no]
 
           if prev_chord_name then
             if prev_letter == chord_letter then

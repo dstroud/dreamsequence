@@ -31,7 +31,7 @@ local latest_strum_coroutine = coroutine.running()
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = "v1.3.1"
+  local version = "v1.3.1.1"
   -----------------------------
 
   function read_prefs()  
