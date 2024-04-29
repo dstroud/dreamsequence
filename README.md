@@ -363,6 +363,9 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
   
 - Dynamics: Volume or amplitude of voice.
 
+- Probability: Probability of note playing vs. being muted.
+ 
+
 #### MIDI HARMONIZER menu
 
 - Voice: Where the output of the harmonizer is sent for playback. Default options include Crow and MIDI ports, but additional synths and devices are supported by installing [NB voice mods](https://llllllll.co/t/n-b-et-al-v0-1/60374).
@@ -460,12 +463,13 @@ Dreamsequence supports using Crow to send and receive CV and triggers. Outputs a
 
 	`;install https://github.com/sixolet/nb_ansible`	Monome Ansible
 - Swing settings for Chord, Seq, CV harmonizer, and Crow clock out.
-- Seq ‘Accent’ param applies a positive or negative dynamics offset to swing steps.
+- Seq `Accent` param applies a positive or negative dynamics offset to swing steps.
 - "Step" duration setting adjusts note duration to always match the step length (Chord and Seq) or Trigger division (CV harmonizer).
 - Pressing a Grid pattern key when transport is stopped will play that chord or note.
 - Chromatic mapping option added to `Notes` parameter.
 - The SONG menu now has settings for configuring Crow's outputs which will result in various CV or CV/Env pair options appearing in Voice parameters. All outs can send CV, Env, and Events while out 4 can also send a Clock pulse when transport is running.
 - `Crow events` event category has been created with subcategories for outputs 1-4. There's also a new event "5v 8-steps" event for driving a sequential switch (i.e. Vice Virga) that maybe works with similar devices (0.31v, 0.94v, 1.56v, 2.19v, 2.81v, 3.44v, 4.06v, 4.69v).
+- Seq `Probability` param determines probability of note playing vs. being muted.
 
 
 ### Changes and FYI
