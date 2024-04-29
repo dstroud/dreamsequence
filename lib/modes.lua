@@ -1,6 +1,7 @@
 modes = {}
 
 -- lookup for chord degrees and qualities, mirroring MusicUtil.SCALE_CHORD_DEGREES with added chord "quality"
+-- indices 1-7 are triads, 8-14 are 7ths
 chord_lookup = {
   {
     name = "Major",

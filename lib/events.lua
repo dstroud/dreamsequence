@@ -47,6 +47,7 @@ events_lookup = {										--
 {	category= 'Seq', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'seq_swing_1', 	name= 'Swing', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'seq_accent_1', 	name= 'Accent', 	value_type= 'continuous', 				},
 {	category= 'Seq', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'seq_dynamics_1', 	name= 'Dynamics', 	value_type= 'continuous', 				},
+{	category= 'Seq', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'seq_probability_1', 	name= 'Probability', 	value_type= 'continuous', 				},
 -- MIDI harmonizer										
 {	category= 'MIDI harmonizer', 	subcategory= 'Config', 	event_type= 'param', 	id= 'midi_voice', 	name= 'Voice', 	value_type= 'continuous', 				},
 {	category= 'MIDI harmonizer', 	subcategory= 'Config', 	event_type= 'param', 	id= 'midi_harmonizer_in_port', 	name= 'Port in', 	value_type= 'continuous', 				},

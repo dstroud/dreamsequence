@@ -31,7 +31,7 @@ local latest_strum_coroutine = coroutine.running()
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = "v1.3.1.2"
+  local version = "v1.3.1.3"
   -----------------------------
 
   function read_prefs()  
@@ -387,7 +387,7 @@ function init()
   ------------------
   -- SEQ PARAMS --
   ------------------
-  params:add_group("seq", "SEQ", 17)
+  params:add_group("seq", "SEQ", 18)
 
   params:add_option("seq_note_map_1", "Notes", {"Triad", "7th", "Mode+Transp.", "Mode", "Chromatic"}, 1)
   
@@ -435,6 +435,8 @@ function init()
   params:add_number("seq_dynamics_1", "Dynamics", 0, 100, 70, function(param) return percent(param:get()) end)
 
   params:add_number("seq_accent_1", "Accent", -100, 100, 0, function(param) return percent(param:get()) end)
+  
+  params:add_number("seq_probability_1", "Probability", 0, 100, 100, function(param) return percent(param:get()) end)
 
 
   ------------------
@@ -712,7 +714,7 @@ function init()
   page_index = 1
   page_name = pages[page_index]
   menus = {}
-  update_menus()
+  gen_menu()
   menu_index = 0
   selected_menu = menus[page_index][menu_index]
   transport_active = false
@@ -1614,7 +1616,7 @@ end
 -- end
 
 
-function update_menus()
+function gen_menu()
   -- SONG MENU 
   menus[1] = {"mode", "transpose", "clock_tempo", "ts_numerator", "ts_denominator", "clock_source", "crow_out_1", "crow_out_2", "crow_out_3", "crow_out_4", "crow_clock_index", "crow_clock_swing", "dedupe_threshold", "chord_generator", "seq_generator"}
   
@@ -1622,7 +1624,7 @@ function update_menus()
   menus[2] = {"chord_voice", "chord_type", "chord_octave", "chord_range", "chord_max_notes", "chord_inversion", "chord_style", "chord_strum_length", "chord_timing_curve", "chord_div_index", "chord_duration_index", "chord_swing", "chord_dynamics", "chord_dynamics_ramp"}
  
   -- SEQ MENU
-  menus[3] = {"seq_voice_1", "seq_note_map_1", "seq_start_on_1", "seq_reset_on_1", "seq_octave_1", "seq_rotate_1", "seq_shift_1", "seq_div_index_1", "seq_duration_index_1", "seq_swing_1", "seq_accent_1", "seq_dynamics_1"}
+  menus[3] = {"seq_voice_1", "seq_note_map_1", "seq_start_on_1", "seq_reset_on_1", "seq_octave_1", "seq_rotate_1", "seq_shift_1", "seq_div_index_1", "seq_duration_index_1", "seq_swing_1", "seq_accent_1", "seq_dynamics_1", "seq_probability_1"}
 
   -- MIDI HARMONIZER MENU
   menus[4] = {"midi_voice", "midi_note_map", "midi_harmonizer_in_port", "midi_octave", "midi_duration_index", "midi_dynamics"}
@@ -3125,7 +3127,7 @@ function advance_seq_pattern()
   end
 
   local x = seq_pattern[active_seq_pattern][seq_pattern_position]
-  if x > 0 then
+  if x > 0 and math.random(1, 100) <= params:get("seq_probability_1") then
     -- shared with g.key except for dynamics accent bit. Could consolidate
     local player = params:lookup_param("seq_voice_raw_1"):get_player()
     local dynamics = (params:get("seq_dynamics_1") * .01)
