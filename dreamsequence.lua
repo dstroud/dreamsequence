@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.3.1 @modularbeat
+-- v1.3 @modularbeat
 -- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -31,7 +31,7 @@ local latest_strum_coroutine = coroutine.running()
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = "v1.3.1.3"
+  local version = "v1.3.1.4"
   -----------------------------
 
   function read_prefs()  
@@ -255,11 +255,26 @@ function init()
   params:set("crow_pullup", param_option_to_index("crow_pullup", prefs.crow_pullup) or 2)
   params:set_action("crow_pullup", function(val) crow_pullup(val); save_prefs() end)
   
-  params:add_number("voice_instances", "Voice instances", 1, 4, 4)
+  params:add_number("voice_instances", "Voice instances", 1, 4, 1)
   params:set_save("voice_instances", false)
   params:set("voice_instances", (prefs.voice_instances or 1))
   params:set_action("voice_instances", function() save_prefs() end)
 
+  local function enc_config(enc, val)
+    local accel = 1 - (val % 2)
+    local val = (9 - val + accel) / 2
+    print("enc " .. enc .. ": sens " .. util.round(val) .. ", accel " .. (accel == 1 and "on" or "off"))
+    norns.enc.sens(enc, val)
+    norns.enc.accel(enc, accel == 1)
+  end
+
+  for i = 1, 3 do
+    params:add_option("enc_config_" .. i, "Enc " .. i, {"Slower -accel","Slower +accel","Slow, -accel","Slow +accel","Normal -accel","Normal +accel","Fast -accel","Fast +accel"}, 6)
+    params:set_save("enc_config_" .. i, false)
+    params:set("enc_config_" .. i, ((prefs["enc_config_" .. i]) or 6))
+    params:set_action("enc_config_" .. i, function(val) save_prefs(); enc_config(i, val) end)
+  end
+  
   params:add_separator ("MIDI CLOCK OUT") -- todo hide if no MIDI devices
     for i = 1, 16 do 
     local id = "midi_continue_" .. i
@@ -644,23 +659,36 @@ function init()
   
   params:add_number("event_op_limit_max", "Max", -9999, 9999, 0)
   params:hide("event_op_limit_max")
-  
-  params:add_number("crow_5v_8_steps_1", "5v 8-steps", 1, 8, 1)
-  params:set_action("crow_5v_8_steps_1", function(param) crow_5v_8_steps_1(param) end)
-  params:hide("crow_5v_8_steps_1")
-  
-  params:add_number("crow_5v_8_steps_2", "5v 8-steps", 1, 8, 1)
-  params:set_action("crow_5v_8_steps_2", function(param) crow_5v_8_steps_2(param) end)
-  params:hide("crow_5v_8_steps_2")
-  
-  params:add_number("crow_5v_8_steps_3", "5v 8-steps", 1, 8, 1)
-  params:set_action("crow_5v_8_steps_3", function(param) crow_5v_8_steps_3(param) end)
-  params:hide("crow_5v_8_steps_3")
-  
-  params:add_number("crow_5v_8_steps_4", "5v 8-steps", 1, 8, 1)
-  params:set_action("crow_5v_8_steps_4", function(param) crow_5v_8_steps_4(param) end)
-  params:hide("crow_5v_8_steps_4")
-  
+
+
+
+  -- crow events load their actions from the event table to avoid being set on load via bang (last to fire wins!)
+  for out = 1, 4 do
+    -- params:add_option("crow_gate_" .. out, "Gate", {0, 10}, 1, function(param) return param:get() .. "v" end)
+    params:add_number("crow_gate_" .. out, "Gate", 0, 1, 0, function(param) return param:get() * 10 .. "v" end)
+    params:hide("crow_gate_" .. out)
+    params:set_save("crow_gate_" ..out, false)
+    
+    params:add_number("crow_v_12_" .. out, "1/12v increments", -60, 120, 0, function(param) return volts_string_note(12, param:get()) end)
+    params:hide("crow_v_12_" .. out)
+    params:set_save("crow_v_12_" ..out, false)
+    
+    params:add_number("crow_v_10_" .. out, "1/10v increments", -50, 100, 0, function(param) return volts_string(10, param:get()) end)
+    params:hide("crow_v_10_" .. out)
+    params:set_save("crow_v_10_" .. out, false)
+    
+    params:add_number("crow_v_100_" .. out, "1/100v increments", -500, 1000, 0, function(param) return volts_string(100, param:get()) end)
+    params:hide("crow_v_100_" .. out)
+    params:set_save("crow_v_100_" .. out, false)
+
+    params:add_number("crow_v_1000_" .. out, "1/1000v increments", -5000, 10000, 0, function(param) return volts_string(1000, param:get()) end)
+    params:hide("crow_v_1000_" .. out)
+    params:set_save("crow_v_1000_" .. out, false)
+    
+    params:add_number("crow_5v_8_steps_" .. out, "5v 8-steps", 1, 8, 1)
+    params:hide("crow_5v_8_steps_" .. out)
+    params:set_save("crow_5v_8_steps_" .. out, false)
+  end
   
   
   -----------------------------
@@ -944,11 +972,7 @@ function init()
       -- if transport_active == true then
       --   clock.transport.start()
       -- end
-      
-      -- Overwrite these prefs
-      params:set("chord_readout", param_option_to_index("chord_readout", prefs.chord_readout) or 1)
-      params:set("default_pset", param_option_to_index("default_pset", prefs.default_pset) or 1)
-      params:set("crow_pullup", param_option_to_index("crow_pullup", prefs.crow_pullup) or 2)
+
       for i = 1,16 do
         local id = "midi_continue_" .. i
         params:set(id, param_option_to_index(id, prefs[id]) or 2)
@@ -1013,6 +1037,9 @@ function init()
     prefs.default_pset = params:string("default_pset")
     prefs.crow_pullup = params:string("crow_pullup")
     prefs.voice_instances = params:get("voice_instances")
+    prefs.enc_config_1 = params:get("enc_config_1")
+    prefs.enc_config_2 = params:get("enc_config_2")
+    prefs.enc_config_3 = params:get("enc_config_3")
     for i = 1, 16 do
       local id = "midi_continue_" .. i
       prefs[id] = params:string(id)
@@ -1988,8 +2015,36 @@ function divisions_string(index)
   if index == 0 then return("Off") else return(division_names[index][2]) end
 end
 
+
 function durations_string(index) 
   if index == 0 then return("Step") else return(division_names[index][2]) end
+end
+
+
+-- for crow bipolar fractional voltage
+function volts_string(quantum, index)
+  -- return(round(index/quantum, 2) .. "v")
+  local pre = index < 0 and "-" or ""
+  local index = math.abs(index)
+  local v = math.floor(index / quantum) + (index < 0 and 1 or 0)
+  local m = index % quantum
+ 
+  if v == 0 then
+    return(pre .. m .. "/" .. quantum .."v")
+  elseif m == 0 then
+    return(pre .. v .. "v")
+  else
+    return(pre .. v .. " " .. m .. "/" .. quantum .."v")
+  end
+end
+
+
+-- supplement to volts_string if we want to show a note alongside 1/12v output.
+-- assumes A440 tuning on oscillator
+function volts_string_note(quantum, index)
+  local notes = {"A#","B", "C", "C#","D","D#","E","F","F#","G","G#","A"}
+  -- return(round(index/quantum, 2) .. "v " .. notes[util.wrap(index, 1, 12)])  -- TODO p0 rounding is off?
+  return(volts_string(quantum, index) .. ", " .. notes[util.wrap(index, 1, 12)] .. " @A440" )
 end
 
 
@@ -2496,15 +2551,13 @@ function do_events_pre(arranger_pos,chord_pos)
             local limit_max = event_path.limit_max
             local operation = event_path.operation
             local action = event_path.action or nil
-            local args = event_path.args or nil
-            
+
             if event_type == "param" then
               if operation == "Set" then
                 params:set(event_name, value)
               elseif operation == "Increment" or operation == "Wander" then
                 
                 if limit == "Clamp" then
-                  -- issue: ideally should use a variant of clone_param() used to preview delta (make sure to write to a different table than `preview`!), clamp within limits, then set once. This way the action doesn't fire repeatedly.
                   params:delta(event_name, value) 
                   if params:get(event_name) < limit_min then
                     params:set(event_name, limit_min)
@@ -2512,48 +2565,49 @@ function do_events_pre(arranger_pos,chord_pos)
                     params:set(event_name, limit_max)
                   end
                   
-                -- Wrap logic tries to maintain "expected" values for nonlinear controlspec/taper deltas:
+                -- Wrap iterates through deltas to maintain "expected" values for nonlinear controlspec/taper deltas:
                 -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
-                -- 2. If *at* max when event fires with positive value, wrap to min regardless of value
-                -- 3. If *at* min when event fires with negative value, wrap to max regardless of value
+                -- 2. If *at* max when applying a positive delta, wrap to min and hold there until the next iteration
+                -- 3. If *at* min when applying a negative delta, wrap to max and hold there until the next iteration
+                
                 elseif limit == "Wrap" then
                   local reset = false
                   
                   -- positive delta
                   if value > 0 then
-                    if params:get(event_name) >= limit_max then
-                      reset = true
-                    end
-                    if reset then
-                      params:set(event_name, limit_min)
-                      break
-                    else
-                      for i = 1, value do
-                        if params:get(event_name) < limit_max then
-                          params:delta(event_name, 1)
-                        else
-                          break
-                        end
+                    for i = 1, value do
+  
+                      -- Wrap logic tries to maintain "expected" values for nonlinear controlspec/taper deltas:
+                      -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
+                      -- 2. If *at* max when event fires with positive value, wrap to min regardless of value
+                      -- 3. If *at* min when event fires with negative value, wrap to max regardless of value
+                
+                      -- This comparison can fail because of floating point precision, but is probably not worth addressing with the following workaround because of the nature of controlspec, to begin with. Even carefully-crafted and output-quantized controlspec params seem to output different values depending on whether your point of origin is the param default, incrementing from param min, or decrementing from param max.
+                      -- if params:get(event_name) - limit_max >= -0.00000001 then
+                      if params:get(event_name) >= limit_max then  
+                        reset = true
+                      end
+                      if reset then -- at the limit_max *before* applying delta
+                        params:set(event_name, limit_min)
+                        reset = false
+                      else
+                        params:delta(event_name, 1)
                       end
                     end
-                  
+                   
                   -- negative delta
                   elseif value < 0 then
-                    if params:get(event_name) <= limit_min then
-                      reset = true
-                    end
-                    if reset then
-                      params:set(event_name, limit_max)
-                      break
-                    else
-                      for i = value, -1 do
-                        if params:get(event_name) > limit_min then
-                          params:delta(event_name, -1)
-                        else
-                          break
-                        end
+                    for i = value, -1 do
+                      if params:get(event_name) <= limit_min then
+                        reset = true
                       end
-                    end            
+                      if reset then -- at the limit_min *before* applying delta
+                        params:set(event_name, limit_max)
+                        reset = false
+                      else
+                        params:delta(event_name, -1)
+                      end 
+                    end
                   end
                   
                 else
@@ -2601,7 +2655,7 @@ function do_events_pre(arranger_pos,chord_pos)
                 params:set(event_name, 1)
                 params:set(event_name, 0)
               end
-            else -- FUNCTIONS
+            -- else -- FUNCTIONS
               -- currently the only function ops are Triggers. Will likely need to expand Operation checks if there are other types.
               -- elseif operation == "Random" then
               --   if limit == "On" then
@@ -2628,13 +2682,17 @@ function do_events_pre(arranger_pos,chord_pos)
               -- Actual functions will be called as "actions" which can include extra args
               -- e.g. this allows us to use have crow_event_trigger function and the output is determined via args
               -- print("DEBUG FN TYPE" .. type(_G[event_name]))
-              if type(_G[event_name]) == "function" then
-                _G[event_name](value)
-              end
-              if action ~= nil then
-                _G[action](args)
-              end
+              -- if type(_G[event_name]) == "function" then
+              --   _G[event_name](value)
+              -- end
+              -- if action ~= nil then
+              --   _G[action](args)
+              -- end
               
+            end
+            -- action can now fire for functions or params
+            if action ~= nil then
+              load(action)()
             end
  
           end
@@ -2666,15 +2724,16 @@ function do_events()
           local limit_max = event_path.limit_max
           local operation = event_path.operation
           local action = event_path.action or nil
-          local args = event_path.args or nil
-          
+
           if event_type == "param" then
             if operation == "Set" then
               params:set(event_name, value)
+
+            -- issue: ideally should use a variant of clone_param() used to preview delta (make sure to write to a different table than `preview`!), clamp within limits, then set once. This way the action doesn't fire repeatedly.
+            -- for wrap, could do this first and only fall back on iterate if it exceeds limit_max
             elseif operation == "Increment" or operation == "Wander" then
               
               if limit == "Clamp" then
-                -- issue: ideally should use a variant of clone_param() used to preview delta (make sure to write to a different table than `preview`!), clamp within limits, then set once. This way the action doesn't fire repeatedly.
                 params:delta(event_name, value) 
                 if params:get(event_name) < limit_min then
                   params:set(event_name, limit_min)
@@ -2682,48 +2741,49 @@ function do_events()
                   params:set(event_name, limit_max)
                 end
                 
-              -- Wrap logic tries to maintain "expected" values for nonlinear controlspec/taper deltas:
+              -- Wrap iterates through deltas to maintain "expected" values for nonlinear controlspec/taper deltas:
               -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
-              -- 2. If *at* max when event fires with positive value, wrap to min regardless of value
-              -- 3. If *at* min when event fires with negative value, wrap to max regardless of value
+              -- 2. If *at* max when applying a positive delta, wrap to min and hold there until the next iteration
+              -- 3. If *at* min when applying a negative delta, wrap to max and hold there until the next iteration
+              
               elseif limit == "Wrap" then
                 local reset = false
                 
                 -- positive delta
                 if value > 0 then
-                  if params:get(event_name) >= limit_max then
-                    reset = true
-                  end
-                  if reset then
-                    params:set(event_name, limit_min)
-                    break
-                  else
-                    for i = 1, value do
-                      if params:get(event_name) < limit_max then
-                        params:delta(event_name, 1)
-                      else
-                        break
-                      end
+                  for i = 1, value do
+
+                    -- Wrap logic tries to maintain "expected" values for nonlinear controlspec/taper deltas:
+                    -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
+                    -- 2. If *at* max when event fires with positive value, wrap to min regardless of value
+                    -- 3. If *at* min when event fires with negative value, wrap to max regardless of value
+              
+                    -- This comparison can fail because of floating point precision, but is probably not worth addressing with the following workaround because of the nature of controlspec, to begin with. Even carefully-crafted and output-quantized controlspec params seem to output different values depending on whether your point of origin is the param default, incrementing from param min, or decrementing from param max.
+                    -- if params:get(event_name) - limit_max >= -0.00000001 then
+                    if params:get(event_name) >= limit_max then  
+                      reset = true
+                    end
+                    if reset then -- at the limit_max *before* applying delta
+                      params:set(event_name, limit_min)
+                      reset = false
+                    else
+                      params:delta(event_name, 1)
                     end
                   end
-                
+                 
                 -- negative delta
                 elseif value < 0 then
-                  if params:get(event_name) <= limit_min then
-                    reset = true
-                  end
-                  if reset then
-                    params:set(event_name, limit_max)
-                    break
-                  else
-                    for i = value, -1 do
-                      if params:get(event_name) > limit_min then
-                        params:delta(event_name, -1)
-                      else
-                        break
-                      end
+                  for i = value, -1 do
+                    if params:get(event_name) <= limit_min then
+                      reset = true
                     end
-                  end            
+                    if reset then -- at the limit_min *before* applying delta
+                      params:set(event_name, limit_max)
+                      reset = false
+                    else
+                      params:delta(event_name, -1)
+                    end 
+                  end
                 end
                 
               else
@@ -2771,7 +2831,7 @@ function do_events()
               params:set(event_name, 1)
               params:set(event_name, 0)
             end
-          else -- FUNCTIONS
+          -- else -- FUNCTIONS
             -- currently the only function ops are Triggers. Will likely need to expand Operation checks if there are other types.
             -- elseif operation == "Random" then
             --   if limit == "On" then
@@ -2798,14 +2858,23 @@ function do_events()
             -- Actual functions will be called as "actions" which can include extra args
             -- e.g. this allows us to use have crow_event_trigger function and the output is determined via args
             -- print("DEBUG FN TYPE" .. type(_G[event_name]))
-            if type(_G[event_name]) == "function" then
-              _G[event_name](value)
-            end
-            if action ~= nil then
-              _G[action](args)
-            end
+            
+            -- todo: simplify this and always have function be whatever is in action field, for both params and functions (for situations where we want to fire action even if param index didn't change, e.g. crow events)
+            -- if type(_G[event_name]) == "function" then
+            --   _G[event_name](value)
+            -- end
+            
+            -- relocating
+            -- if action ~= nil then
+            --   _G[action](args)
+            -- end
             
           end
+          -- action can now fire for functions or params
+          if action ~= nil then
+            load(action)()
+          end
+          
         end
       end
     end
@@ -4128,14 +4197,14 @@ function key(n,z)
           -- Set, Increment, Wander, Random
           local operation = params:string("event_operation") -- changed to id which will need to be looked up and turned into an id
           local action = events_lookup[event_index].action
-          local args = events_lookup[event_index].args
+          -- local args = events_lookup[event_index].args
           
           local limit = params:string(operation == "Random" and "event_op_limit_random" or "event_op_limit")
           -- variant for "Random" op -- todo p1 make sure we can store here and get it loaded into the right param correctly
           -- local limit_random = params:string("event_op_limit_random")
           local limit_min = params:get("event_op_limit_min")
           local limit_max = params:get("event_op_limit_max")
-          
+
           local probability = params:get("event_probability") -- todo p1 convert to 0-1 float?
           
           -- Keep track of how many events are populated in this step so we don't have to iterate through them all later
@@ -4281,10 +4350,7 @@ function key(n,z)
           -- Extra fields are added if action is assigned to param/function
           if action ~= nil then
             events[event_edit_segment][event_edit_step][event_edit_lane].action = action
-            events[event_edit_segment][event_edit_step][event_edit_lane].args = args
-            
             print(">> action = " .. action)
-            print(">> args = " .. (args or "nil"))
           end
           
           -- Back to event overview
@@ -4412,9 +4478,6 @@ end
 -- ENCODERS
 ----------------------------------          
 function enc(n,d)
-  -- todo p1 more refined switching between clamped and raw deltas depending on the use-case
-  -- local d = util.clamp(d, -1, 1)
-  
   -- Scrolling/extending Arranger, Chord, Seq patterns
   if n == 1 then
     local d = util.clamp(d, -1, 1)
@@ -4587,7 +4650,7 @@ function delta_menu_range(d, minimum, maximum)  -- TODO fix min/max can't be fli
   local prev_value = params:get(selected_events_menu) -- e.g. 0 or 1
   preview:set(prev_value) -- pass the min/max value to preview so we can delta it
   preview:delta(d)
-  local value = util.clamp(preview:get(), minimum, maximum) -- prevernt min/max overlap
+  local value = util.clamp(preview:get(), minimum, maximum) -- prevent min/max overlap
   if value ~= prev_value then
     params:set(selected_events_menu, value)
 
