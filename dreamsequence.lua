@@ -985,18 +985,20 @@ function init()
     local warning = false
     for segment = 1, max_arranger_length do
       for step = 1, max_chord_pattern_length do
-        for slot = 1, 16 do
-          local event = events[segment][step][slot]
-          if event ~= nil then
-            if events_lookup_index[event.id] == nil then
-              warning = true
-              print("WARNING: unable to locate " .. event.event_type .. " " ..  event.id .. " on event ["..segment.."][" .. step .. "][" .. slot .. "]")
-              
-              events[segment][step][slot] = nil
-              events[segment][step].populated = events[segment][step].populated - 1
-              -- If the step's new populated count == 0, decrement count of populated event STEPS in the segment
-              if (events[segment][step].populated or 0) == 0 then
-                events[segment].populated = (events[segment].populated or 0) - 1
+        if events[segment][step] ~= nil then
+          for slot = 1, 16 do
+            local event = events[segment][step][slot]
+            if event ~= nil then
+              if events_lookup_index[event.id] == nil then
+                warning = true
+                print("WARNING: unable to locate " .. event.event_type .. " " ..  event.id .. " on event ["..segment.."][" .. step .. "][" .. slot .. "]")
+                
+                events[segment][step][slot] = nil
+                events[segment][step].populated = events[segment][step].populated - 1
+                -- If the step's new populated count == 0, decrement count of populated event STEPS in the segment
+                if (events[segment][step].populated or 0) == 0 then
+                  events[segment].populated = (events[segment].populated or 0) - 1
+                end
               end
             end
           end
@@ -2235,7 +2237,7 @@ function calc_seconds_remaining()
     seconds_remaining = chord_steps_to_seconds(steps_remaining_in_arrangement - (steps_remaining_in_active_pattern or 0))
   end
   seconds_remaining = s_to_min_sec(math.ceil(seconds_remaining))
-  end
+end
 
 
 -- 1/10s timer used to calculate arranger countdown timer and do transport/grid blinkies
@@ -3923,26 +3925,31 @@ function g.key(x,y,z)
 end
 
 
--- todo p3 relocated
 function apply_arranger_shift()
   if d_cuml > 0 then  -- same as interaction == "arranger_shift"? todo p2 clean up anywhere this check is used
     for i = 1, d_cuml do
       table.insert(arranger, event_edit_segment, 0)
       table.remove(arranger, max_arranger_length + 1)
       table.insert(events, event_edit_segment, nil)
-      events[event_edit_segment] = {{},{},{},{},{},{},{},{}}
+      events[event_edit_segment] = {}
+      for p = 1, max_chord_pattern_length do
+        table.insert(events[event_edit_segment], {})
+      end
       table.remove(events, max_arranger_length + 1)
     end
     gen_arranger_padded()
     d_cuml = 0
 
   elseif d_cuml < 0 then
-    for i = 1, math.abs(d_cuml) do --math.min(math.abs(d_cuml), 1) do
+    for i = 1, math.abs(d_cuml) do
       table.remove(arranger, math.max(event_edit_segment - i, 1))
       table.insert(arranger, 0)
       table.remove(events, math.max(event_edit_segment - i, 1))
       table.insert(events, {})
-      events[max_arranger_length] = {{},{},{},{},{},{},{},{}}
+      events[max_arranger_length] = {}
+      for p = 1, max_chord_pattern_length do
+        table.insert(events[max_arranger_length], {})
+      end
     end
     gen_arranger_padded()
     d_cuml = 0
