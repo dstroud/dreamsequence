@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.3.1 @modularbeat
+-- v1.3.2 @modularbeat
 -- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -31,7 +31,7 @@ local latest_strum_coroutine = coroutine.running()
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = "v1.3.1.3"
+  local version = "v1.3.2"
   -----------------------------
 
   function read_prefs()  
@@ -961,22 +961,24 @@ function init()
     local warning = false
     for segment = 1, max_arranger_length do
       for step = 1, max_chord_pattern_length do
-        for slot = 1, 16 do
-          local event = events[segment][step][slot]
-          if event ~= nil then
-            if events_lookup_index[event.id] == nil then
-              warning = true
-              print("WARNING: unable to locate " .. event.event_type .. " " ..  event.id .. " on event ["..segment.."][" .. step .. "][" .. slot .. "]")
-              
-              events[segment][step][slot] = nil
-              events[segment][step].populated = events[segment][step].populated - 1
-              -- If the step's new populated count == 0, decrement count of populated event STEPS in the segment
-              if (events[segment][step].populated or 0) == 0 then
-                events[segment].populated = (events[segment].populated or 0) - 1
-              end
-            end
-          end
-        end
+				if events[segment][step] ~= nil then
+	      	for slot = 1, 16 do
+	          local event = events[segment][step][slot]
+	          if event ~= nil then
+	            if events_lookup_index[event.id] == nil then
+	              warning = true
+	              print("WARNING: unable to locate " .. event.event_type .. " " ..  event.id .. " on event ["..segment.."][" .. step .. "][" .. slot .. "]")
+	              
+	              events[segment][step][slot] = nil
+	              events[segment][step].populated = events[segment][step].populated - 1
+	              -- If the step's new populated count == 0, decrement count of populated event STEPS in the segment
+	              if (events[segment][step].populated or 0) == 0 then
+	                events[segment].populated = (events[segment].populated or 0) - 1
+	              end
+	            end
+	          end
+	        end
+				end
       end
     end
     if warning then
@@ -3861,7 +3863,10 @@ function apply_arranger_shift()
       table.insert(arranger, event_edit_segment, 0)
       table.remove(arranger, max_arranger_length + 1)
       table.insert(events, event_edit_segment, nil)
-      events[event_edit_segment] = {{},{},{},{},{},{},{},{}}
+      events[event_edit_segment] = {}
+      for p = 1, max_chord_pattern_length do
+        table.insert(events[event_edit_segment], {})
+      end
       table.remove(events, max_arranger_length + 1)
     end
     gen_arranger_padded()
@@ -3873,7 +3878,10 @@ function apply_arranger_shift()
       table.insert(arranger, 0)
       table.remove(events, math.max(event_edit_segment - i, 1))
       table.insert(events, {})
-      events[max_arranger_length] = {{},{},{},{},{},{},{},{}}
+      events[max_arranger_length] = {}
+      for p = 1, max_chord_pattern_length do
+        table.insert(events[max_arranger_length], {})
+      end
     end
     gen_arranger_padded()
     d_cuml = 0
