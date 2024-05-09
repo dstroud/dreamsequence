@@ -1,5 +1,5 @@
 -- Dreamsequence
--- v1.3 @modularbeat
+-- v1.4 @modularbeat
 -- l.llllllll.co/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -31,7 +31,7 @@ local latest_strum_coroutine = coroutine.running()
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = "v1.3.1.4"
+  local version = "v1.4"
   -----------------------------
 
   function read_prefs()  
@@ -402,57 +402,85 @@ function init()
   ------------------
   -- SEQ PARAMS --
   ------------------
-  params:add_group("seq", "SEQ", 18)
+  params:add_group("seq", "SEQ", 20)
 
-  params:add_option("seq_note_map_1", "Notes", {"Triad", "7th", "Mode+Transp.", "Mode", "Chromatic"}, 1)
-  
-  -- todo p1 rename these and update documentation: {"Repeat", "Chord step", "Chord", "Cue"}
-  params:add_option("seq_start_on_1", "Start on", {"Seq end", "Step", "Chord", "Cue"}, 1)
-  -- params:set_save("seq_start_on_1", false)
-  -- params:hide(params.lookup["seq_start_on_1"])
+  for seq_no = 1, 1 do
+    params:add_option("seq_note_map_"..seq_no, "Notes", {"Triad", "7th", "Mode+Transp.", "Mode", "Chromatic"}, 1)
     
-  params:add_option("seq_reset_on_1", "Reset on", {"Step", "Chord", "Stop"}, 3)
-  
-  -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
-  params:add_binary("seq_start_1","Start", "trigger")
-  params:set_action("seq_start_1",function()  play_seq = true end) -- seq_1_shot_1 = true end)
-  
-  -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
-  params:add_binary("seq_reset_1","Reset", "trigger")
-  params:set_action("seq_reset_1",function() seq_pattern_position = 0 end)
-  
-  params:add_number("seq_div_index_1", "Step length", 1, 57, 8, function(param) return divisions_string(param:get()) end)
+    params:add_option("seq_note_priority_"..seq_no, "Priority", {"Mono", "L-R", "R-L", "Random"}, 1)
+    params:set_action("seq_note_priority_"..seq_no, 
+      function(val)
 
-  nb:add_param("seq_voice_raw_1", "Voice raw")
-  params:hide("seq_voice_raw_1")
+        if val == 1 and type(seq_pattern[seq_no][1]) == "table" then -- poly to mono
+          for step = 1, max_seq_pattern_length do
+            for col = 1, 14 do
+              if seq_pattern[seq_no][step][col] == 1 then
+                seq_pattern[seq_no][step] = col
+                break
+              elseif col == 14 then
+                seq_pattern[seq_no][step] = 0
+              end
+            end
+          end
 
-  params:add_option("seq_voice_1", "Voice", voice_param_options, 1)
-  params:set_action("seq_voice_1", function(index) params:set("seq_voice_raw_1", voice_param_index[index]) end)
+        elseif val ~= 1 and type(seq_pattern[seq_no][1]) ~= "table" then  -- mono to poly
+          for i = 1, max_seq_pattern_length do
+            local v = seq_pattern[seq_no][i]
+            seq_pattern[seq_no][i] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+            seq_pattern[seq_no][i][v] = 1
+          end
+        end
+      end
+    )
+    
+    params:add_number("seq_polyphony_"..seq_no, "Polyphony", 1, 14, 1) -- to 0??
+    
+    -- params:add_option("seq_start_on_"..seq_no, "Start on", {"Seq end", "Step", "Chord", "Cue"}, 1)
+    params:add_option("seq_start_on_"..seq_no, "Play", {"in a loop", "every step", "on chord steps", "on blank steps", "on cue/event"}, 1)
+
+    params:add_option("seq_reset_on_"..seq_no, "⏎", {"every step", "on chord steps", "on blank steps", "on stop/event"}, 3)
+    
+    -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
+    params:add_binary("seq_start_"..seq_no,"Start", "trigger")
+    params:set_action("seq_start_"..seq_no,function()  play_seq = true end) -- seq_1_shot_1 = true end)
+    
+    -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
+    params:add_binary("seq_reset_"..seq_no,"Reset", "trigger")
+    params:set_action("seq_reset_"..seq_no,function() seq_pattern_position = 0 end)
+    
+    params:add_number("seq_div_index_"..seq_no, "Step length", 1, 57, 8, function(param) return divisions_string(param:get()) end)
   
-  params:add_number("seq_duration_index_1", "Duration", 0, 57, 0, function(param) return durations_string(param:get()) end)
-  params:set_action("seq_duration_index_1", function(val) seq_duration = val == 0 and division_names[params:get("seq_div_index_1")][1] or division_names[val][1] end)
-
-  max_seq_pattern_length = 16  
-  params:add_number("seq_rotate_1", "Pattern rotate", (max_seq_pattern_length * -1), max_seq_pattern_length, 0)
-  params:set_action("seq_rotate_1", function() pattern_rotate_abs("seq_rotate_1") end)
+    nb:add_param("seq_voice_raw_"..seq_no, "Voice raw")
+    params:hide("seq_voice_raw_"..seq_no)
   
-  params:add_number("seq_shift_1", "Pattern shift", -14, 14, 0)
-  params:set_action("seq_shift_1", function() pattern_shift_abs("seq_shift_1") end)
+    params:add_option("seq_voice_"..seq_no, "Voice", voice_param_options, 1)
+    params:set_action("seq_voice_"..seq_no, function(index) params:set("seq_voice_raw_"..seq_no, voice_param_index[index]) end)
+    
+    params:add_number("seq_duration_index_"..seq_no, "Duration", 0, 57, 0, function(param) return durations_string(param:get()) end)
+    params:set_action("seq_duration_index_"..seq_no, function(val) seq_duration = val == 0 and division_names[params:get("seq_div_index_"..seq_no)][1] or division_names[val][1] end)
   
-  -- numbered so we can operate on parallel seqs down the road
-  params:add_number("seq_pattern_length_1", "Pattern length", 1, max_seq_pattern_length, 8)
-  params:set_action("seq_pattern_length_1", function() pattern_length(1) end)
+    max_seq_pattern_length = 16  
+    params:add_number("seq_rotate_"..seq_no, "Pattern rotate", (max_seq_pattern_length * -1), max_seq_pattern_length, 0)
+    params:set_action("seq_rotate_"..seq_no, function() pattern_rotate_abs("seq_rotate_"..seq_no) end)
+    
+    params:add_number("seq_shift_"..seq_no, "Pattern shift", -14, 14, 0)
+    params:set_action("seq_shift_"..seq_no, function() pattern_shift_abs("seq_shift_"..seq_no) end)
+    
+    -- numbered so we can operate on parallel seqs down the road
+    params:add_number("seq_pattern_length_"..seq_no, "Pattern length", 1, max_seq_pattern_length, 8)
+    params:set_action("seq_pattern_length_"..seq_no, function() pattern_length(1) end)
+    
+    params:add_number("seq_octave_"..seq_no, "Octave", -4, 4, 0)
   
-  params:add_number("seq_octave_1", "Octave", -4, 4, 0)
-
-  params:add_number("seq_swing_1", "Swing", 50, 99, 50, function(param) return percent(param:get()) end)
-
-  params:add_number("seq_dynamics_1", "Dynamics", 0, 100, 70, function(param) return percent(param:get()) end)
-
-  params:add_number("seq_accent_1", "Accent", -100, 100, 0, function(param) return percent(param:get()) end)
+    params:add_number("seq_swing_"..seq_no, "Swing", 50, 99, 50, function(param) return percent(param:get()) end)
   
-  params:add_number("seq_probability_1", "Probability", 0, 100, 100, function(param) return percent(param:get()) end)
-
+    params:add_number("seq_dynamics_"..seq_no, "Dynamics", 0, 100, 70, function(param) return percent(param:get()) end)
+  
+    params:add_number("seq_accent_"..seq_no, "Accent", -100, 100, 0, function(param) return percent(param:get()) end)
+    
+    params:add_number("seq_probability_"..seq_no, "Probability", 0, 100, 100, function(param) return percent(param:get()) end)
+    
+  end
 
   ------------------
   -- MIDI HARMONIZER PARAMS --
@@ -951,7 +979,7 @@ function init()
 
       -- don't remember why this was needed?
       -- local seq_reset_on_1 = params:get("seq_reset_on_1")
-      -- if seq_reset_on_1 == 3 then -- Stop or Event type.
+      -- if seq_reset_on_1 == 4 then -- "on stop/event"
       --   play_seq = true
       -- else
       --   play_seq = false
@@ -1487,7 +1515,7 @@ params:set_action("ts_numerator",
         -- might be better to include a check in lattice since this probably affects all sprockets (including crow/harm)
         -- if transport_state == "playing" or transport_state == "pausing" then 
           local seq_start_on_1 = params:get("seq_start_on_1")
-          if seq_start_on_1 == 1 then -- Seq end
+          if seq_start_on_1 == 1 then -- "in a loop"
             advance_seq_pattern()
             grid_dirty = true
           elseif play_seq then
@@ -1653,7 +1681,7 @@ function gen_menu()
   menus[2] = {"chord_voice", "chord_type", "chord_octave", "chord_range", "chord_max_notes", "chord_inversion", "chord_style", "chord_strum_length", "chord_timing_curve", "chord_div_index", "chord_duration_index", "chord_swing", "chord_dynamics", "chord_dynamics_ramp"}
  
   -- SEQ MENU
-  menus[3] = {"seq_voice_1", "seq_note_map_1", "seq_start_on_1", "seq_reset_on_1", "seq_octave_1", "seq_rotate_1", "seq_shift_1", "seq_div_index_1", "seq_duration_index_1", "seq_swing_1", "seq_accent_1", "seq_dynamics_1", "seq_probability_1"}
+  menus[3] = {"seq_voice_1", "seq_note_map_1", "seq_note_priority_1", "seq_polyphony_1", "seq_start_on_1", "seq_reset_on_1", "seq_octave_1", "seq_rotate_1", "seq_shift_1", "seq_div_index_1", "seq_duration_index_1", "seq_swing_1", "seq_accent_1", "seq_dynamics_1", "seq_probability_1"}
 
   -- MIDI HARMONIZER MENU
   menus[4] = {"midi_voice", "midi_note_map", "midi_harmonizer_in_port", "midi_octave", "midi_duration_index", "midi_dynamics"}
@@ -2266,7 +2294,7 @@ function clock.transport.start(sync_value)
     reset_sprockets("transport start")
   end
   
-  if params:get("seq_start_on_1") == 1 then -- Seq end
+  if params:get("seq_start_on_1") == 1 then -- "in a loop"
     play_seq = true
   end
   start = true
@@ -2483,20 +2511,27 @@ function advance_chord_pattern()
     if x > 0 then
       update_chord(x)
       play_chord()
-      if seq_reset_on_1 == 2 then -- Chord
+      if seq_reset_on_1 == 2 then -- "on chord steps"
         seq_pattern_position = 0
         -- play_seq = true
       end
-      if seq_start_on_1 == 3 then -- Chord
+      if seq_start_on_1 == 3 then -- "on chord steps"
+        play_seq = true
+      end
+    else -- no chord but we might need to start/reset seq
+      if seq_reset_on_1 == 3 then -- "on blank steps"
+        seq_pattern_position = 0
+      end
+      if seq_start_on_1 == 4 then -- "on blank steps"
         play_seq = true
       end
     end
     
-    if seq_reset_on_1 == 1 then -- Step
+    if seq_reset_on_1 == 1 then -- "every step"
       seq_pattern_position = 0
     end
     
-    if seq_start_on_1 == 2 then -- Step
+    if seq_start_on_1 == 2 then -- "every step"
       play_seq = true 
     end
     
@@ -3197,23 +3232,84 @@ function advance_seq_pattern()
     seq_pattern_position = util.wrap(seq_pattern_position + 1, 1, seq_pattern_length[active_seq_pattern])
   end
 
-  local x = seq_pattern[active_seq_pattern][seq_pattern_position]
-  if x > 0 and math.random(1, 100) <= params:get("seq_probability_1") then
-    -- shared with g.key except for dynamics accent bit. Could consolidate
+  -- todo dynamic function set by seq_probability action? seems expensive
+  -- todo would be awesome to have not just step probability but note probability!
+  if math.random(1, 100) <= params:get("seq_probability_1") then
     local player = params:lookup_param("seq_voice_raw_1"):get_player()
     local dynamics = (params:get("seq_dynamics_1") * .01)
     local dynamics = dynamics + (dynamics * (sprocket_seq_1.downbeat and (params:get("seq_accent_1") * .01) or 0))
-    local note = _G["map_note_" .. params:get("seq_note_map_1")](x, params:get("seq_octave_1")) + 36
-    to_player(player, note, dynamics, seq_duration)
+    local sequence = params:get("seq_note_priority_1")
+    local polyphony = params:get("seq_polyphony_1")
+    local note_map = "map_note_" .. params:get("seq_note_map_1")
+    local octave = params:get("seq_octave_1")
+
+    
+    -- todo dynamic function set by seq_mono_poly action
+    -- todo p1 should also look at an optimized table of only active notes rather than having to iterate through all 14!
+    if sequence == 1 then -- mono
+      local x = seq_pattern[active_seq_pattern][seq_pattern_position]
+      if x > 0 then -- and math.random(1, 100) <= params:get("seq_probability_1") then
+        local note = _G[note_map](x, octave) + 36
+        to_player(player, note, dynamics, seq_duration)
+      end
+    
+      
+    elseif sequence == 2 then -- Poly L-R
+      local count = 0
+      for x = 1, 14 do
+        if seq_pattern[active_seq_pattern][seq_pattern_position][x] == 1 then 
+          local note = _G[note_map](x, octave) + 36
+          to_player(player, note, dynamics, seq_duration)
+          count = count + 1
+          if count == polyphony then 
+            break
+          end
+        end
+      end
+        
+    elseif sequence == 3 then -- poly R-L
+      local count = 0
+      for x = 14, 1, -1 do
+        if seq_pattern[active_seq_pattern][seq_pattern_position][x] == 1 then 
+          local note = _G[note_map](x, octave) + 36
+          to_player(player, note, dynamics, seq_duration)
+          count = count + 1
+          if count == polyphony then 
+            break
+          end
+        end
+      end
+      
+    else-- if sequence == 4 then -- pool
+
+      local pool = {}
+      for i = 1, 14 do
+        if seq_pattern[active_seq_pattern][seq_pattern_position][i] == 1 then
+          table.insert(pool, i)
+        end
+
+      end
+      shuffle(pool)
+
+      for i = 1, math.min(#pool, polyphony) do
+        local note = _G[note_map](pool[i], octave) + 36  -- make these local!
+        to_player(player, note, dynamics, seq_duration)
+      end
+      
+    end
   end
+  
   
   if seq_pattern_position >= seq_pattern_length[active_seq_pattern] then
     local seq_start_on_1 = params:get("seq_start_on_1")
-    if seq_start_on_1 ~= 1 then -- seq end
+    if seq_start_on_1 ~= 1 then -- "in a loop"
       play_seq = false
-      -- if seq_start_on_1 == 4 then -- Only reset if we're currently in Event start_on mode. Could go either way here.
+      
+      -- for "on cue/event "
+      -- if seq_start_on_1 == 5 then -- Only reset if we're currently in Event start_on mode. Could go either way here.
       --   seq_1_shot_1 = false
       -- end
+      
     end
   end
 end
@@ -3501,36 +3597,47 @@ function grid_redraw()
       end
       
       
-    -- SEQ GRID REDRAW  
+    -- SEQ GRID REDRAW
+    -- todo avoid conditionals by having this function be defined by seq_mono_poly param action
     elseif grid_view_name == "Seq" then
       g:led(16, 8 + extra_rows, 15)
       
       -- seq playhead
       local seq_pattern_position_offset = seq_pattern_position - pattern_grid_offset
-      -- fix for Midigrid which was breaking when drawing out-of-bounds. todo: check if this is still necessary
-      -- if seq_pattern_position_offset > 0 and seq_pattern_position_offset <= rows then
-        for i = 1, 14 do                                                               
-          g:led(i, seq_pattern_position - pattern_grid_offset, 3)
-        end
-      -- end
+      
+      -- todo needs to be updated to work with poly where, theoretically, all keys could be illuminated
+      for i = 1, 14 do                                                               
+        g:led(i, seq_pattern_position - pattern_grid_offset, 3)
+      end
       
       local length = seq_pattern_length[active_seq_pattern]
-      for i = 1, rows do
+      for y = 1, rows do
         
         -- pattern_length LEDs
         -- if length > rows - pattern_grid_offset then
           if length - pattern_grid_offset > rows and i == rows then 
-            g:led(15, i, (length < (i + pattern_grid_offset) and 4 or 15 - (fast_blinky * 2)))
+            g:led(15, y, (length < (y + pattern_grid_offset) and 4 or 15 - (fast_blinky * 2)))
           elseif pattern_grid_offset > 0 and i == 1 then 
-            g:led(15, i, (length < (i + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 2))))
+            g:led(15, y, (length < (y + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 2))))
           else  
-            g:led(15, i, length < (i + pattern_grid_offset) and 4 or 15)
+            g:led(15, y, length < (y + pattern_grid_offset) and 4 or 15)
           end
           
         -- sequence pattern LEDs off/on
-        if seq_pattern[active_seq_pattern][i + pattern_grid_offset] > 0 then
-          g:led(seq_pattern[active_seq_pattern][i + pattern_grid_offset], i, 15)
+        if params:string("seq_note_priority_"..active_seq_pattern) == "Mono" then 
+        -- could also just check the table contents I guess...
+        -- if type(seq_pattern[active_seq_pattern][y + pattern_grid_offset]) ~= "table" then
+          if seq_pattern[active_seq_pattern][y + pattern_grid_offset] > 0 then
+            g:led(seq_pattern[active_seq_pattern][y + pattern_grid_offset], y, 15)
+          end
+        else -- Poly
+          for x = 1, 14 do
+            if seq_pattern[active_seq_pattern][y + pattern_grid_offset][x] == 1 then
+              g:led(x, y, 15)
+            end
+          end
         end
+        
       end
     end
   end
@@ -3778,25 +3885,16 @@ function g.key(x,y,z)
     -- SEQ PATTERN KEYS
     elseif grid_view_name == "Seq" then
       if x < 15 then
-        if x == seq_pattern[active_seq_pattern][y + pattern_grid_offset] then
-          seq_pattern[active_seq_pattern][y + pattern_grid_offset] = 0
-        else
-          seq_pattern[active_seq_pattern][y + pattern_grid_offset] = x
-
-          -- -- option A:
-          -- -- plays note when pressing on a blank Grid key
-          -- -- mostly shared with advance_seq. could be consolidated into one fn
-          -- if transport_state == "stopped" or transport_state == "paused" then
-          --   local player = params:lookup_param("seq_voice_raw_1"):get_player()
-          --   local dynamics = (params:get("seq_dynamics_1") * .01)
-          --   -- local dynamics = dynamics + (dynamics * (sprocket_seq_1.downbeat and (params:get("seq_accent_1") * .01) or 0))
-          --   local note = _G["map_note_" .. params:get("seq_note_map_1")](x, params:get("seq_octave_1")) + 36
-          --   to_player(player, note, dynamics, seq_duration)
-          -- end
-
+        if params:string("seq_note_priority_1") == "Mono" then
+          if x == seq_pattern[active_seq_pattern][y + pattern_grid_offset] then
+            seq_pattern[active_seq_pattern][y + pattern_grid_offset] = 0
+          else
+            seq_pattern[active_seq_pattern][y + pattern_grid_offset] = x
+          end
+        else -- poly
+          seq_pattern[active_seq_pattern][y + pattern_grid_offset][x] = 1 - seq_pattern[active_seq_pattern][y + pattern_grid_offset][x]
         end
-
-        -- -- option B:
+        -- Play note if stopped/paused. Todo: may want to have this be a pref for stopped/paused, stopped, off
         -- plays note when pressing on any Grid key (even turning note off)
         -- mostly shared with advance_seq. could be consolidated into one fn
         if transport_state == "stopped" or transport_state == "paused" then
@@ -3806,7 +3904,6 @@ function g.key(x,y,z)
           local note = _G["map_note_" .. params:get("seq_note_map_1")](x, params:get("seq_octave_1")) + 36
           to_player(player, note, dynamics, seq_duration)
         end
-
       elseif x == 15 then
         params:set("seq_pattern_length_" .. active_seq_pattern, y + pattern_grid_offset)
       end
