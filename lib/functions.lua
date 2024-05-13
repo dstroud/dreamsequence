@@ -3,25 +3,27 @@
 --------------------------------------------
 
 -- Rotate looping portion of pattern
-function rotate_pattern(view, direction)
+function rotate_pattern(view, offset)
   if view == "Chord" then
-    local length = chord_pattern_length[active_chord_pattern]
-    local temp_chord_pattern = {}
-    for i = 1, length do
-      temp_chord_pattern[i] = chord_pattern[active_chord_pattern][i]
-    end
-    for i = 1, length do
-      chord_pattern[active_chord_pattern][i] = temp_chord_pattern[util.wrap(i - direction,1,length)]
-    end
+    -- local length = chord_pattern_length[active_chord_pattern]
+    -- local temp_chord_pattern = {}
+    -- for i = 1, length do
+      -- temp_chord_pattern[i] = chord_pattern[active_chord_pattern][i]
+    -- end
+    -- for i = 1, length do
+      -- chord_pattern[active_chord_pattern][i] = temp_chord_pattern[util.wrap(i - offset,1,length)]
+    -- end
+    chord_pattern[active_chord_pattern] = rotate_tab_values(chord_pattern[active_chord_pattern], offset)
   elseif view == "Seq" then
-    local length = seq_pattern_length[active_seq_pattern]
-    local temp_seq_pattern = {}
-    for i = 1, length do
-      temp_seq_pattern[i] = seq_pattern[active_seq_pattern][i]
-    end
-    for i = 1, length do
-      seq_pattern[active_seq_pattern][i] = temp_seq_pattern[util.wrap(i - direction,1,length)]
-    end
+    -- local length = seq_pattern_length[active_seq_pattern]
+    -- local temp_seq_pattern = {}
+    -- for i = 1, length do
+    --   temp_seq_pattern[i] = seq_pattern[active_seq_pattern][i]
+    -- end
+    -- for i = 1, length do
+    --   seq_pattern[active_seq_pattern][i] = temp_seq_pattern[util.wrap(i - offset,1,length)]
+    -- end
+    seq_pattern[active_seq_pattern] = rotate_tab_values(seq_pattern[active_seq_pattern], offset)
   end
 end
 
@@ -146,20 +148,28 @@ end
 
 
 -- "Transposes" pattern if you can call it that
-function transpose_pattern(view, direction)
-if view == "Chord" then
-  for y = 1, max_chord_pattern_length do
-    if chord_pattern[active_chord_pattern][y] ~= 0 then
-      chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + direction, 1, 14)
+function transpose_pattern(view, offset)
+  if view == "Chord" then
+    for y = 1, max_chord_pattern_length do
+      if chord_pattern[active_chord_pattern][y] ~= 0 then
+        chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + offset, 1, 14)
+      end
     end
-  end
-elseif view == "Seq" then
-  for y = 1, max_seq_pattern_length do
-    if seq_pattern[active_seq_pattern][y] ~= 0 then
-      seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + direction, 1, 14)
+  elseif view == "Seq" then
+    --shared with pattern_shift_abs fwiw
+    if params:get("seq_note_priority_"..active_seq_pattern) == 1 then -- mono seq
+      for y = 1, max_seq_pattern_length do
+        if seq_pattern[active_seq_pattern][y] ~= 0 then
+          seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + offset, 1, 14)
+        end
+      end
+    else -- poly seq
+      for y = 1, max_seq_pattern_length do
+        seq_pattern[active_seq_pattern][y] = rotate_tab_values(seq_pattern[active_seq_pattern][y], offset)
+      end
     end
-  end
-end  
+
+  end  
 end   
 
 -- END OF EVENT-SPECIFIC FUNCTIONS ------------------------------------------------------

@@ -263,7 +263,7 @@ function init()
   local function enc_config(enc, val)
     local accel = 1 - (val % 2)
     local val = (9 - val + accel) / 2
-    print("enc " .. enc .. ": sens " .. util.round(val) .. ", accel " .. (accel == 1 and "on" or "off"))
+    -- print("enc " .. enc .. ": sens " .. util.round(val) .. ", accel " .. (accel == 1 and "on" or "off"))
     norns.enc.sens(enc, val)
     norns.enc.accel(enc, accel == 1)
   end
@@ -405,7 +405,7 @@ function init()
   params:add_group("seq", "SEQ", 20)
 
   for seq_no = 1, 1 do
-    params:add_option("seq_note_map_"..seq_no, "Notes", {"Triad", "7th", "Mode+Transp.", "Mode", "Chromatic"}, 1)
+    params:add_option("seq_note_map_"..seq_no, "Notes", {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic", "Chromatic+tr."}, 1)
     
     params:add_option("seq_note_priority_"..seq_no, "Priority", {"Mono", "L-R", "R-L", "Random"}, 1)
     params:set_action("seq_note_priority_"..seq_no, 
@@ -438,7 +438,7 @@ function init()
     -- params:add_option("seq_start_on_"..seq_no, "Start on", {"Seq end", "Step", "Chord", "Cue"}, 1)
     params:add_option("seq_start_on_"..seq_no, "Play", {"in a loop", "every step", "on chord steps", "on blank steps", "on cue/event"}, 1)
 
-    params:add_option("seq_reset_on_"..seq_no, "⏎", {"every step", "on chord steps", "on blank steps", "on stop/event"}, 3)
+    params:add_option("seq_reset_on_"..seq_no, "⏎", {"every step", "on chord steps", "on blank steps", "on stop/event"}, 4)
     
     -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
     params:add_binary("seq_start_"..seq_no,"Start", "trigger")
@@ -487,7 +487,7 @@ function init()
   ------------------
   params:add_group("midi_harmonizer", "MIDI HARMONIZER", 8)  
 
-  params:add_option("midi_note_map", "Notes", {"Triad", "7th", "Mode+Transp.", "Mode", "Chromatic"}, 1)
+  params:add_option("midi_note_map", "Notes", {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic", "Chromatic+tr."}, 1)
 
   nb:add_param("midi_voice_raw", "Voice raw")
   params:hide("midi_voice_raw")
@@ -527,7 +527,7 @@ function init()
   params:add_number("crow_div_index", "Trigger", 0, 57, 0, function(param) return crow_trigger_string(param:get()) end)
   params:set_action("crow_div_index", function(val) crow_div = val == 0 and 0 or division_names[val][1] end) -- overwritten
 
-  params:add_option("crow_note_map", "Notes", {"Triad", "7th", "Mode+Transp.", "Mode", "Chromatic"}, 1)
+  params:add_option("crow_note_map", "Notes", {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic", "Chromatic+tr."}, 1)
 
   params:add_option("crow_auto_rest", "Auto-rest", {"Off", "On"}, 1)
 
@@ -1884,46 +1884,73 @@ end
   --todo p3 move and can simplify by arg concats (rename pattern to active_chord_pattern)
 function pattern_rotate_abs(source)
   local new_rotation_val = params:get(source)
-  if source == "seq_rotate_1" then
+  -- if source == "seq_rotate_1" then
     local offset = new_rotation_val - (current_rotation_seq or 0)
-    local length = seq_pattern_length[active_seq_pattern]
-    local temp_seq_pattern = {}
-    for i = 1, length do
-      temp_seq_pattern[i] = seq_pattern[active_seq_pattern][i]
-    end
+    -- old style to rotate within loop
+    -- local length = seq_pattern_length[active_seq_pattern]
+    -- local temp_seq_pattern = {}
+    -- for i = 1, length do
+    --   temp_seq_pattern[i] = seq_pattern[active_seq_pattern][i]
+    -- end
     
-    for i = 1, length do
-      seq_pattern[active_seq_pattern][i] = temp_seq_pattern[util.wrap(i - (offset), 1, length)]
-    end
+    -- for i = 1, length do
+    --   seq_pattern[active_seq_pattern][i] = temp_seq_pattern[util.wrap(i - (offset), 1, length)]
+    -- end
     
+    -- for y = 1, length do
+    seq_pattern[active_seq_pattern] = rotate_tab_values(seq_pattern[active_seq_pattern], offset)
+    -- end
+
     current_rotation_seq = params:get(source)
     
-  end
+  -- end
   grid_dirty = true
 end
 
 
+function rotate_tab_values(tbl, positions)
+  local length = #tbl
+  local rotated = {}
+  
+  for i = 1, length do
+      local new_pos = ((i - 1 + positions) % length) + 1
+      rotated[new_pos] = tbl[i]
+  end
+  
+  return rotated
+end
+
+
 --todo p3 move and can simplify by arg concats (rename pattern to active_chord_pattern)
+-- todo how to handle multiple seqs?
 function pattern_shift_abs(source)
+  -- print("pattern shift source = " .. source)
   local new_shift_val = params:get(source)
   -- print("DEBUG SHIFT", (current_shift_seq or 0), new_shift_val)
-  if source == "seq_shift_1" then
+  -- if source == "chord_shift" then -- punting on chords because how to handle multiple patterns...
+  --   local offset = new_shift_val - (current_shift_chord or 0)
+  --   for y = 1, max_chord_pattern_length do
+  --     if chord_pattern[active_chord_pattern][y] ~= 0 then
+  --       chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + offset, 1, 14)
+  --     end
+  --   end    
+  --   current_shift_chord = params:get(source)   
+  -- -- elseif source == "seq_shift_1" then -- will need update for multiple seqs
+  -- else
     local offset = new_shift_val - (current_shift_seq or 0)
-    for y = 1, max_seq_pattern_length do
-      if seq_pattern[active_seq_pattern][y] ~= 0 then
-        seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + offset, 1, 14)
+    if params:get("seq_note_priority_"..active_seq_pattern) == 1 then -- mono seq
+      for y = 1, max_seq_pattern_length do
+        if seq_pattern[active_seq_pattern][y] ~= 0 then
+          seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + offset, 1, 14)
+        end
       end
-    end    
-    current_shift_seq = params:get(source)
-  elseif source == "chord_shift" then
-    local offset = new_shift_val - (current_shift_chord or 0)
-    for y = 1, max_chord_pattern_length do
-      if chord_pattern[active_chord_pattern][y] ~= 0 then
-        chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + offset, 1, 14)
+    else -- poly seq
+      for y = 1, max_seq_pattern_length do
+        seq_pattern[active_seq_pattern][y] = rotate_tab_values(seq_pattern[active_seq_pattern][y], offset)
       end
-    end    
-    current_shift_chord = params:get(source)  
-  end
+    end
+    current_shift_seq = params:get(source) 
+  -- end
   grid_dirty = true
 end
 
@@ -3213,7 +3240,6 @@ function map_note_3(note_num, octave) --, pre)  -- mode mapping + diatonic trans
   return(quantized_note + (octave * 12) + params:get("transpose"))
 end
 
-
 function map_note_4(note_num, octave) -- mode mapping
   local note_num = note_num
   local quantized_note = notes_nums[util.wrap(note_num, 1, 7)] + (math.floor((note_num -1) / 7) * 12)
@@ -3224,6 +3250,11 @@ function map_note_5(note_num, octave) -- chromatic mapping
   return(note_num -1 + (octave * 12) + params:get("transpose"))
 end
 
+function map_note_6(note_num, octave) -- chromatic intervals from chord root
+  -- local diatonic_transpose = (math.max(current_chord_x, 1)) -1
+  local root = chord_raw[1] or 0
+  return(note_num  -1 + root + (octave * 12) + params:get("transpose"))
+end
 
 function advance_seq_pattern()
   if seq_pattern_position > seq_pattern_length[active_seq_pattern] or arranger_retrig == true then
