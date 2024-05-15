@@ -122,9 +122,9 @@ function event_seq_gen()
 end    
 
 
-function shuffle_seq_1()
-  local shuffled_seq_pattern = shuffle(seq_pattern[active_seq_pattern])
-  seq_pattern[active_seq_pattern] = shuffled_seq_pattern
+function shuffle_seq(seq)
+  local shuffled_seq_pattern = shuffle(seq_pattern[seq])
+  seq_pattern[seq] = shuffled_seq_pattern
 end
     
         
