@@ -31,6 +31,7 @@ events_lookup = {									--
 {	category= 'Chord', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'chord_dynamics', 	name= 'Dynamics', 	value_type= 'continuous', 			},
 {	category= 'Chord', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'chord_dynamics_ramp', 	name= 'Ramp (dynamics)', 	value_type= 'continuous', 			},
 -- Seq 1									
+{	category= 'Seq 1', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_mute_1', 	name= 'Play/mute', 	value_type= 'continuous', 			},
 {	category= 'Seq 1', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_voice_1', 	name= 'Voice', 	value_type= 'continuous', 			},
 {	category= 'Seq 1', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_note_priority_1', 	name= 'Priority', 	value_type= 'continuous', 			},
 {	category= 'Seq 1', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_polyphony_1', 	name= 'Polyphony', 	value_type= 'continuous', 			},
@@ -51,6 +52,7 @@ events_lookup = {									--
 {	category= 'Seq 1', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'seq_dynamics_1', 	name= 'Dynamics', 	value_type= 'continuous', 			},
 {	category= 'Seq 1', 	subcategory= 'Notes', 	event_type= 'param', 	id= 'seq_probability_1', 	name= 'Probability', 	value_type= 'continuous', 			},
 -- Seq 2									
+{	category= 'Seq 2', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_mute_2', 	name= 'Play/mute', 	value_type= 'continuous', 			},
 {	category= 'Seq 2', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_voice_2', 	name= 'Voice', 	value_type= 'continuous', 			},
 {	category= 'Seq 2', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_note_priority_2', 	name= 'Priority', 	value_type= 'continuous', 			},
 {	category= 'Seq 2', 	subcategory= 'Config', 	event_type= 'param', 	id= 'seq_polyphony_2', 	name= 'Polyphony', 	value_type= 'continuous', 			},

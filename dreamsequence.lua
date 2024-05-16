@@ -402,12 +402,12 @@ function init()
   ------------------
   -- SEQ PARAMS --
   ------------------
-  params:add_group("seq", "SEQ", 20)
-
   for seq_no = 1, 2 do
+    params:add_group("seq"..seq_no, "SEQ "..seq_no, 21)
+
     params:add_option("seq_note_map_"..seq_no, "Notes", {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic+tr.", "Chromatic"}, 1)
     
-    params:add_option("seq_note_priority_"..seq_no, "Priority", {"Mono", "L-R", "R-L", "Random"}, 1)
+    params:add_option("seq_note_priority_"..seq_no, "Priority", {"Mono", "L→", "←R", "Random"}, 1)
     params:set_action("seq_note_priority_"..seq_no, 
       function(val)
 
@@ -437,7 +437,7 @@ function init()
     
     params:add_option("seq_start_on_"..seq_no, "Play", {"in a loop", "every step", "on chord steps", "on blank steps", "on cue/event"}, 1)
 
-    params:add_option("seq_reset_on_"..seq_no, "⏎", {"every step", "on chord steps", "on blank steps", "on stop/event"}, 4)
+    params:add_option("seq_reset_on_"..seq_no, "Rst.", {"every step", "on chord steps", "on blank steps", "on stop/event"}, 4)
     
     -- Technically acts like a trigger but setting up as add_binary lets it be PMAP-compatible
     params:add_binary("seq_start_"..seq_no,"Start", "trigger")
@@ -455,6 +455,8 @@ function init()
     params:add_option("seq_voice_"..seq_no, "Voice", voice_param_options, 1)
     params:set_action("seq_voice_"..seq_no, function(index) params:set("seq_voice_raw_"..seq_no, voice_param_index[index]) end)
     
+    params:add_option("seq_mute_"..seq_no, "Play/mute", {"Play", "Mute"}, 1)
+
     params:add_number("seq_duration_index_"..seq_no, "Duration", 0, 57, 0, function(param) return durations_string(param:get()) end)
     params:set_action("seq_duration_index_"..seq_no, function(val) seq_duration[seq_no] = val == 0 and division_names[params:get("seq_div_index_"..seq_no)][1] or division_names[val][1] end)
   
@@ -3267,7 +3269,7 @@ function advance_seq_pattern(seq_no)
 
   -- todo dynamic function set by seq_probability action? seems expensive
   -- todo would be awesome to have not just step probability but note probability!
-  if math.random(1, 100) <= params:get("seq_probability_"..seq_no) then
+  if params:get("seq_mute_"..seq_no) == 1 and math.random(1, 100) <= params:get("seq_probability_"..seq_no) then
     local player = params:lookup_param("seq_voice_raw_"..seq_no):get_player()
     local dynamics = (params:get("seq_dynamics_"..seq_no) * .01)
     local dynamics = dynamics + (dynamics * (_G["sprocket_seq_"..seq_no].downbeat and (params:get("seq_accent_"..seq_no) * .01) or 0))
@@ -3611,20 +3613,19 @@ function grid_redraw()
       -- end
       
       local length = chord_pattern_length[active_chord_pattern]
-      for i = 1, rows do
+      for y = 1, rows do
       -- pattern_length LEDs
-      -- if length > rows - pattern_grid_offset then
-        if length - pattern_grid_offset > rows and i == rows then
-          g:led(15, i, (length < (i + pattern_grid_offset) and 4 or 15 - (fast_blinky * 2)))
-        elseif pattern_grid_offset > 0 and i == 1 then 
-          g:led(15, i, (length < (i + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 2))))
+        if length - pattern_grid_offset > rows and y == rows then
+          g:led(15, y, (length < (y + pattern_grid_offset) and 4 or 15 - (fast_blinky * 4)))
+        elseif pattern_grid_offset > 0 and y == 1 then 
+          g:led(15, y, (length < (y + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 4))))
         else  
-          g:led(15, i, length < (i + pattern_grid_offset) and 4 or 15)
+          g:led(15, y, length < (y + pattern_grid_offset) and 4 or 15)
         end
         
         -- sequence pattern LEDs off/on
-        if chord_pattern[active_chord_pattern][i + pattern_grid_offset] > 0 then
-          g:led(chord_pattern[active_chord_pattern][i + pattern_grid_offset], i, 15)
+        if chord_pattern[active_chord_pattern][y + pattern_grid_offset] > 0 then
+          g:led(chord_pattern[active_chord_pattern][y + pattern_grid_offset], y, 15)
         end
       end
       
@@ -3649,14 +3650,13 @@ function grid_redraw()
       for y = 1, rows do
         
         -- pattern_length LEDs
-        -- if length > rows - pattern_grid_offset then
-          if length - pattern_grid_offset > rows and i == rows then 
-            g:led(15, y, (length < (y + pattern_grid_offset) and 4 or 15 - (fast_blinky * 2)))
-          elseif pattern_grid_offset > 0 and i == 1 then 
-            g:led(15, y, (length < (y + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 2))))
-          else  
-            g:led(15, y, length < (y + pattern_grid_offset) and 4 or 15)
-          end
+        if length - pattern_grid_offset > rows and y == rows then 
+          g:led(15, y, (length < (y + pattern_grid_offset) and 4 or 15 - (fast_blinky * 4)))
+        elseif pattern_grid_offset > 0 and y == 1 then 
+          g:led(15, y, (length < (y + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 4))))
+        else  
+          g:led(15, y, length < (y + pattern_grid_offset) and 4 or 15)
+        end
           
         -- sequence pattern LEDs off/on
         if params:string("seq_note_priority_"..active_seq_pattern) == "Mono" then 
@@ -3676,17 +3676,13 @@ function grid_redraw()
       end
 
       -- active seq selector
-      if active_seq_pattern == 1 then
-        g:led(16, 1, 15)
-        g:led(16, 2, 4)
-      else
-        g:led(16, 1, 4)
-        g:led(16, 2, 15)
+      for y = 1, 2 do
+        if params:get("seq_mute_"..y) == 2 then -- muted, blinkies
+          g:led(16, y, active_seq_pattern == y and (15 - fast_blinky * 4) or (4 - fast_blinky * 2))
+        else
+          g:led(16, y, active_seq_pattern == y and 15 or 4)
+        end
       end
-
-      -- seq on/off modifier
-      -- todo
-      g:led(16, 4, 4)
 
     end
   end
@@ -3956,7 +3952,11 @@ function g.key(x,y,z)
       elseif x == 15 then
         params:set("seq_pattern_length_" .. active_seq_pattern, y + pattern_grid_offset)
       elseif y <= 2 then -- pattern selector
-        active_seq_pattern = y
+        if grid_view_keys[1] == 8 then -- mute/unmute
+          params:set("seq_mute_"..y, 3 - params:get("seq_mute_"..y))
+        else -- switch seq grid view
+          active_seq_pattern = y
+        end
       end
     end
     
@@ -5190,15 +5190,21 @@ function redraw()
       screen.move(128,62)
       screen.text_right("(K3) GEN. CHORDS")     
         
-     elseif grid_view_name == "Seq" then --or grid_view_name == "Seq") then-- Chord/Seq 
+     elseif grid_view_name == "Seq" then
       screen.level(15)
       screen.move(2,8)
       screen.text(string.upper(grid_view_name) .. " GRID FUNCTIONS")
+      
       screen.move(2,28)
       screen.text("ENC 2: rotate ↑↓")
+      
       screen.move(2,38)
       screen.text("ENC 3: transpose ←→")
-      screen.level(4)
+
+      screen.move(2,48)
+      screen.text("Tap pattern to (un)mute")
+      
+      screen.level(4)  
       screen.move(1,54)
       screen.line(128,54)
       screen.stroke()
