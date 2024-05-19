@@ -57,7 +57,7 @@ function init()
   nb.players["crow 1/2"] = nil
   nb.players["crow 3/4"] = nil
   nb.players["crow para"] = nil
-  nb.players["jf kit"] = nil
+  -- nb.players["jf kit"] = nil
   nb.players["jf mpe"] = nil
 
 
@@ -387,12 +387,6 @@ function init()
 
   params:add_number("chord_dynamics_ramp", "Ramp", -100, 100, 0, function(param) return percent(param:get()) end)
 
-  -- params:add_number("chord_rotate", "Pattern rotate", -14, 14, 0)
-  -- params:set_action("chord_rotate",function() pattern_rotate_abs("chord_rotate") end)  
-  
-  -- params:add_number("chord_shift", "Pattern shift", -14, 14, 0)
-  -- params:set_action("chord_shift",function() pattern_shift_abs("chord_shift") end)
-  
   -- will act on current pattern unlike numbered seq param
   max_chord_pattern_length = 16
   params:add_number("chord_pattern_length", "Pattern length", 1, max_chord_pattern_length, 4)
@@ -402,10 +396,15 @@ function init()
   ------------------
   -- SEQ PARAMS --
   ------------------
-  for seq_no = 1, 2 do
+  max_seqs = 2
+
+  local note_map = {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic+tr.", "Chromatic", "Drums"} -- used by all but chord
+
+  for seq_no = 1, max_seqs do
+
     params:add_group("seq"..seq_no, "SEQ "..seq_no, 21)
 
-    params:add_option("seq_note_map_"..seq_no, "Notes", {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic+tr.", "Chromatic"}, 1)
+    params:add_option("seq_note_map_"..seq_no, "Notes", note_map, 1)
     
     params:add_option("seq_note_priority_"..seq_no, "Priority", {"Mono", "L→", "←R", "Random"}, 1)
     params:set_action("seq_note_priority_"..seq_no, 
@@ -461,11 +460,15 @@ function init()
     params:set_action("seq_duration_index_"..seq_no, function(val) seq_duration[seq_no] = val == 0 and division_names[params:get("seq_div_index_"..seq_no)][1] or division_names[val][1] end)
   
     max_seq_pattern_length = 16  
-    params:add_number("seq_rotate_"..seq_no, "Pattern rotate", (max_seq_pattern_length * -1), max_seq_pattern_length, 0)
-    params:set_action("seq_rotate_"..seq_no, function() pattern_rotate_abs("seq_rotate_"..seq_no) end)
-    
-    params:add_number("seq_shift_"..seq_no, "Pattern shift", -14, 14, 0)
-    params:set_action("seq_shift_"..seq_no, function() pattern_shift_abs("seq_shift_"..seq_no) end)
+    params:add_number("seq_rotate_"..seq_no, "Pattern rotate", 0, max_seq_pattern_length - 1, 0, function(param) return param:get() end, true) -- dummy formatter??
+    params:set_action("seq_rotate_"..seq_no, function(val) seq_rotate_abs(seq_no, val) end)
+    params:add_number("prev_seq_rotate_"..seq_no, "prev_seq_rotate_"..seq_no, (max_seq_pattern_length * -1), max_seq_pattern_length, 0)
+    params:hide("prev_seq_rotate_"..seq_no)
+        
+    params:add_number("seq_shift_"..seq_no, "Pattern shift", 0, 13, 0, function(param) return param:get() end, true) -- dummy formatter??
+    params:set_action("seq_shift_"..seq_no, function(val) seq_shift_abs(seq_no, val) end)
+    params:add_number("prev_seq_shift_"..seq_no, "prev_seq_shift_"..seq_no, -14, 14, 0)
+    params:hide("prev_seq_shift_"..seq_no)
     
     -- numbered so we can operate on parallel seqs down the road
     params:add_number("seq_pattern_length_"..seq_no, "Pattern length", 1, max_seq_pattern_length, 8)
@@ -488,7 +491,7 @@ function init()
   ------------------
   params:add_group("midi_harmonizer", "MIDI HARMONIZER", 8)  
 
-  params:add_option("midi_note_map", "Notes", {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic+tr.", "Chromatic"}, 1)
+  params:add_option("midi_note_map", "Notes", note_map, 1)
 
   nb:add_param("midi_voice_raw", "Voice raw")
   params:hide("midi_voice_raw")
@@ -528,7 +531,7 @@ function init()
   params:add_number("crow_div_index", "Trigger", 0, 57, 0, function(param) return crow_trigger_string(param:get()) end)
   params:set_action("crow_div_index", function(val) crow_div = val == 0 and 0 or division_names[val][1] end) -- overwritten
 
-  params:add_option("crow_note_map", "Notes", {"Triad", "7th", "Mode+tr.", "Mode", "Chromatic+tr.", "Chromatic"}, 1)
+  params:add_option("crow_note_map", "Notes", note_map, 1)
 
   params:add_option("crow_auto_rest", "Auto-rest", {"Off", "On"}, 1)
 
@@ -842,9 +845,6 @@ function init()
     end
   end  
   pattern_grid_offset = 0 -- grid view scroll offset
-  current_shift_seq = 0
-  current_shift_chord = 0
-  current_rotation_seq = 0
   chord_pattern_position = 0
   chord_raw = {}
   current_chord_x = 0
@@ -853,11 +853,16 @@ function init()
   next_chord_x = 0
   next_chord_o = 0
   next_chord_c = 1
-  seq_pattern_length = {8,8}
+
+
   active_seq_pattern = 1
-  seq_pattern_position = {0,0}
+  seq_pattern_length = {}
+  seq_pattern_position = {}
   seq_duration = {}
-  for seq_no = 1, 2 do
+
+  for seq_no = 1, max_seqs do
+    seq_pattern_length[seq_no] = 8
+    seq_pattern_position[seq_no] = 0
     seq_pattern_position[seq_no] = 0
   end
   note_history = {}  -- todo p2 performance of having one vs dynamically created history for each voice
@@ -883,9 +888,6 @@ function init()
     misc.version = version
     misc.clock_tempo = params:get("clock_tempo")
     misc.clock_source = params:get("clock_source")
-    misc.current_shift_seq = current_shift_seq
-    misc.current_shift_chord = current_shift_chord
-    misc.current_rotation_seq = current_rotation_seq
 
     -- need to save and restore nb voices which can change based on what mods are enabled
     -- reworked for seq2 but haven't tested
@@ -929,9 +931,6 @@ function init()
       end
       -- clock_tempo isn't stored in .pset for some reason so set it from misc.data (todo: look into inserting into .pset)
       params:set("clock_tempo", misc.clock_tempo or params:get("clock_tempo"))
-      current_shift_seq = misc.current_shift_seq
-      current_shift_chord = misc.current_shift_chord
-      current_rotation_seq = misc.current_rotation_seq
 
       -- restore nb voices based on string
       local sources = {"chord_voice", "seq_voice_1", "seq_voice_2", "crow_voice", "midi_voice"}
@@ -1906,48 +1905,41 @@ end
 function build_scale()
   notes_nums = musicutil.generate_scale_of_length(0, params:get("mode"), 7)
 end
-  
-  --todo p3 move and can simplify by arg concats (rename pattern to active_chord_pattern)
-function pattern_rotate_abs(source)
-  local new_rotation_val = params:get(source)
-  local offset = new_rotation_val - (current_rotation_seq or 0)
-  seq_pattern[active_seq_pattern] = rotate_tab_values(seq_pattern[active_seq_pattern], offset)
-  current_rotation_seq = params:get(source)
-  grid_dirty = true
-end
 
 
 function rotate_tab_values(tbl, positions)
   local length = #tbl
   local rotated = {}
-  
   for i = 1, length do
       local new_pos = ((i - 1 + positions) % length) + 1
       rotated[new_pos] = tbl[i]
   end
-  
   return rotated
 end
 
 
---todo p3 move and can simplify by arg concats (rename pattern to active_chord_pattern)
--- todo how to handle multiple seqs?
-function pattern_shift_abs(source)
-  -- print("pattern shift source = " .. source)
-  local new_shift_val = params:get(source)
-  local offset = new_shift_val - (current_shift_seq or 0)
-  if params:get("seq_note_priority_"..active_seq_pattern) == 1 then -- mono seq
+function seq_rotate_abs(seq_no, new_rotation_val)
+  local offset = new_rotation_val - params:get("prev_seq_rotate_"..seq_no)
+  seq_pattern[seq_no] = rotate_tab_values(seq_pattern[seq_no], offset)
+  params:set("prev_seq_rotate_"..seq_no, new_rotation_val)
+  grid_dirty = true
+end
+
+
+function seq_shift_abs(seq_no, new_shift_val)
+  local offset = new_shift_val - (params:get("prev_seq_shift_"..seq_no))
+  if params:get("seq_note_priority_"..seq_no) == 1 then -- mono seq
     for y = 1, max_seq_pattern_length do
-      if seq_pattern[active_seq_pattern][y] ~= 0 then
-        seq_pattern[active_seq_pattern][y] = util.wrap(seq_pattern[active_seq_pattern][y] + offset, 1, 14)
+      if seq_pattern[seq_no][y] ~= 0 then
+        seq_pattern[seq_no][y] = util.wrap(seq_pattern[seq_no][y] + offset, 1, 14)
       end
     end
   else -- poly seq
     for y = 1, max_seq_pattern_length do
-      seq_pattern[active_seq_pattern][y] = rotate_tab_values(seq_pattern[active_seq_pattern][y], offset)
+      seq_pattern[seq_no][y] = rotate_tab_values(seq_pattern[seq_no][y], offset)
     end
   end
-  current_shift_seq = params:get(source) 
+  params:set("prev_seq_shift_"..seq_no, new_shift_val)
   grid_dirty = true
 end
 
@@ -2626,55 +2618,80 @@ function do_events_pre(arranger_pos,chord_pos)
               elseif operation == "Increment" or operation == "Wander" then
                 
                 if limit == "Clamp" then
-                  params:delta(event_name, value) 
-                  if params:get(event_name) < limit_min then
-                    params:set(event_name, limit_min)
-                  elseif params:get(event_name) > limit_max then
-                    params:set(event_name, limit_max)
+                
+                  if value > 0 then -- positive delta
+                    if params:get(event_name) < limit_min then
+                      params:set(event_name, limit_min)
+                    else
+                      for i = 1, value do
+                        if params:get(event_name) >= limit_max then
+                          params:set(event_name, limit_max)
+                          break
+                        else
+                          params:delta(event_name, 1)
+                        end
+                      end
+                    end
+  
+                  elseif value < 0 then -- negative delta
+                    if params:get(event_name) > limit_max then
+                      params:set(event_name, limit_max)
+                    else
+                      for i = value, -1 do
+                        if params:get(event_name) <= limit_min then
+                          params:set(event_name, limit_min)
+                          break
+                        else
+                          params:delta(event_name, -1)
+                        end
+                      end
+                    end
                   end
                   
-                -- Wrap iterates through deltas to maintain "expected" values for nonlinear controlspec/taper deltas:
-                -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
-                -- 2. If *at* max when applying a positive delta, wrap to min and hold there until the next iteration
-                -- 3. If *at* min when applying a negative delta, wrap to max and hold there until the next iteration
-                
                 elseif limit == "Wrap" then
                   local reset = false
                   
-                  -- positive delta
-                  if value > 0 then
-                    for i = 1, value do
-  
-                      -- Wrap logic tries to maintain "expected" values for nonlinear controlspec/taper deltas:
-                      -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
-                      -- 2. If *at* max when event fires with positive value, wrap to min regardless of value
-                      -- 3. If *at* min when event fires with negative value, wrap to max regardless of value
-                
-                      -- This comparison can fail because of floating point precision, but is probably not worth addressing with the following workaround because of the nature of controlspec, to begin with. Even carefully-crafted and output-quantized controlspec params seem to output different values depending on whether your point of origin is the param default, incrementing from param min, or decrementing from param max.
-                      -- if params:get(event_name) - limit_max >= -0.00000001 then
-                      if params:get(event_name) >= limit_max then  
-                        reset = true
-                      end
-                      if reset then -- at the limit_max *before* applying delta
-                        params:set(event_name, limit_min)
-                        reset = false
-                      else
-                        params:delta(event_name, 1)
+                  if value > 0 then -- positive delta
+                    if params:get(event_name) < limit_min then
+                      params:set(event_name, limit_min)
+                    else
+                      for i = 1, value do
+    
+                        -- Wrap logic tries to maintain "expected" values for nonlinear controlspec/taper deltas:
+                        -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
+                        -- 2. If *at* max when event fires with positive value, wrap to min regardless of value
+                        -- 3. If *at* min when event fires with negative value, wrap to max regardless of value
+                  
+                        -- This comparison can fail because of floating point precision, but is probably not worth addressing with the following workaround because of the nature of controlspec, to begin with. Even carefully-crafted and output-quantized controlspec params seem to output different values depending on whether your point of origin is the param default, incrementing from param min, or decrementing from param max.
+                        -- if params:get(event_name) - limit_max >= -0.00000001 then
+                        if params:get(event_name) >= limit_max then
+                          reset = true
+                        end
+                        if reset then -- at the limit_max *before* applying delta
+                          params:set(event_name, limit_min)
+                          reset = false
+                        else
+                          params:delta(event_name, 1)
+                        end
                       end
                     end
                    
-                  -- negative delta
-                  elseif value < 0 then
-                    for i = value, -1 do
-                      if params:get(event_name) <= limit_min then
-                        reset = true
+
+                  elseif value < 0 then -- negative delta
+                    if params:get(event_name) > limit_max then
+                      params:set(event_name, limit_max)
+                    else
+                      for i = value, -1 do
+                        if params:get(event_name) <= limit_min then
+                          reset = true
+                        end
+                        if reset then -- at the limit_min *before* applying delta
+                          params:set(event_name, limit_max)
+                          reset = false
+                        else
+                          params:delta(event_name, -1)
+                        end 
                       end
-                      if reset then -- at the limit_min *before* applying delta
-                        params:set(event_name, limit_max)
-                        reset = false
-                      else
-                        params:delta(event_name, -1)
-                      end 
                     end
                   end
                   
@@ -2800,25 +2817,46 @@ function do_events()
             -- issue: ideally should use a variant of clone_param() used to preview delta (make sure to write to a different table than `preview`!), clamp within limits, then set once. This way the action doesn't fire repeatedly.
             -- for wrap, could do this first and only fall back on iterate if it exceeds limit_max
             elseif operation == "Increment" or operation == "Wander" then
-              
+
+              -- todo p0 update this this in events_pre (or just fix the damn function to pass an 'order' arg!)
               if limit == "Clamp" then
-                params:delta(event_name, value) 
+
+                if value > 0 then -- positive delta
+                  if params:get(event_name) < limit_min then
+                    params:set(event_name, limit_min)
+                  else
+                    for i = 1, value do
+                      if params:get(event_name) >= limit_max then
+                        params:set(event_name, limit_max)
+                        break
+                      else
+                        params:delta(event_name, 1)
+                      end
+                    end
+                  end
+
+                elseif value < 0 then -- negative delta
+                  if params:get(event_name) > limit_max then
+                    params:set(event_name, limit_max)
+                  else
+                    for i = value, -1 do
+                      if params:get(event_name) <= limit_min then
+                        params:set(event_name, limit_min)
+                        break
+                      else
+                        params:delta(event_name, -1)
+                      end
+                    end
+                  end
+                end
+
+            elseif limit == "Wrap" then
+              local reset = false
+              
+              if value > 0 then -- positive delta
                 if params:get(event_name) < limit_min then
                   params:set(event_name, limit_min)
-                elseif params:get(event_name) > limit_max then
-                  params:set(event_name, limit_max)
-                end
-                
-              -- Wrap iterates through deltas to maintain "expected" values for nonlinear controlspec/taper deltas:
-              -- 1. If within wrap min/max, delta (but clamp if the delta would exceed limit)
-              -- 2. If *at* max when applying a positive delta, wrap to min and hold there until the next iteration
-              -- 3. If *at* min when applying a negative delta, wrap to max and hold there until the next iteration
-              
-              elseif limit == "Wrap" then
-                local reset = false
-                
-                -- positive delta
-                if value > 0 then
+                else
                   for i = 1, value do
 
                     -- Wrap logic tries to maintain "expected" values for nonlinear controlspec/taper deltas:
@@ -2828,7 +2866,7 @@ function do_events()
               
                     -- This comparison can fail because of floating point precision, but is probably not worth addressing with the following workaround because of the nature of controlspec, to begin with. Even carefully-crafted and output-quantized controlspec params seem to output different values depending on whether your point of origin is the param default, incrementing from param min, or decrementing from param max.
                     -- if params:get(event_name) - limit_max >= -0.00000001 then
-                    if params:get(event_name) >= limit_max then  
+                    if params:get(event_name) >= limit_max then
                       reset = true
                     end
                     if reset then -- at the limit_max *before* applying delta
@@ -2838,9 +2876,13 @@ function do_events()
                       params:delta(event_name, 1)
                     end
                   end
-                 
-                -- negative delta
-                elseif value < 0 then
+                end
+               
+
+              elseif value < 0 then -- negative delta
+                if params:get(event_name) > limit_max then
+                  params:set(event_name, limit_max)
+                else
                   for i = value, -1 do
                     if params:get(event_name) <= limit_min then
                       reset = true
@@ -2853,10 +2895,11 @@ function do_events()
                     end 
                   end
                 end
-                
-              else
-                params:delta(event_name, value) 
               end
+              
+            else -- limit == "Off"
+              params:delta(event_name, value) 
+            end
               
             elseif operation == "Random" then
               local param = params:lookup_param(event_name)
@@ -2899,44 +2942,6 @@ function do_events()
               params:set(event_name, 1)
               params:set(event_name, 0)
             end
-          -- else -- FUNCTIONS
-            -- currently the only function ops are Triggers. Will likely need to expand Operation checks if there are other types.
-            -- elseif operation == "Random" then
-            --   if limit == "On" then
-            --     local value = math.random(limit_min, limit_max)
-            --     _G[event_name](value)
-                
-            --     -- currently not using actions other than param actions which will fire automatically.
-            --     -- todo: if/when param actions are set up this needs to be replicated (or a global var used) to pick up random/wander values
-            --     if action ~= nil then
-            --       _G[action](args)
-            --     end                
-            --   else
-            --     -- todo: make sure we pick up the latest range in case it has changed since event was saved (pset load)
-                
-            --     -- currently not using actions other than param actions which will fire automatically.
-            --     -- todo: if/when param actions are set up this needs to be replicated (or a global var used) to pick up random/wander values
-            --     if action ~= nil then
-            --       _G[action](args)
-            --     end                    
-            --   end
-            -- else
-            
-            -- Some function events can have faux ids that are just used to store the event
-            -- Actual functions will be called as "actions" which can include extra args
-            -- e.g. this allows us to use have crow_event_trigger function and the output is determined via args
-            -- print("DEBUG FN TYPE" .. type(_G[event_name]))
-            
-            -- todo: simplify this and always have function be whatever is in action field, for both params and functions (for situations where we want to fire action even if param index didn't change, e.g. crow events)
-            -- if type(_G[event_name]) == "function" then
-            --   _G[event_name](value)
-            -- end
-            
-            -- relocating
-            -- if action ~= nil then
-            --   _G[action](args)
-            -- end
-            
           end
           -- action can now fire for functions or params
           if action ~= nil then
@@ -3258,6 +3263,10 @@ end
 
 function map_note_6(note_num, octave) -- chromatic mapping
   return(note_num -1 + (octave * 12) + params:get("transpose"))
+end
+
+function map_note_7(note_num, octave) -- drum mapping (no key transposition)
+  return(note_num -1 + (octave * 12)) -- todo param to shift?
 end
 
 function advance_seq_pattern(seq_no)
@@ -3618,7 +3627,7 @@ function grid_redraw()
         if length - pattern_grid_offset > rows and y == rows then
           g:led(15, y, (length < (y + pattern_grid_offset) and 4 or 15 - (fast_blinky * 4)))
         elseif pattern_grid_offset > 0 and y == 1 then 
-          g:led(15, y, (length < (y + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 4))))
+          g:led(15, y, (length < (y + pattern_grid_offset) and (4 + (fast_blinky * 2)) or (15 - (fast_blinky * 4))))
         else  
           g:led(15, y, length < (y + pattern_grid_offset) and 4 or 15)
         end
@@ -3653,7 +3662,7 @@ function grid_redraw()
         if length - pattern_grid_offset > rows and y == rows then 
           g:led(15, y, (length < (y + pattern_grid_offset) and 4 or 15 - (fast_blinky * 4)))
         elseif pattern_grid_offset > 0 and y == 1 then 
-          g:led(15, y, (length < (y + pattern_grid_offset) and (4 + (fast_blinky)) or (15 - (fast_blinky * 4))))
+          g:led(15, y, (length < (y + pattern_grid_offset) and (4 - (fast_blinky * 2)) or (15 - (fast_blinky * 4))))
         else  
           g:led(15, y, length < (y + pattern_grid_offset) and 4 or 15)
         end
@@ -4118,11 +4127,34 @@ function key(n,z)
     -- if n == 1 then
     -- KEY 2  
     if n == 2 then
-      -- if keys[1] == 1 then
-      -- Not used at the moment
+      if view_key_count > 0 then -- Grid view key held down
+        if screen_view_name == "Chord+seq" then
         
+          -- When Chord+Seq Grid View keys are held down, K3 runs Generator (and resets pattern+seq on internal clock)
+          generator()
+
+          -- This reset patterns and resyncs seq, but only for internal clock. todo p1 think on this. Not great and might be weird with new seq reset logic
+          if params:string("clock_source") == "internal" then
+            local prev_transport_state = transport_state
+            reset_external_clock()
+            -- don't reset arranger it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
+            reset_pattern()
+            if transport_state ~= prev_transport_state then
+              transport_state = prev_transport_state
+              print(transport_state)
+            end
+          end
+     
+        elseif grid_view_name == "Chord" then       
+          chord_generator_lite()
+          -- gen_dash("chord_generator_lite") -- will run when called from event but not from keys
+        elseif grid_view_name == "Seq" then       
+          seq_generator("run")
+        end
+        grid_dirty = true
+      
       -- Arranger Events strip held down
-      if arranger_loop_key_count > 0 and interaction ~= "arranger_shift" then -- interaction == nil then
+      elseif arranger_loop_key_count > 0 and interaction ~= "arranger_shift" then -- interaction == nil then
         arranger_queue = event_edit_segment
         -- jumping arranger queue cancels pattern change on key up
         if arranger_queue <= arranger_length then arranger_one_shot_last_pattern = false end -- instantly de-blink glyph
@@ -4290,40 +4322,43 @@ function key(n,z)
       -----------------------
     elseif n == 3 then
       -- if keys[1] == 1 then
-      if init_message ~= nil then
-        init_message = nil
+      -- if init_message ~= nil then
+      --   init_message = nil
       
-      elseif view_key_count > 0 then -- Grid view key held down
-        if screen_view_name == "Chord+seq" then
+      -- else
         
-          -- When Chord+Seq Grid View keys are held down, K3 runs Generator (and resets pattern+seq on internal clock)
-          generator()
+      -- rework to enter chord/scale editor, maybe
+      -- if view_key_count > 0 then -- Grid view key held down
+      --   if screen_view_name == "Chord+seq" then
+        
+      --     -- When Chord+Seq Grid View keys are held down, K3 runs Generator (and resets pattern+seq on internal clock)
+      --     generator()
 
-          -- This reset patterns and resyncs seq, but only for internal clock. todo p1 think on this. Not great and might be weird with new seq reset logic
-          if params:string("clock_source") == "internal" then
-            local prev_transport_state = transport_state
-            reset_external_clock()
-            -- don't reset arranger it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
-            reset_pattern()
-            if transport_state ~= prev_transport_state then
-              transport_state = prev_transport_state
-              print(transport_state)
-            end
-          end
+      --     -- This reset patterns and resyncs seq, but only for internal clock. todo p1 think on this. Not great and might be weird with new seq reset logic
+      --     if params:string("clock_source") == "internal" then
+      --       local prev_transport_state = transport_state
+      --       reset_external_clock()
+      --       -- don't reset arranger it's confusing if we generate on, say, pattern 3 and then Arranger is reset and we're now on pattern 1.
+      --       reset_pattern()
+      --       if transport_state ~= prev_transport_state then
+      --         transport_state = prev_transport_state
+      --         print(transport_state)
+      --       end
+      --     end
      
-        elseif grid_view_name == "Chord" then       
-          chord_generator_lite()
-          -- gen_dash("chord_generator_lite") -- will run when called from event but not from keys
-        elseif grid_view_name == "Seq" then       
-          seq_generator("run")
-        end
-        grid_dirty = true
+      --   elseif grid_view_name == "Chord" then       
+      --     chord_generator_lite()
+      --     -- gen_dash("chord_generator_lite") -- will run when called from event but not from keys
+      --   elseif grid_view_name == "Seq" then       
+      --     seq_generator("run")
+      --   end
+      --   grid_dirty = true
       
         ---------------------------------------------------------------------------
         -- Event Editor --
         -- K3 with Event Timeline key held down enters Event editor / function key event editor
         ---------------------------------------------------------------------------        
-      elseif arranger_loop_key_count > 0 and interaction ~= "arranger_shift" then -- interaction == nil then
+      if arranger_loop_key_count > 0 and interaction ~= "arranger_shift" then -- interaction == nil then
         pattern_grid_offset = 0
         arranger_loop_key_count = 0
         event_edit_step = 0
@@ -5155,8 +5190,10 @@ function redraw()
       screen.line(128,54)
       screen.stroke()
       screen.level(3)      
-      screen.move(128,62)
-      screen.text_right("(K3) GEN. CHORDS+SEQ")      
+      screen.move(2,62)
+      screen.text("(K2) GEN. CHORDS+SEQ")  
+      -- screen.move(128,62)
+      -- screen.text_right("(K3) GEN. CHORDS+SEQ")      
 
     elseif grid_view_name == "Arranger" then
       screen.level(15)
@@ -5187,8 +5224,10 @@ function redraw()
       screen.line(128,54)
       screen.stroke()
       screen.level(3)      
-      screen.move(128,62)
-      screen.text_right("(K3) GEN. CHORDS")     
+      screen.move(2,62)
+      screen.text("(K2) GEN. CHORDS")    
+      -- screen.move(128,62)
+      -- screen.text_right("(K3) GEN. CHORDS")     
         
      elseif grid_view_name == "Seq" then
       screen.level(15)
@@ -5209,8 +5248,10 @@ function redraw()
       screen.line(128,54)
       screen.stroke()
       screen.level(3)      
-      screen.move(128,62)
-      screen.text_right("(K3) GEN. SEQ")  
+      screen.move(2,62)
+      screen.text("(K2) GEN. SEQ")  
+      -- screen.move(128,62)
+      -- screen.text_right("(K3) GEN. SEQ")  
       end
       
   -- Arranger shift interaction

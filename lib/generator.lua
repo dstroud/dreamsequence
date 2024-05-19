@@ -378,10 +378,10 @@ function seq_generator(mode)
 
     local peak = math.random(2, seq_pattern_length[active_seq_pattern] - 1)
     for i = 1, peak do
-      seq_pattern[1][i] = seq_min - 1 + i
+      seq_pattern[active_seq_pattern][i] = seq_min - 1 + i
     end
     for i = 1, seq_pattern_length[active_seq_pattern] - peak do
-      seq_pattern[1][i + peak] = seq_pattern[1][peak] - i
+      seq_pattern[active_seq_pattern][i + peak] = seq_pattern[active_seq_pattern][peak] - i
     end
     
     seq_check_bounds() -- confirmed issues
@@ -407,10 +407,10 @@ function seq_generator(mode)
 
     local peak = math.random(2, seq_pattern_length[active_seq_pattern] - 1)
     for i = 1, peak do
-      seq_pattern[1][i] = seq_max - 1 - i
+      seq_pattern[active_seq_pattern][i] = seq_max - 1 - i
     end
     for i = 1, seq_pattern_length[active_seq_pattern] - peak do
-      seq_pattern[1][i + peak] = seq_pattern[1][peak] + i
+      seq_pattern[active_seq_pattern][i + peak] = seq_pattern[active_seq_pattern][peak] + i
     end  
     
     seq_check_bounds() -- confirmed issues
@@ -422,7 +422,7 @@ function seq_generator(mode)
   table.insert(seq_algos["func"], function()
     
     for i = 1, #er_table do
-      seq_pattern[1][i] = er_table[i] and seq_root or 0
+      seq_pattern[active_seq_pattern][i] = er_table[i] and seq_root or 0
     end
     rotate_pattern("Seq", math.random(0,percent_chance(50) and 7 or 0))
   
@@ -434,7 +434,7 @@ function seq_generator(mode)
   table.insert(seq_algos["func"], function()
     
     for i = 1, #er_table do
-      seq_pattern[1][i] = er_table[i] and seq_root or seq_offset
+      seq_pattern[active_seq_pattern][i] = er_table[i] and seq_root or seq_offset
     end
     rotate_pattern("Seq", math.random(0,percent_chance(50) and 7 or 0))
   
@@ -456,7 +456,7 @@ function seq_generator(mode)
     params:set("seq_div_index_"..active_seq_pattern, math.random(1,5))
     
     for i = 1, seq_pattern_length[active_seq_pattern] do
-      seq_pattern[1][i] = seq_min - 1 + i
+      seq_pattern[active_seq_pattern][i] = seq_min - 1 + i
     end
     
   end)
@@ -475,7 +475,7 @@ function seq_generator(mode)
     params:set("seq_div_index_"..active_seq_pattern, math.random(1,5))
     
     for i = 1, seq_pattern_length[active_seq_pattern] do
-      seq_pattern[1][i] = seq_max - 1 - i
+      seq_pattern[active_seq_pattern][i] = seq_max - 1 - i
     end
     
   end)
@@ -488,18 +488,18 @@ function seq_generator(mode)
   --   local note_shift = 0
   --   if seq_root - er_note_on_count < 1 then
   --     for i = 1, #er_table do
-  --       seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --       seq_pattern[active_seq_pattern][i] = er_table[i] and (seq_root + note_shift) or 0
   --       note_shift = note_shift + (er_table[i] and 1 or 0)
   --     end
   --   elseif seq_root + er_note_on_count > 14 then
   --     for i = 1, #er_table do
-  --       seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --       seq_pattern[active_seq_pattern][i] = er_table[i] and (seq_root + note_shift) or 0
   --       note_shift = note_shift - (er_table[i] and 1 or 0)
   --     end
   --   else
   --     local direction = (seq_root + math.random() > .5 and 1 or -1)
   --     for i = 1, #er_table do    -- I don't think this is firing?
-  --       seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --       seq_pattern[active_seq_pattern][i] = er_table[i] and (seq_root + note_shift) or 0
   --       note_shift = note_shift + (er_table[i] and direction or 0)
   --     end
   --   end
@@ -514,7 +514,7 @@ function seq_generator(mode)
 
   --   local note_shift = 0
   --   for i = 1, #er_table do
-  --     seq_pattern[1][i] = er_table[i] and (seq_root + note_shift) or 0
+  --     seq_pattern[active_seq_pattern][i] = er_table[i] and (seq_root + note_shift) or 0
   --     direction = math.random() > .5 and 1 or -1
   --     note_shift = note_shift + (er_table[i] and direction or 0)
   --   end
@@ -544,7 +544,7 @@ function seq_generator(mode)
   --   -- params:set("seq_duration_index_1",math.max(math.random(params:get("seq_div_index_1"), params:get("seq_div_index_1") + 4), 5))
     
   --   for i = 1, seq_pattern_length[active_seq_pattern] do
-  --     seq_pattern[1][i] = seq_min - 1 + i
+  --     seq_pattern[active_seq_pattern][i] = seq_min - 1 + i
   --   end
     
   -- end)
@@ -564,7 +564,7 @@ function seq_generator(mode)
     -- params:set("seq_duration_index_1",math.max(math.random(params:get("seq_div_index_1"), params:get("seq_div_index_1") + 4), 5))
     
     for i = 1, seq_pattern_length[active_seq_pattern] do
-      seq_pattern[1][i] = seq_max + 1 - i
+      seq_pattern[active_seq_pattern][i] = seq_max + 1 - i
     end
     
   end)
@@ -590,12 +590,12 @@ function seq_generator(mode)
     
     local x = math.random(1,2)
     for i = 1, length/2  do
-      seq_pattern[1][i*2 - 1] = seq_min - 1 + i * x
+      seq_pattern[active_seq_pattern][i*2 - 1] = seq_min - 1 + i * x
     end
   
     local x = math.random(1,2)
     for i = 1, length/2  do
-      seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * x
+      seq_pattern[active_seq_pattern][i*2 - 1 + 1] = seq_max + 1 - i * x
     end
 
     seq_check_repeats()
@@ -603,18 +603,18 @@ function seq_generator(mode)
     -- local x1 = math.random(1,2)
     -- local x2 = math.random(1,2)
     -- for i = 1, length / 2 do
-    --   seq_pattern[1][i*2 - 1] = seq_min - 1 + i * x1
-    --   if seq_pattern[1][i*2 - 1] == seq_pattern[1][i*2 - 2] then
+    --   seq_pattern[active_seq_pattern][i*2 - 1] = seq_min - 1 + i * x1
+    --   if seq_pattern[active_seq_pattern][i*2 - 1] == seq_pattern[active_seq_pattern][i*2 - 2] then
     --     print("dual seq repeat")
-    --     seq_pattern[1] = {0,0,0,0,0,0}
+    --     seq_pattern[active_seq_pattern] = {0,0,0,0,0,0}
     --     load(seq_algos["func"][seq_algo])
     --     break
     --   end
       
-    --   seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * 2
-    --   if seq_pattern[1][i*2 - 1 + 1] == seq_pattern[1][i*2 - 1] then
+    --   seq_pattern[active_seq_pattern][i*2 - 1 + 1] = seq_max + 1 - i * 2
+    --   if seq_pattern[active_seq_pattern][i*2 - 1 + 1] == seq_pattern[active_seq_pattern][i*2 - 1] then
     --     print("dual seq repeat")
-    --     seq_pattern[1] = {}
+    --     seq_pattern[active_seq_pattern] = {}
     --     load(seq_algos["func"][seq_algo])
     --     break
     --   end
@@ -628,9 +628,9 @@ function seq_generator(mode)
     -- while pass == false do
     --   local x = math.random(1,2)
     --   for i = 1, length/2  do
-    --     seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * x
-    --     -- pass = seq_pattern[1][i + 1] == seq_pattern[1] and false or true
-    --     if seq_pattern[1][i*2 - 1 + 1] == seq_pattern[1][i*2 - 1] then
+    --     seq_pattern[active_seq_pattern][i*2 - 1 + 1] = seq_max + 1 - i * x
+    --     -- pass = seq_pattern[active_seq_pattern][i + 1] == seq_pattern[active_seq_pattern] and false or true
+    --     if seq_pattern[active_seq_pattern][i*2 - 1 + 1] == seq_pattern[active_seq_pattern][i*2 - 1] then
     --       print("failed")
     --       pass = false
     --     else
@@ -640,15 +640,15 @@ function seq_generator(mode)
     --   end
     -- end
     
-    -- if seq_max + 1 - i * x == seq_pattern[1][i*2 - 1]
+    -- if seq_max + 1 - i * x == seq_pattern[active_seq_pattern][i*2 - 1]
     
-    -- tab.print(seq_pattern[1])
+    -- tab.print(seq_pattern[active_seq_pattern])
     
-    -- if seq_pattern[1][1] < 7 then
+    -- if seq_pattern[active_seq_pattern][1] < 7 then
     --   print("reroll")
     --   local x = math.random(1,2)
     --     for i = 1, length/2  do
-    --       seq_pattern[1][i*2 - 1 + 1] = seq_max + 1 - i * x
+    --       seq_pattern[active_seq_pattern][i*2 - 1 + 1] = seq_max + 1 - i * x
     --     end
     -- end
 
@@ -661,11 +661,11 @@ function seq_generator(mode)
   -- table.insert(seq_algos["func"], function()  
     
   --   for i = 1, length do
-  --     seq_pattern[1][i] = math.random(1,7) + random_note_offset
+  --     seq_pattern[active_seq_pattern][i] = math.random(1,7) + random_note_offset
   --   end
   --   if percent_chance(60) then --add some rests to the seq
   --     for i = 1, length do
-  --       seq_pattern[1][i] = er_table[i] and seq_pattern[1][i] or 0
+  --       seq_pattern[active_seq_pattern][i] = er_table[i] and seq_pattern[active_seq_pattern][i] or 0
   --     end
   --   end
   
@@ -678,7 +678,7 @@ function seq_generator(mode)
   if mode == "run" then
     -- Clear pattern.
     for i = 1,8 do
-      seq_pattern[1][i] = 0
+      seq_pattern[active_seq_pattern][i] = 0
     end
     
   -- seq_generator index 1 is reserved for Randomize, otherwise fire the selected algo.
@@ -763,7 +763,7 @@ function seq_check_bounds()
   error_check = false
   local length = seq_pattern_length[active_seq_pattern]
   for i = 2, length do
-    if seq_pattern[1][i] < 0 or seq_pattern[1][i] > 14 then
+    if seq_pattern[active_seq_pattern][i] < 0 or seq_pattern[active_seq_pattern][i] > 14 then
       error_check = true
       print("off-grid note on row " .. i)
       break
@@ -784,7 +784,7 @@ function seq_check_repeats()
   error_check = false
   local length = seq_pattern_length[active_seq_pattern]
   for i = 2, length do
-    if seq_pattern[1][i] == seq_pattern[1][i - 1] then
+    if seq_pattern[active_seq_pattern][i] == seq_pattern[active_seq_pattern][i - 1] then
       error_check = true
       -- print("repeat on row " .. i)
       break
