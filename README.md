@@ -415,7 +415,25 @@ To navigate between pages, use E2 to scroll to the top of the list of menu items
      		- Template: Load the template pset (see 'Save template' above) on script launch.
 	- Chords as: displays chords names (Gmaj) or chord degrees (VII).
 	- Crow pullup: i2c pullup resistors can be set On (default) or Off.
- 	- MIDI Clock Out: Determines behavior of synced MIDI devices when pausing/continuing:
+ 	- Voice instances: For NB voices that support multiple instances, this determines how many are created. Importantly, this is how you can send to multiple channels for a single MIDI port. **__Important: restart Dreamsequence to apply changes.__**
+<br><br>
+
+		> **_Configuring MIDI channels:_**
+ 		> <br><br>
+   		> Set `Voice instances` to the maximum number of channels you anticipate needing for a single MIDI port.
+		> In each source’s Voice parameter, you’ll now have an option for each port+instance pair.
+		>
+   		> Example: If you have 2 MIDI devices/ports and set instances to 3, you would end up with something like:
+		> 
+		> midi A 1.1, midi A 1.2, midi A 1.3
+		> 
+		> midi B 2.1, midi B 2.2, midi B 2.3
+		> 
+		> Note that each instance defaults to channel 1, so they are effectively duplicates until configured. To to so, navigate to K1>>parameters>>edit>>VOICES and use K3 to change the channel for each instance: e.g. _midi 1_ to channel 1, _midi 2_ to channel 2, etc… (they do not have to be sequential).
+		> 
+		> If you’d like to save your channel settings for the next time you launch Dreamsequence, these settings can be saved as part of the template .pset (see above). Beware, however, that the `Voice instances` setting is global (stored outside of the Template/.pset file). If you lower this setting then load a saved song .pset, some voices may no longer be available and will need to be reconfigured.
+
+  	- MIDI Clock Out: Determines behavior of synced MIDI devices when pausing/continuing:
    		- The “song” option will send out MIDI Song Position Pointer (SPP) and ‘continue’ messages which should work well for things like DAWs.
 		- The “pattern” setting will cause Dreamsequence to continue playback and then send a ’start’ message at the beginning of the next measure. This works well for devices that don’t support SPP: drum machines, loopers, Ableton live’s “Session” view, etc…
 		- In order for ‘pattern’ mode to work as expected, you must set a time signature via SONG>>Beats per bar/Beat length (time signature numerator and denominator). Changing the time signature requires restarting playback. 
