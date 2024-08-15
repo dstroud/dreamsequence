@@ -100,23 +100,23 @@ function Lattice:pulse()
       for _, id in ipairs(self.sprocket_ordering[i]) do
         local sprocket = self.sprockets[id]
 
-        -- debugging. kill off
-        local sprocket_name
-        if sprocket.id == sprocket_notes.id then 
-          sprocket_name = "notes"    
-        elseif sprocket.id == sprocket_measure.id then 
-          sprocket_name = "measure"     
-        elseif sprocket.id == sprocket_16th.id then 
-          sprocket_name = "16th"             
-        elseif sprocket.id == sprocket_chord.id then 
-          sprocket_name = "chord"     
-        elseif sprocket.id == sprocket_seq_1.id then 
-          sprocket_name = "seq_1"                     
-        elseif sprocket.id == sprocket_crow_clock.id then 
-          sprocket_name = "crow_clock"
-        elseif sprocket.id == sprocket_cv_harm.id then 
-          sprocket_name = "cv_harm"                                
-        end
+        -- -- debugging. kill off
+        -- local sprocket_name
+        -- if sprocket.id == sprocket_notes.id then 
+        --   sprocket_name = "notes"    
+        -- elseif sprocket.id == sprocket_measure.id then 
+        --   sprocket_name = "measure"     
+        -- elseif sprocket.id == sprocket_16th.id then 
+        --   sprocket_name = "16th"             
+        -- elseif sprocket.id == sprocket_chord.id then 
+        --   sprocket_name = "chord"     
+        -- elseif sprocket.id == sprocket_seq_1.id then 
+        --   sprocket_name = "seq_1"                     
+        -- elseif sprocket.id == sprocket_crow_clock.id then 
+        --   sprocket_name = "crow_clock"
+        -- elseif sprocket.id == sprocket_cv_harm.id then 
+        --   sprocket_name = "cv_harm"                                
+        -- end
 
           -- if sprocket_name == "chord" then
           --   print("phase " ..sprocket.phase, "txp " .. self.transport)

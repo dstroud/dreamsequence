@@ -1,6 +1,3 @@
--- modified version of https://github.com/sixolet/nb/blob/main/lib/nb.lua
--- add_player_params() generates a param lookup table for each voice in nb.indices
-
 local mydir = debug.getinfo(1).source:match("@?" .. _path.code .. "(.*/)")
 local player_lib = include(mydir .. "player")
 local nb = {}
@@ -95,12 +92,18 @@ local function add_midi_players()
                             mod_d = "cc " .. params:get("midi_modulation_cc_" .. i .. '_' .. j)
                         end
                         return {
-                            name = "v.name",
+                            name = v.name,
                             supports_bend = true,
                             supports_slew = false,
                             note_mod_targets = { "pressure" },
                             modulate_description = mod_d
                         }
+                    end
+
+                    function player:stop_all(val)
+                        for ch = 1, 16 do -- all channels since init() calls before add_params()
+                            self.conn:cc(120, 1, ch)
+                        end
                     end
 
                     nb.players["midi: " .. abbreviate(v.name) .. " " .. j] = player
@@ -125,7 +128,9 @@ function nb:add_param(param_id, param_name)
     for name, _ in pairs(note_players) do
         table.insert(names, name)
     end
-    table.sort(names)
+    table.sort(names, function(a, b)
+        return string.lower(a) < string.lower(b)
+    end)
     table.insert(names, 1, "none")
     local names_inverted = tab.invert(names)
     params:add_option(param_id, param_name, names, 1)
@@ -191,7 +196,6 @@ local function pairsByKeys(t, f)
     end
     return iter
 end
-
 
 function nb:add_player_params()
     if params.lookup['nb_sentinel_param'] then

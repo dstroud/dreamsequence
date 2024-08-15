@@ -1,15 +1,17 @@
+local lib = norns.state.shortname.."/lib/"
+
+
 -- ships with norns
 er = require("er")
 
-musicutil = require("musicutil") -- subbed
-
-local lib = norns.state.shortname.."/lib/"
+-- modular dashboard functions
+include(lib .. "dashboards")
 
 -- modified version of lattice lib
 lattice = include(lib .. "lattice")
 
--- lookup table for chord names/qualities in mode
-include(lib .. "modes")
+-- lookup tables for chord names/qualities in mode, default custom scales, etc...
+include(lib .. "theory")
 
 -- divisions for clock modulo and durations
 include(lib .. "divisions")
@@ -29,5 +31,7 @@ include(lib .. "glyphs")
 -- nota bene
 nb = include("lib/nb/lib/nb")
 
--- bundled crow nb voice
+-- bundled nb voices
 include("lib/crow")
+
+include("lib/midi")
