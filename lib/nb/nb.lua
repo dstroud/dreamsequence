@@ -22,6 +22,10 @@ function init()
     end)
 end
 
+function cleanup()
+    nb:stop_all()
+end
+
 function g.key(x, y, z)
     local note = 24
     note = note + x

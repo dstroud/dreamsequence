@@ -3,10 +3,7 @@
 -- params are shared across voices
 -- derivative of https://github.com/sixolet/nb_crow
 
-local mod = require "core/mods"
 local music = require "lib/musicutil"
-local voice = require "lib/voice"
-
 local ASL_SHAPES = {'linear','sine','logarithmic','exponential','now'}
 
 -- since multiple players can share ports, keep usage count of each port so we know when to show/hide their param groups

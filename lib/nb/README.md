@@ -24,6 +24,10 @@ nb:init() -- run this first, from your init method.
 ```
 
 ```
+nb:stop_all() -- add this to your script's cleanup() function to prevent hanging notes on script exit.
+```
+
+```
 nb:add_param("voice_id", "voice") -- adds a voice selector param to your script.
 nb:add_player_params() -- Adds the parameters for the selected voices to your script.
 ```
@@ -39,4 +43,4 @@ player:note_on(48, 0.5)
 player:note_off(48)
 ```
 
-MIDI devices that are currently connected while the script is started will be available for selection as vocies. Other vocies depend on any voices included with the script or installed as mods.
+MIDI devices that are currently connected while the script is started will be available for selection as voices. Other voices depend on any voices included with the script or installed as mods.

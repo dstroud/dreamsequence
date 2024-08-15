@@ -22,7 +22,7 @@ end
 -- Implement to do midi-style note-on. If you only implement play_note,
 -- you should implement a trivial note_on to call it.
 -- "properties" is an optional table of note mod properties. It should
--- contain only keys that the vocie says it can modulate in note_mod_targets
+-- contain only keys that the voice says it can modulate in note_mod_targets
 -- in the description.
 -- The note should be interepereted as pitch mod 128. High-value notes may be sent
 -- in the case two note-ons happen for the same note; this is possible in MPE situations.
@@ -31,7 +31,7 @@ end
 
 -- Implement to do midi-style note-off. This is optional if you implement
 -- play_note instead.
-function player:note_off(note)
+function player:note_off(note, vel, properties)
 end
 
 -- Optional. Send pitch bend to the voice. If the voice doesn't support
@@ -68,6 +68,7 @@ end
 -- supports_bend (does this voice support pitch bend?)
 -- supports_slew (does this voice support set_slew?)
 -- note_mod_targets (optional list of targets for "note mod")
+-- params (optional list of parameter IDs for lookup use in scripts)
 function player:describe()
     return {
         name = "none",
@@ -75,7 +76,8 @@ function player:describe()
         supports_slew = false,
         modulate_description = "unsupported",
         note_mod_targets = {},
-        voice_mod_tarets = {},
+        voice_mod_targets = {},
+        params = {},
     }
 end
 
@@ -116,7 +118,7 @@ function player:play_note(note, vel, length, properties)
     self:note_on(note, vel, properties)
     clock.run(function()
         clock.sleep(length*clock.get_beat_sec())
-        self:note_off(note)
+        self:note_off(note, 0, properties)
     end)
 end
 
