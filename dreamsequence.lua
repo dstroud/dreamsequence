@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240815 Dan Stroud
+-- 1.4 240816 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -613,7 +613,7 @@ function init()
   -- SEQ PARAMS --
   ------------------
 
-  local note_map = {"Triad", "Chord extd.", "Chord dense", "Chord raw", "Scale", "Scale+tr.", "Chromatic", "Chromatic+tr.", "Kit"} -- used by all but chord
+  local note_map = {"Triad", "Chord raw", "Chord extd.", "Chord dense", "Scale", "Scale+tr.", "Chromatic", "Chromatic+tr.", "Kit"} -- used by all but chord
   for i = 1, 8 do
     table.insert(note_map, "Mask " .. i)
     table.insert(note_map, "Mask " .. i .. "+tr.")
@@ -3996,7 +3996,17 @@ transform_note[1] = function(note_num, octave) -- triad chord mapping
 end
 
 
-transform_note[2] = function(note_num, octave) -- Chord extd., insert notes from 1st octave into 2nd octave
+transform_note[2] = function(note_num, octave) -- Chord raw: custom chords played exactly as-is
+  local chord_length = #chord_raw or 0
+  local additional_octave = math.floor(((chord_raw[chord_length] or 0) - (chord_raw[1] or 0)) / 12) or 0 -- in anticipation of variable max_seqs
+  local quantized_note = chord_raw[util.wrap(note_num, 1, chord_length)] or 0
+  local quantized_octave = (math.floor((note_num - 1) / chord_length) * (additional_octave + 1)) or 0 -- no work on 24
+
+  return(quantized_note + ((octave + quantized_octave) * 12) + params:get("tonic"))
+end
+
+
+transform_note[3] = function(note_num, octave) -- Chord extd., insert notes from 1st octave into 2nd octave
   local chord_length = #chord_extended or 0
 
   -- jump to next octave if difference from chord min/max intervals is >1 octave.
@@ -4009,20 +4019,10 @@ transform_note[2] = function(note_num, octave) -- Chord extd., insert notes from
 end
 
 
-transform_note[3] = function(note_num, octave) -- Chord dense: custom chords with notes in 2nd octave played in 1st octave (removes duplicates in pitch class)
+transform_note[4] = function(note_num, octave) -- Chord dense: custom chords with notes in 2nd octave played in 1st octave (removes duplicates in pitch class)
   local chord_length = #chord_densified or 0
   local quantized_note = chord_densified[util.wrap(note_num, 1, chord_length)] or 0
   local quantized_octave = math.floor((note_num - 1) / chord_length)
-
-  return(quantized_note + ((octave + quantized_octave) * 12) + params:get("tonic"))
-end
-
-
-transform_note[4] = function(note_num, octave) -- Chord raw: custom chords played exactly as-is
-  local chord_length = #chord_raw or 0
-  local additional_octave = math.floor(((chord_raw[chord_length] or 0) - (chord_raw[1] or 0)) / 12) or 0 -- in anticipation of variable max_seqs
-  local quantized_note = chord_raw[util.wrap(note_num, 1, chord_length)] or 0
-  local quantized_octave = (math.floor((note_num - 1) / chord_length) * (additional_octave + 1)) or 0 -- no work on 24
 
   return(quantized_note + ((octave + quantized_octave) * 12) + params:get("tonic"))
 end
@@ -5606,7 +5606,7 @@ function key(n, z)
         lvl = lvl_dimmed
         -- end
       elseif not grid_interaction and not norns_interaction then
-        notification("HOLD TO DEFER EDITS")--, {"k", 1}) --always show with timer rather than with a hold for this one 
+        -- notification("HOLD TO DEFER EDITS")--, {"k", 1}) --always show with timer rather than with a hold for this one 
         norns_interaction = "k1"
         gen_menu() -- show hidden menus so they aren't affected by events and user can switch to specific MIDI channel
         if menu_index ~= 0 then
