@@ -271,6 +271,7 @@ Dreamsequence has seven primary views, each containing a list of menus. Scrollin
 
 ![dreamsequence](doc/dash_4.svg)
 - The name of the active chord. If a custom chord has been created that isn't recognized, the root note of the selected chord degree will be shown with an asterisk (e.g. "D*").
+- An alternative module with a visual keyboard is available called "Chord kbd".
     
 --------------------------------------------------------------------------------
 
@@ -538,6 +539,7 @@ Global preferences that persist across sessions, set via PARAMETERS>>EDIT>>PREFE
   - Off
   - Arranger chart: Arranger position, loop on/off, and visualization of arranger.
 	- Chord name: Readout of active chord.
+  - Chord kbd: Keyboard viz of active chord, arranged as one octave.
 	- Chord progress: Current chord pattern and progress.
   - Metro T-: Transport state, metronome, and time remaining in arrangement.
   - Metro T+: Transport state, metronome, and elapsed play time.
