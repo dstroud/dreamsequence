@@ -226,13 +226,13 @@ function dash_functions.chord_active_kbd()
   screen.fill()
 
   for i = 1, 7 do
-    screen.level(state_white[i] and lvl_chart_deselected or lvl_pane) -- normal = white, playing = gray
+    screen.level(state_white[i] and (lvl_chart_deselected + 1) or lvl_pane) -- normal = white, playing = gray
     screen.rect(dash_x + 4 + ((i - 1) * 4), dash_y + 4, 3, 9)
     screen.fill()
   end
   
   for i = 1, 5 do
-    screen.level(state_black[i] and (lvl_chart_deselected - 1) or lvl_pane_selected) -- normal = black, playing = gray
+    screen.level(state_black[i] and (math.max(lvl_chart_deselected - 1, 2)) or lvl_pane_selected) -- normal = black, playing = gray
     screen.rect(dash_x + b_x[i], dash_y + 4, 3, 5)
     screen.fill()
   end
