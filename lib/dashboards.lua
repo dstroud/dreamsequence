@@ -206,6 +206,42 @@ end
 
 
 
+---------------------
+-- CHORD READOUT: KEYBOARD VIZ
+---------------------
+table.insert(dash_ids, "chord_active_kbd")
+table.insert(dash_name, "Chord kbd")
+
+function dash_functions.chord_active_kbd()
+  local state_white = dash_keys_white
+  local state_black = dash_keys_black
+  local b_x = {6, 10, 18, 22, 26} -- x coords for black keys
+
+  screen.level(lvl_pane)
+  screen.rect(dash_x, dash_y, width, 17)
+  screen.fill()
+
+  screen.level(lvl_pane_selected)
+  screen.rect(dash_x + 3, dash_y + 3, 29, 11)
+  screen.fill()
+
+  for i = 1, 7 do
+    screen.level(state_white[i] and lvl_chart_deselected or lvl_pane) -- normal = white, playing = gray
+    screen.rect(dash_x + 4 + ((i - 1) * 4), dash_y + 4, 3, 9)
+    screen.fill()
+  end
+  
+  for i = 1, 5 do
+    screen.level(state_black[i] and (lvl_chart_deselected - 1) or lvl_pane_selected) -- normal = black, playing = gray
+    screen.rect(dash_x + b_x[i], dash_y + 4, 3, 5)
+    screen.fill()
+  end
+
+  dash_y = dash_y + 18 -- position for next dash
+end
+
+
+
 
 ----------------------------------------------------
 -- CHORD PATTERN PROGRESS

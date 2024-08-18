@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240816 Dan Stroud
+-- 1.4 240818 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -381,6 +381,7 @@ function init()
   local function init_dummy_funcs()
     function calc_seconds_remaining() end
     function calc_seconds_elapsed() end
+    function gen_dash_chord_viz() end
   end
   init_dummy_funcs()
   xy.dash_x = 129 -- kinda silly but in case user has no dashboards, shift over the scrollbar
@@ -425,6 +426,29 @@ function init()
             end
 
             xy.dash_x = 93
+
+          elseif dash == "Chord kbd" then -- generate chord keyboard diagram for dash
+
+            function gen_dash_chord_viz()
+              local txp = params:get("tonic")
+              local w = {0, 2, 4, 5, 7, 9, 11} -- white keys
+              local b = {1, 3, 6, 8, 10} -- black keys
+              local keystate = {}
+              dash_keys_white = {}
+              dash_keys_black = {}
+
+              for i = 1, #chord_raw do
+                keystate[util.wrap(chord_raw[i] + txp, 0, 11)] = true
+              end
+
+              for i = 1, 7 do
+                dash_keys_white[i] = keystate[w[i]]
+              end
+
+              for i = 1, 5 do
+                dash_keys_black[i] = keystate[b[i]]
+              end
+            end
 
           elseif dash ~= "Off" then
             xy.dash_x = 93
@@ -489,6 +513,7 @@ function init()
   params:add_group("song", "SONG", 13)
  
   params:add_number("tonic", "Tonic", -12, 12, 0, function(param) return transpose_string(param:get()) end)
+  params:set_action("tonic", function() gen_chord_readout() end)
 
   local scales = {}
   for i = 1, #dreamsequence.scales do
@@ -3705,6 +3730,8 @@ function gen_chord_readout()
     -- todo:
     -- active_chord_degree = theory.chord_degree[scale]["chords"][x_wrapped]
   end
+
+  gen_dash_chord_viz() -- for keyboard diagram
 end
 
 
@@ -3727,6 +3754,7 @@ function gen_chord_name()
     editing_chord_name = theory.scale_chord_names[scale][util.wrap(params:get("tonic"), 0, 11)][x_wrapped]
   end
 end
+
 
 
 
