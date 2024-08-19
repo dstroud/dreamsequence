@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240818 Dan Stroud
+-- 1.4 240819 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -4998,136 +4998,161 @@ function g.key(x, y, z)
         -- events_length[event_edit_segment] = y + pattern_grid_offset
       else
         lane_glyph_preview = nil
-        local events_path = events[event_edit_segment][y + pattern_grid_offset][x]
+        local y_offset = y + pattern_grid_offset
 
-        -- Setting of events beyond the pattern length is permitted
-        event_key_count = event_key_count + 1
-      
-        -- load events
-        -- First touched event is the one we edit, effectively resetting on key_count = 0
-        if event_key_count == 1 then
-          event_edit_step = y + pattern_grid_offset
-          params:set("event_lane", x) -- todo can this replace event_lane??
-          event_edit_lane = x
-          event_saved = false
+        -- -- ensure that mid-hold grid disconnect or erroneously sent repeat key-ons are handled gracefully
+        if event_key_count == 1 and event_edit_lane == x and event_edit_step == y_offset then
+          print("---------------------------------------------")
+          print("ERROR: event repeat @ lane/step " .. x .. "/" .. y_offset)
+          print("---------------------------------------------")
+        else
 
-          local event_edit_lane_id = event_lanes[x].id -- used to determine if lane is configured or not
+          local events_path = events[event_edit_segment][y_offset][x]
+          -- Setting of events beyond the pattern length is permitted
+          event_key_count = event_key_count + 1
+        
+          -- load events
+          -- First touched event is the one we edit, effectively resetting on key_count = 0
+          if event_key_count == 1 then
+            event_edit_step = y_offset
+            params:set("event_lane", x) -- todo can this replace event_lane??
+            event_edit_lane = x
+            event_saved = false
 
-          -- If the event is populated, Load the Event vars back to the displayed param.
-          if events_path ~= nil then
-            events_index = 1
-            selected_events_menu = events_menus[events_index]
+            local event_edit_lane_id = event_lanes[x].id -- used to determine if lane is configured or not
 
-            local id = events_path.id
-            local index = events_lookup_index[id]
-            local value = events_path.value
-            local operation = events_path.operation
-            local limit = events_path.limit or "Off"
+            -- If the event is populated, Load the Event vars back to the displayed param.
+            if events_path ~= nil then
+              events_index = 1
+              selected_events_menu = events_menus[events_index]
 
-            event_edit_status = "(Saved)"
+              local id = events_path.id
+              local index = events_lookup_index[id]
+              local value = events_path.value
+              local operation = events_path.operation
+              local limit = events_path.limit or "Off"
 
-            params:set("event_category", param_option_to_index("event_category", events_lookup[index].category))
-            change_category()
-            
-            params:set("event_subcategory", param_option_to_index("event_subcategory", events_lookup[index].subcategory))
-            change_subcategory()
-            
-            params:set("event_name", index)
-            change_event()
-            
-            params:set("event_operation", param_option_to_index("event_operation", operation))
-            change_operation("g.key") -- 2024-03-28 added to update prev_operation in called function
-            if operation == "Random" then
-              params:set("event_op_limit_random", param_option_to_index("event_op_limit_random", limit))
-            else
-              params:set("event_op_limit", param_option_to_index("event_op_limit", limit))
+              event_edit_status = "(Saved)"
+
+              params:set("event_category", param_option_to_index("event_category", events_lookup[index].category))
+              change_category()
+              
+              params:set("event_subcategory", param_option_to_index("event_subcategory", events_lookup[index].subcategory))
+              change_subcategory()
+              
+              params:set("event_name", index)
+              change_event()
+              
+              params:set("event_operation", param_option_to_index("event_operation", operation))
+              change_operation("g.key") -- 2024-03-28 added to update prev_operation in called function
+              if operation == "Random" then
+                params:set("event_op_limit_random", param_option_to_index("event_op_limit_random", limit))
+              else
+                params:set("event_op_limit", param_option_to_index("event_op_limit", limit))
+              end
+              if limit ~= "Off" then
+                params:set("event_op_limit_min", events_path.limit_min)
+                params:set("event_op_limit_max", events_path.limit_max)
+              end
+              if value ~= nil then params:set("event_value", value) end -- triggers don't save
+              params:set("event_probability", events_path.probability)
+
+
+            elseif event_edit_lane_id ~= nil then -- load default event for configured lane
+
+              events_index = 1
+              selected_events_menu = events_menus[1]
+
+              local index = events_lookup_index[event_edit_lane_id]
+              local event = events_lookup[index] -- with unconfigured lanes, use event instead of event_path
+
+              event_edit_status = "(New)"
+
+              params:set("event_category", param_option_to_index("event_category", event.category)) -- see if this change can be applied above, too
+              change_category()
+              
+              params:set("event_subcategory", param_option_to_index("event_subcategory", event.subcategory))
+              change_subcategory()
+              
+              params:set("event_name", index)
+              change_event()
+
+              -- todo wishlist:     
+              -- when working in a single lane, the last-set value persists across slots
+              -- but changing to a new lane then returning will reset to the current param value
+              -- would be nice to have a memory of the last-set value in lane, but this requires that it be explicitly saved somewhere
+
+            else -- unconfigured lanes
+              event_edit_status = "(New)"
+              change_operation("change_event") -- sets starting value to param's current value rather than default value
             end
-            if limit ~= "Off" then
-              params:set("event_op_limit_min", events_path.limit_min)
-              params:set("event_op_limit_max", events_path.limit_max)
+            gen_menu_events()
+
+            event_edit_active = true
+            
+          else -- Subsequent keys down paste event
+            -- But first check if the events we're working with are populated
+            local og_event_populated = events_path ~= nil
+            local copied_event_populated = events[event_edit_segment][event_edit_step][event_edit_lane] ~= nil
+
+            -- Then copy
+            events[event_edit_segment][y_offset][x] = deepcopy(events[event_edit_segment][event_edit_step][event_edit_lane])
+            
+            -- Adjust populated events count at the step level. todo: also set at the segment level once implemented
+            if og_event_populated and not copied_event_populated then
+              events[event_edit_segment][y_offset].populated = events[event_edit_segment][y_offset].populated - 1
+              
+              -- If the step's new populated count == 0, decrement count of populated event STEPS in the segment
+              if (events[event_edit_segment][y_offset].populated or 0) == 0 then 
+                events[event_edit_segment].populated = (events[event_edit_segment].populated or 0) - 1
+              end
+            elseif not og_event_populated and copied_event_populated then
+              events[event_edit_segment][y_offset].populated = (events[event_edit_segment][y_offset].populated or 0) + 1
+
+              -- If this is the first event to be added to this step, increment count of populated event STEPS in the segment
+              if (events[event_edit_segment][y_offset].populated or 0) == 1 then
+                -- print("incrementing segment populated")
+                events[event_edit_segment].populated = (events[event_edit_segment].populated or 0) + 1
+              end
             end
-            if value ~= nil then params:set("event_value", value) end -- triggers don't save
-            params:set("event_probability", events_path.probability)
 
-
-          elseif event_edit_lane_id ~= nil then -- load default event for configured lane
-
-            events_index = 1
-            selected_events_menu = events_menus[1]
-
-            local index = events_lookup_index[event_edit_lane_id]
-            local event = events_lookup[index] -- with unconfigured lanes, use event instead of event_path
-
-            event_edit_status = "(New)"
-
-            params:set("event_category", param_option_to_index("event_category", event.category)) -- see if this change can be applied above, too
-            change_category()
-            
-            params:set("event_subcategory", param_option_to_index("event_subcategory", event.subcategory))
-            change_subcategory()
-            
-            params:set("event_name", index)
-            change_event()
-
-            -- todo wishlist:     
-            -- when working in a single lane, the last-set value persists across slots
-            -- but changing to a new lane then returning will reset to the current param value
-            -- would be nice to have a memory of the last-set value in lane, but this requires that it be explicitly saved somewhere
-
-          else -- unconfigured lanes
-            event_edit_status = "(New)"
-            change_operation("change_event") -- sets starting value to param's current value rather than default value
+            notification("COPIED " .. event_edit_step .. "." .. event_edit_lane  .. " TO " .. (y_offset) .. "." .. x , {"g", x, y})
+            update_lanes(x) -- update the lanes we've pasted into
           end
-          gen_menu_events()
-
-          event_edit_active = true
-          
-        else -- Subsequent keys down paste event
-          -- But first check if the events we're working with are populated
-          local og_event_populated = events_path ~= nil
-          local copied_event_populated = events[event_edit_segment][event_edit_step][event_edit_lane] ~= nil
-
-          -- Then copy
-          events[event_edit_segment][y + pattern_grid_offset][x] = deepcopy(events[event_edit_segment][event_edit_step][event_edit_lane])
-          
-          -- Adjust populated events count at the step level. todo: also set at the segment level once implemented
-          if og_event_populated and not copied_event_populated then
-            events[event_edit_segment][y + pattern_grid_offset].populated = events[event_edit_segment][y + pattern_grid_offset].populated - 1
-            
-            -- If the step's new populated count == 0, decrement count of populated event STEPS in the segment
-            if (events[event_edit_segment][y + pattern_grid_offset].populated or 0) == 0 then 
-              events[event_edit_segment].populated = (events[event_edit_segment].populated or 0) - 1
-            end
-          elseif not og_event_populated and copied_event_populated then
-            events[event_edit_segment][y + pattern_grid_offset].populated = (events[event_edit_segment][y + pattern_grid_offset].populated or 0) + 1
-
-            -- If this is the first event to be added to this step, increment count of populated event STEPS in the segment
-            if (events[event_edit_segment][y + pattern_grid_offset].populated or 0) == 1 then
-              -- print("incrementing segment populated")
-              events[event_edit_segment].populated = (events[event_edit_segment].populated or 0) + 1
-            end
-          end
-
-          notification("COPIED " .. event_edit_step .. "." .. event_edit_lane  .. " TO " .. (y + pattern_grid_offset) .. "." .. x , {"g", x, y})
-          update_lanes(x) -- update the lanes we've pasted into
         end
       end
 
-    elseif x == 16 and y > 5 + extra_rows then -- view switcher (across all views except Events)
+    elseif x == 16 and (y >= 6 and y <= 8) then -- view switcher (across all views except Events)
       if (grid_interaction or "view_switcher") == "view_switcher" then  -- other interactions block view switching
-        grid_interaction = "view_switcher"
-        view_key_count = view_key_count + 1
-        
-        -- following lines cancel any pending pattern changes by acting as if a copy was just performed (overrides)
-        -- pattern_key_count = 0
-        -- pattern_copy_performed = true
-        
-        table.insert(grid_view_keys, y - extra_rows)
-        if view_key_count == 1 then
-          set_grid_view(grid_views[y - extra_rows - 5])
 
-        elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
-          screen_view_name = "Chord+seq"
+        -- ensure that mid-hold grid disconnect or erroneously sent repeat key-ons are handled gracefully
+        local valid = true
+        for i = 1, #grid_view_keys do
+          if grid_view_keys[i] == y then
+            valid = false
+            break
+          end
+        end
+
+        if not valid then
+          print("---------------------------------------------")
+          print("ERROR: grid_view_keys repeat @ y " .. y)
+          print("---------------------------------------------")
+        else
+          grid_interaction = "view_switcher"
+          view_key_count = view_key_count + 1
+          
+          -- following lines cancel any pending pattern changes by acting as if a copy was just performed (overrides)
+          -- pattern_key_count = 0
+          -- pattern_copy_performed = true
+          
+          table.insert(grid_view_keys, y)
+          if view_key_count == 1 then
+            set_grid_view(grid_views[y - 5])
+
+          elseif view_key_count > 1 and (grid_view_keys[1] == 7 and grid_view_keys[2] == 8) or (grid_view_keys[1] == 8 and grid_view_keys[2] == 7) then
+            screen_view_name = "Chord+seq"
+          end
         end
       end
       
@@ -5179,20 +5204,28 @@ function g.key(x, y, z)
 
       -- ARRANGER EVENTS TIMELINE KEY DOWN
       elseif y == 5 then
-        arranger_loop_key_count = arranger_loop_key_count + 1
-        if (grid_interaction or "event_copy") == "event_copy" then -- if no interaction or already in event_copy
-          grid_interaction = "event_copy"
-          -- First touched pattern is the one we edit, effectively resetting on key_count = 0
-          if arranger_loop_key_count == 1 then
-            event_edit_segment = x_offset
-  
-          -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
-          -- arranger shift interaction will block this
-          -- implicit here that more than 1 key is held down so we're pasting
-          else
-            events[x_offset] = deepcopy(events[event_edit_segment])
-            notification("COPIED " .. event_edit_segment .. " TO " .. x_offset, {"g", x, y})
-            gen_arranger_dash_data("Event copy+paste")
+
+        if arranger_loop_key_count == 1 and x == event_edit_segment then
+          print("---------------------------------------------")
+          print("ERROR: event repeat @ x " .. x)
+          print("---------------------------------------------")
+        else
+
+          arranger_loop_key_count = arranger_loop_key_count + 1
+          if (grid_interaction or "event_copy") == "event_copy" then -- if no interaction or already in event_copy
+            grid_interaction = "event_copy"
+            -- First touched pattern is the one we edit, effectively resetting on key_count = 0
+            if arranger_loop_key_count == 1 then
+              event_edit_segment = x_offset
+    
+            -- Subsequent keys down paste all arranger events in segment, but not the segment pattern
+            -- arranger shift interaction will block this
+            -- implicit here that more than 1 key is held down so we're pasting
+            else
+              events[x_offset] = deepcopy(events[event_edit_segment])
+              notification("COPIED " .. event_edit_segment .. " TO " .. x_offset, {"g", x, y})
+              gen_arranger_dash_data("Event copy+paste")
+            end
           end
         end
       
@@ -5202,50 +5235,60 @@ function g.key(x, y, z)
       if x < 15 then -- chord degrees
         local x_wrapped = util.wrap(x, 1, 7)
         local y_offset = y + pattern_grid_offset
-        chord_key_count = chord_key_count + 1 -- used to determine "chord_key_held" grid_interaction
 
-        -- flag this pattern/chord as needing to be disabled on key-up, if not interrupted by some other action
-        if x == chord_pattern[active_chord_pattern][y_offset] then
-          if not pending_chord_disable[x] then
-            pending_chord_disable[x] = {}
+        -- ensure that mid-hold grid disconnect or erroneously sent repeat key-ons are handled gracefully
+        if grid_interaction == "chord_key_held" and x == editing_chord_x and y_offset == editing_chord_y then -- repeat/invalid!
+          print("---------------------------------------------")
+          print("ERROR: Grid chord key repeat @ x/y_offset " .. x .. "/" .. y_offset)
+          print("---------------------------------------------")
+          else
+
+          chord_key_count = chord_key_count + 1 -- used to determine "chord_key_held" grid_interaction
+
+          -- flag this pattern/chord as needing to be disabled on key-up, if not interrupted by some other action
+          if x == chord_pattern[active_chord_pattern][y_offset] then
+            if not pending_chord_disable[x] then
+              pending_chord_disable[x] = {}
+            end
+            pending_chord_disable[x][y_offset] = active_chord_pattern
+
+          else
+            chord_pattern[active_chord_pattern][y_offset] = x
+            -- pending_chord_disable = nil -- will be for copy+paste
           end
-          pending_chord_disable[x][y_offset] = active_chord_pattern
 
-        else
-          chord_pattern[active_chord_pattern][y_offset] = x
-          -- pending_chord_disable = nil -- will be for copy+paste
-        end
+          -- plays Chord when pressing on any Grid key (even turning chord off)
+          if params:get("preview_notes") == 2 and (transport_state == "stopped" or transport_state == "paused") then
+            update_chord(x, y)
+            play_chord()
+          end
 
-        -- plays Chord when pressing on any Grid key (even turning chord off)
-        if params:get("preview_notes") == 2 and (transport_state == "stopped" or transport_state == "paused") then
-          update_chord(x, y)
-          play_chord()
-        end
+          -- todo p0 need to do copy+paste and figure out complications there with simultaneous keypresses
+          if not grid_interaction then -- first keypress which defines editing_chord
+            grid_interaction = "chord_key_held"
+            lvl = lvl_dimmed
+            update_dash_lvls()
+            editing_chord_scale = params:get("scale")
+            editing_chord_pattern = active_chord_pattern
+            editing_chord_x = x -- used for chord editor
+            editing_chord_y = y_offset -- used for chord editor
+            editing_chord_root = theory.chord_triad_intervals[editing_chord_scale][x][1]
 
-        -- todo p0 need to do copy+paste and figure out complications there with simultaneous keypresses
-        if not grid_interaction then -- first keypress which defines editing_chord
-          grid_interaction = "chord_key_held"
-          lvl = lvl_dimmed
-          update_dash_lvls()
-          editing_chord_scale = params:get("scale")
-          editing_chord_pattern = active_chord_pattern
-          editing_chord_x = x -- used for chord editor
-          editing_chord_y = y -- used for chord editor
-          editing_chord_root = theory.chord_triad_intervals[editing_chord_scale][x][1]
+            local mode = params:get("scale")
+            local key = util.wrap(params:get("tonic"), 0, 11)
+            editing_chord_letter = theory.scale_chord_letters[mode][key][x_wrapped]       -- letter
+            editing_chord_triad_name = theory.scale_chord_names[mode][key][x_wrapped]        -- base triad name+quality
 
-          local mode = params:get("scale")
-          local key = util.wrap(params:get("tonic"), 0, 11)
-          editing_chord_letter = theory.scale_chord_letters[mode][key][x_wrapped]       -- letter
-          editing_chord_triad_name = theory.scale_chord_names[mode][key][x_wrapped]        -- base triad name+quality
+            -- todo p0!
+            editing_chord_degree = theory.chord_degree[mode]["numeral"][x_wrapped]        -- degree roman numeral only
+            
+            gen_chord_name()
+            init_chord_editor() -- moved here from K3 so this can be used for quick chord selection
+          end
 
-          -- todo p0!
-          editing_chord_degree = theory.chord_degree[mode]["numeral"][x_wrapped]        -- degree roman numeral only
-          
-          gen_chord_name()
-          init_chord_editor() -- moved here from K3 so this can be used for quick chord selection
-        end
+          preload_chord()
 
-        preload_chord()
+        end -- of dupe key on check
 
       elseif x == 15 then -- set chord_pattern_length
         params:set("chord_pattern_length", y + pattern_grid_offset)
@@ -5259,25 +5302,35 @@ function g.key(x, y, z)
         else
 
           grid_interaction = "pattern_switcher"
-          pattern_key_count = pattern_key_count + 1
-          pattern_keys[1][y] = true -- pattern_keys is used by seqs as well so when in chord mode, always use table 1
-          if pattern_key_count == 1 then
-            copied_pattern = y
-          else -- if pattern_key_count > 1 then
-            notification("COPIED " ..  pattern_name[copied_pattern] .. " TO " .. pattern_name[y], {"g", x, y})
-            pattern_copy_performed[1] = true
-            chord_pattern[y] = simplecopy(chord_pattern[copied_pattern])
 
-            for scale = 1, #dreamsequence.scales do             -- copy custom chords (for all scales)
-              theory.custom_chords[scale][y] = deepcopy(theory.custom_chords[scale][copied_pattern])
-            end
+          -- ensure that mid-hold grid disconnect or erroneously sent repeat key-ons are handled gracefully
+          if pattern_keys[1][y] then -- pattern_keys is used by seqs as well so when in chord mode, always use table 1
+            local p = {"A", "B", "C", "D"}
+            print("---------------------------------------------")
+            print("ERROR: pattern_keys repeat @ chord pattern " .. p[y])
+            print("---------------------------------------------")
+          else
+            pattern_key_count = pattern_key_count + 1
+            pattern_keys[1][y] = true -- pattern_keys is used by seqs as well so when in chord mode, always use table 1
+            if pattern_key_count == 1 then
+              copied_pattern = y
+            else -- if pattern_key_count > 1 then
+              notification("COPIED " ..  pattern_name[copied_pattern] .. " TO " .. pattern_name[y], {"g", x, y})
+              pattern_copy_performed[1] = true
+              chord_pattern[y] = simplecopy(chord_pattern[copied_pattern])
 
-            -- If we're pasting to the currently viewed active_chord_pattern, do it via param so we update param/grid table.
-            if y == active_chord_pattern then
-              params:set("chord_pattern_length", chord_pattern_length[copied_pattern])
-            -- Otherwise just update the table
-            else
-              chord_pattern_length[y] = chord_pattern_length[copied_pattern]
+              for scale = 1, #dreamsequence.scales do             -- copy custom chords (for all scales)
+                theory.custom_chords[scale][y] = deepcopy(theory.custom_chords[scale][copied_pattern])
+              end
+
+              -- If we're pasting to the currently viewed active_chord_pattern, do it via param so we update param/grid table.
+              if y == active_chord_pattern then
+                params:set("chord_pattern_length", chord_pattern_length[copied_pattern])
+              -- Otherwise just update the table
+              else
+                chord_pattern_length[y] = chord_pattern_length[copied_pattern]
+              end
+
             end
 
           end
@@ -5323,45 +5376,55 @@ function g.key(x, y, z)
 
         else
           grid_interaction = "pattern_switcher"
-          pattern_key_count = pattern_key_count + 1 --used to identify when the first key is pressed and last key is released. Could also use pattern_keys...
-          pattern_keys[seq_no][y] = true -- log keydown
 
-          if pattern_key_count == 1 then -- initial keydown sets pattern to copy and starts timer for simultaneous keydown detection
-            simultaneous = false
-            copied_seq_no = seq_no
-            copied_pattern = y
-            clock.run(pattern_key_timer)
-            update_seq_pattern = {}
-            update_seq_pattern[seq_no] = y -- sets pattern we need to update seq_no/index to on key-up
-
+          -- ensure that mid-hold grid disconnect or erroneously sent repeat key-ons are handled gracefully
+          if pattern_keys[seq_no][y] then
+            local p = {"A", "B", "C", "D"}
+            print("---------------------------------------------")
+            print("ERROR: pattern_keys repeat @ SEQ " .. seq_no .. ", pattern " .. p[y])
+            print("---------------------------------------------")
           else
-            if (seq_no ~= copied_seq_no) and (keydown_timer < 2) then -- if ANY other seq is touched <2ms after initial keydown, this is now a simultaneous interaction
-              simultaneous = true
-            end
+            pattern_key_count = pattern_key_count + 1 --used to identify when the first key is pressed and last key is released. Could also use pattern_keys...
+            pattern_keys[seq_no][y] = true -- log keydown
 
-            if not simultaneous then -- copy pattern
-                update_seq_pattern[copied_seq_no] = nil -- remove entry since we don't want to change to the pattern we're copying from
-
-                -- possibly misleading as this copies the pattern in current state rather than when keydown was performed
-                -- todo consider copying the table contents at keydown which is probably what users expect (but more expensive)
-                for step = 1, max_seq_pattern_length do
-                  for note = 1, max_seq_cols do
-                    seq_pattern[seq_no][y][step][note] = seq_pattern[copied_seq_no][copied_pattern][step][note]
-                  end
-                end
-
-                -- Pattern length. If we're pasting to a current active_seq_pattern, also update param
-                if y == active_seq_pattern[seq_no] then
-                  params:set("seq_pattern_length_" .. seq_no, seq_pattern_length[copied_seq_no][copied_pattern])
-                else
-                  seq_pattern_length[seq_no][y] = seq_pattern_length[copied_seq_no][copied_pattern]
-                end
-                notification("COPIED " ..  copied_seq_no .. "." .. pattern_name[copied_pattern] .. " TO " .. seq_no .. "." .. pattern_name[y], {"g", x, y})
-
-            else -- simultaneous keypresses in other seq columns are interpreted as intent to switch patterns
+            if pattern_key_count == 1 then -- initial keydown sets pattern to copy and starts timer for simultaneous keydown detection
+              simultaneous = false
+              copied_seq_no = seq_no
+              copied_pattern = y
+              clock.run(pattern_key_timer)
+              update_seq_pattern = {}
               update_seq_pattern[seq_no] = y -- sets pattern we need to update seq_no/index to on key-up
+
+            else
+              if (seq_no ~= copied_seq_no) and (keydown_timer < 2) then -- if ANY other seq is touched <2ms after initial keydown, this is now a simultaneous interaction
+                simultaneous = true
+              end
+
+              if not simultaneous then -- copy pattern
+                  update_seq_pattern[copied_seq_no] = nil -- remove entry since we don't want to change to the pattern we're copying from
+
+                  -- possibly misleading as this copies the pattern in current state rather than when keydown was performed
+                  -- todo consider copying the table contents at keydown which is probably what users expect (but more expensive)
+                  for step = 1, max_seq_pattern_length do
+                    for note = 1, max_seq_cols do
+                      seq_pattern[seq_no][y][step][note] = seq_pattern[copied_seq_no][copied_pattern][step][note]
+                    end
+                  end
+
+                  -- Pattern length. If we're pasting to a current active_seq_pattern, also update param
+                  if y == active_seq_pattern[seq_no] then
+                    params:set("seq_pattern_length_" .. seq_no, seq_pattern_length[copied_seq_no][copied_pattern])
+                  else
+                    seq_pattern_length[seq_no][y] = seq_pattern_length[copied_seq_no][copied_pattern]
+                  end
+                  notification("COPIED " ..  copied_seq_no .. "." .. pattern_name[copied_pattern] .. " TO " .. seq_no .. "." .. pattern_name[y], {"g", x, y})
+
+              else -- simultaneous keypresses in other seq columns are interpreted as intent to switch patterns
+                update_seq_pattern[seq_no] = y -- sets pattern we need to update seq_no/index to on key-up
+              end
             end
-          end
+
+        end
 
         end
       end
