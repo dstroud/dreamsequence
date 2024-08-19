@@ -16,6 +16,8 @@ local lvl_pane_selected = lvl.pane_selected
 local lvl_pane_deselected = lvl.pane_deselected
 local lvl_chart_deselected = lvl.chart_deselected
 local lvl_menu_selected = lvl.menu_selected
+
+-- local lvl_pane_dark = lvl.pane_dark
 -- local lvl_chart_area = lvl.chart_area
 -- local lvl_menu_deselected = lvl.menu_deselected
 -- local blinky = blinky -- can't be locally defined here or there's no updating of value
@@ -31,6 +33,8 @@ function update_dash_lvls()
   lvl_pane_deselected = lvl.pane_deselected
   lvl_chart_deselected = lvl.chart_deselected
   lvl_menu_selected = lvl.menu_selected
+
+  -- lvl_pane_dark = lvl.pane_dark
   -- lvl_chart_area = lvl.chart_area
 end
 
@@ -213,6 +217,7 @@ table.insert(dash_ids, "chord_active_kbd")
 table.insert(dash_name, "Chord kbd")
 
 function dash_functions.chord_active_kbd()
+  local dark_g = lvl_pane_selected + 2
   local state_white = dash_keys_white
   local state_black = dash_keys_black
   local b_x = {6, 10, 18, 22, 26} -- x coords for black keys
@@ -221,18 +226,20 @@ function dash_functions.chord_active_kbd()
   screen.rect(dash_x, dash_y, width, 17)
   screen.fill()
 
-  screen.level(lvl_pane_selected)
+  screen.level(dark_g) -- outlines
   screen.rect(dash_x + 3, dash_y + 3, 29, 11)
   screen.fill()
 
+
   for i = 1, 7 do
-    screen.level(state_white[i] and (lvl_chart_deselected + 1) or lvl_pane) -- normal = white, playing = gray
+    screen.level(state_white[i] and lvl_pane or (lvl_pane_deselected + 2)) -- normal = white, playing = gray
+
     screen.rect(dash_x + 4 + ((i - 1) * 4), dash_y + 4, 3, 9)
     screen.fill()
   end
   
   for i = 1, 5 do
-    screen.level(state_black[i] and (math.max(lvl_chart_deselected - 1, 2)) or lvl_pane_selected) -- normal = black, playing = gray
+    screen.level(state_black[i] and lvl_pane_selected or dark_g) -- normal = black, playing = gray
     screen.rect(dash_x + b_x[i], dash_y + 4, 3, 5)
     screen.fill()
   end
