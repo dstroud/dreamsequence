@@ -2,14 +2,6 @@ local mydir = debug.getinfo(1).source:match("@?" .. _path.code .. "(.*/)")
 local player_lib = include(mydir .. "player")
 local nb = {}
 
-if note_players == nil then
-    note_players = {}
-end
-
--- note_players is a global that you can add note-players to from anywhere before
--- you call nb:add_param.
-nb.players = note_players -- alias the global here. Helps with standalone use.
-
 nb.none = player_lib:new()
 
 -- Set this before init() to affect the number of voices added for some mods.
@@ -102,7 +94,7 @@ local function add_midi_players()
 
                     function player:stop_all(val)
                         for ch = 1, 16 do -- all channels since init() calls before add_params()
-                            self.conn:cc(120, 1, ch)
+                            self.conn:cc(123, 1, ch)
                         end
                     end
 
@@ -115,6 +107,13 @@ end
 
 -- Call from your init method.
 function nb:init()
+    if note_players == nil then
+        note_players = {}
+    end
+    
+    -- note_players is a global that you can add note-players to from anywhere before
+    -- you call nb:add_param.
+    nb.players = note_players -- alias the global here. Helps with standalone use.
     nb_player_refcounts = {}
     add_midi_players()
     self:stop_all()

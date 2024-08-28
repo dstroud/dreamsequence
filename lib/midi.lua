@@ -67,7 +67,7 @@ local function add_midi_ds_players()
 
                 function player:stop_all(val)
                     for ch = 1, 16 do -- all channels since init() calls before add_params()
-                        self.conn:cc(120, 1, ch)
+                        self.conn:cc(123, 1, ch)
                     end
                 end
 

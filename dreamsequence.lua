@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240819 Dan Stroud
+-- 1.4 240828 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -246,7 +246,7 @@ function init()
   function cleanup()
     seq_lattice:destroy()
     nb:stop_all()
-    note_players = nil -- clears bundled crow/midi players for next script
+    note_players = {} -- clears bundled crow/midi players for next script
     clock.link.stop()
     
     if preinit_jf_mode == 0 then
@@ -2629,7 +2629,7 @@ function gen_voice_lookups()
   end  
   
   local function trim_menu(string)
-    return util.trim_string_to_width(string, 55)--63)
+    return util.trim_string_to_width(string, 59)
   end
   
   for i = 1, params:lookup_param("chord_voice_raw").count do
