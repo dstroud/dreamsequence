@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240828 Dan Stroud
+-- 1.4 240908 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -121,7 +121,7 @@ local latest_strum_coroutine = coroutine.running()
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = 010400 --1.4.0
+  local version = 010410 --1.4.1
   -----------------------------
 
   function read_prefs()  
@@ -2053,6 +2053,8 @@ function init()
             local q = arranger_q
             local next = q ~= nil and q <= arranger_length and q or arranger_next
             do_events(next, 1)
+          else
+            do_events(arranger_position, chord_pattern_position + 1)
           end
         end
       end,
