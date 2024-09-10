@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240908 Dan Stroud
+-- 1.4 240910 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -121,7 +121,7 @@ local latest_strum_coroutine = coroutine.running()
 function init()
   -----------------------------
   -- todo p0 prerelease ALSO MAKE SURE TO UPDATE ABOVE!
-  local version = 010410 --1.4.1
+  local version = 010400 --1.4.0
   -----------------------------
 
   function read_prefs()  
@@ -890,7 +890,6 @@ function init()
           action = 'midi.vports[' .. port .. ']:cc(0, params:get("' .. name .. '"), ' .. ch .. ')'
         })
 
-
         -- generate param for each port/channel
         local name = "midi_bank_lsb_" .. port .. "_" .. ch
         params:add_number(name, name, 1, 128, 1)
@@ -1001,6 +1000,8 @@ function init()
   subdivide_indices("crow_ds 1/2") -- env params
   
   
+  --#region scrape/ingest nb voice params
+
   -- append nb params to events_lookup
   -- todo derivative of gen_voice_lookup() but mind the different trim width
   local function gen_category_name(string)
@@ -1009,6 +1010,7 @@ function init()
   end
   
   -- Function to sort table keys alphabetically. Might move to lib/functions
+  -- todo p2 case-sensitive sorting (untested)
   local function sort_keys(tbl)
     local keys = {}
     for key in pairs(tbl) do
@@ -1030,6 +1032,21 @@ function init()
     -- and name ~= "jf kit" -- todo test
     and name ~= "jf mpe" then
 
+      -- check if this voice has "officially" defined params (as opposed to scraped params)
+      local has_params = false
+      local params_official
+      if nb.players[name] and nb.players[name].describe ~= nil then
+        local plist = nb.players[name]:describe().params
+        if type(plist) == "table" then
+          has_params = true
+          params_official = {}
+          local ids = nb.players[name]:describe().params -- can be nil
+          for i = 1, #ids do
+            params_official[ids[i]] = true
+          end
+        end
+      end
+
       local v = nb.indices[k]
       local separator = "general"
       for i = 1, params:get(v.start_index) do
@@ -1049,13 +1066,18 @@ function init()
             subcategory	= separator,
             event_type = "param",
           }
-          table.insert(events_lookup, event)
+
+          -- if voice describe() includes params, only include explicitly defined param ids. otherwise, scrape 'em all
+          if (has_params == false) or (has_params and params_official[param.id]) then
+            table.insert(events_lookup, event)
+          end
         elseif param.t == 0 then
           separator = util.trim_string_to_width(param.name, 78)
         end
       end
     end
   end
+  --#endregion scrape/ingest nb voice params
 
 
   init_events() -- creates lookup tables for events
