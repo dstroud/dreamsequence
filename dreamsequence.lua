@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240910 Dan Stroud
+-- 1.4 240912 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -541,8 +541,8 @@ function init()
   
   params:add_number("crow_clock_swing", "Crow swing", 50, 99, 50, function(param) return percent(param:get()) end)
   
-  params:add_number("dedupe_threshold", "Dedupe <", 0, 10, div_to_index("1/32"), function(param) return divisions_string(param:get()) end)
-  params:set_action("dedupe_threshold", function() dedupe_threshold() end)
+  params:add_number("dedupe_threshold", "Dedupe", 0, 10, div_to_index("1/64T"), function(param) return divisions_string(param:get()) end)
+  -- params:set_action("dedupe_threshold", function() dedupe_threshold() end)
   
   -- deprecated
   -- params:add_number("chord_preload", "Chord preload", 0, 10, div_to_index("1/64"), function(param) return divisions_string(param:get()) end)
@@ -1379,7 +1379,7 @@ function init()
 
   pattern_grid_offset = 0 -- grid view scroll offset
   note_history = {}  -- todo p2 performance of having one vs dynamically created history for each voice
-  dedupe_threshold()
+  -- dedupe_threshold()
   -- reset_clock() -- might need reset_lattice but it hasn't been intialized
   
   -- replacing
@@ -1745,9 +1745,10 @@ function init()
     -- Assumes PPQN == global_clock_div. Lookup tables will need adjustments if PPQN ~= 48
     for i = #note_history, 1, -1 do -- Steps backwards to account for table.remove messing with [i]
       local hist = note_history[i]
-      hist.step = hist.step - 1
+      hist.elapsed = hist.elapsed + 1
+      hist.remaining = hist.remaining - 1
 
-      if hist.step == 0 then
+      if hist.remaining == 0 then
         if hist.channel then -- todo unsure if this check is optimal vs just sending properties
           hist.player:note_off(hist.note, 0, {ch = hist.channel})
         else
@@ -3108,14 +3109,6 @@ function percent(x)
 end
 
 
--- Establishes the threshold in seconds for considering duplicate notes as well as providing an integer for placeholder duration
-function dedupe_threshold()
-  local index = params:get("dedupe_threshold")
-  dedupe_threshold_int = (index == 0) and 1 or division_names[index][1]
-  dedupe_threshold_s = (index == 0) and 1 or duration_sec(dedupe_threshold_int) * .95
-end
-
-
 -- function chord_preload(index)
 --   chord_preload_tics = (index == 0) and 0 or division_names[index][1]
 -- end  
@@ -3139,13 +3132,6 @@ function shuffle(tbl) -- doesn't deepcopy
     tbl[i], tbl[j] = tbl[j], tbl[i]
   end
   return tbl
-end
-
-
--- Callback function when system tempo changes
-function clock.tempo_change_handler()  
-  dedupe_threshold()  
-  -- crow_clock_offset = ms_to_beats(params:get("crow_clock_offset"))
 end
 
 
@@ -3909,12 +3895,12 @@ end
 
 
 -- todo relocate!
+-- todo break up note_history by player so we don't have to check every note against non-matching players
 function to_player(player, note, dynamics, duration, channel)
-  -- todo break up note_history by player so we don't have to check every note against non-matching players
-
-  local note_on_time = util.time()
   local player_play_note = true
   local note_history_insert = true
+  local dedupe_raw = params:get("dedupe_threshold")
+  local dedupe_ticks = dedupe_raw == 0 and 0 or division_names[dedupe_raw][1]
   
   for i = 1, #note_history do
     local hist = note_history[i]
@@ -3923,18 +3909,19 @@ function to_player(player, note, dynamics, duration, channel)
       
       -- Preserve longer note-off duration to avoid which-note-was-first race condition. 
       -- Ex: if a sustained chord and a staccato note play at approximately the same time, the chord's note will sustain without having to worry about order
-      hist.step = math.max(duration, hist.step)
+      hist.remaining = math.max(duration, hist.remaining)
       note_history_insert = false -- don't insert a new note-off record since we just updated the duration
-
-      if params:get("dedupe_threshold") > 1 and (note_on_time - hist.note_on_time) < dedupe_threshold_s then
-        -- print(("Deduped " .. note_on_time - hist.note_on_time) .. " | " .. dedupe_threshold_s)
+      
+      -- switched from seconds-based to lattice pulse/transport-based dedupe calc
+      if dedupe_raw ~= 0 and hist.elapsed < dedupe_ticks then
         player_play_note = false -- Prevent duplicate note from playing
       end
-    
-      -- Always update any existing note_on_time, even if a note wasn't played. 
-      -- Otherwise the note duration may be extended but the gap between note_on_time and current time grows indefinitely and no dedupe occurs.
+
+
+      -- Always update any existing elapsed time, even if a note wasn't played
+      -- This allows repeated deduping of a note that has already been deduped and extended
       -- Alternative is to not extend the duration when dedupe_threshold > 0 and a duplicate is found
-      hist.note_on_time = note_on_time
+      hist.elapsed = 0
     end
   end
 
@@ -3953,11 +3940,11 @@ function to_player(player, note, dynamics, duration, channel)
     -- no other note duration exists so insert a new note record into the history table
     else
       table.insert(note_history, {
-        step = duration,
+        elapsed = 0,
+        remaining = duration, -- count down from max duration to 0 when note_off occurs
         player = player,
         channel = channel,
         note = note,
-        note_on_time = note_on_time
       })
     end
   
