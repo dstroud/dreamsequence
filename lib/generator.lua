@@ -1,4 +1,7 @@
--- IT'S CRAZY IN HERE DON'T JUDGE Meeeeeee
+local er = require("er")
+local max_seqs = 3
+local max_seq_cols = 15 - max_seqs
+
 function init_generator()
   chord_reroll_attempt = 0
   chord_generator("init")

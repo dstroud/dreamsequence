@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240912 Dan Stroud
+-- 1.4 240918 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -25,8 +25,9 @@
 -- stuff needed by includes
 dreamsequence = {}
 
+-- environment tables that are passed to included/required .lua files
 -- layout and palette
-xy = {
+local xy = {
   dash_x = 93,
   header_x = 0,
   header_y = 8,
@@ -54,22 +55,23 @@ local lvl_dimmed = {
   chart_deselected = 2,
 }
 
-lvl = lvl_normal -- required for includes:dashboards.lua
-
-blinky = 0 -- must be global for dashboards.lua todo look into this
+local lvl = lvl_normal
+local cycle_1_16 = 1
+local blinky = 0
+local led_pulse = 0
 local led_high = 15
 local led_med = 7
 local led_low = 3
 local led_high_blink = 15 - blinky * 4
 local led_med_blink = 7 - blinky * 2
 local led_low_blink = 3 - blinky
-led_pulse = 0  -- must be global for dashboards.lua todo look into this
 
-max_seqs = 3
-max_seq_cols = 15 - max_seqs
-max_seq_patterns = 4
-max_seq_pattern_length = 16
+local max_seqs = 3 -- also defined locally in events.lua, generator.lua
+local max_seq_cols = 15 - max_seqs -- also defined in generator.lua
+local max_seq_patterns = 4
+local max_seq_pattern_length = 16
 
+local dash_list = {}
 
 -- base scales used to define triads
 dreamsequence.scales = {
@@ -93,8 +95,36 @@ dreamsequence.scales = {
 
 -- pre-init bits n bobs
 norns.version.required = 231114 -- rolling back for Fates but 240221 is required for link support
-g = grid.connect()
-include(norns.state.shortname.."/lib/includes")
+local g = grid.connect()
+
+
+-- #region INCLUDES
+local lib = norns.state.shortname .. "/lib/"
+include(lib .. "functions")                       -- generic functions
+local er = require("er")
+local dashboards = include(lib .. "dashboards")   -- modular dashboard functions
+local lattice = include(lib .. "lattice")         -- modified version of lattice lib
+local nb = include(lib .. "nb/lib/nb")            -- modified nota bene
+local theory = include(lib .. "theory")           -- music theory lib
+include(lib .. "divisions")                       -- divisions for clock modulo and durations
+include(lib .. "events")                          -- Lookup table for events
+include(lib .. "generator")                       -- Chord and arp pattern generator + engine params
+include(lib .. "glyphs")                          -- pixel art
+include(lib .. "crow")                            -- bundled nb crow players
+include(lib .. "midi")                            -- bundled nb crow players
+-- #endregion INCLUDES
+
+
+-- pass "normal" or "dimmed" args
+local function set_lvl(val)
+  if val == "dimmed" then
+    lvl = lvl_dimmed
+  else
+    lvl = lvl_normal
+  end
+  dashboards.update_dash_lvls(lvl)
+end
+set_lvl("normal")
 
 -- load global scale mask file if present
 local filepath = norns.state.data
@@ -111,11 +141,19 @@ end
 
 theory.masks = masks
 
-
 clock.link.stop() -- transport won't start if external link clock is already running
 
--- pre-init locals
+-- #region pre-init locals (not needed for includes/requires)
 local latest_strum_coroutine = coroutine.running()
+local prefs = {}
+local preinit_jf_mode
+local crow_version
+local jf_time
+local events_lookup_index
+local pattern_name = {"A","B","C","D"}
+local max_dashboards = 4
+-- #endregion pre-init locals
+
 
 --#region init
 function init()
@@ -124,7 +162,7 @@ function init()
   local version = 010400 --1.4.0
   -----------------------------
 
-  function read_prefs()  
+  local function read_prefs()  
     prefs = {}
     local filepath = norns.state.data
     if util.file_exists(filepath) then
@@ -182,9 +220,10 @@ function init()
     crow_version = ...
   end
   crow.version() -- Uses redefined crow.version() function to set crow_version global var
-  crow_version_clock = clock.run(
+  clock.run(
     function()
       clock.sleep(.05) -- a small hold for usb round-trip
+      local crow_trigger_in = function() end
       local major, minor, patch = string.match(crow_version or "v9.9.9", "(%d+)%.(%d+)%.(%d+)")
       local crow_version_num = major + (minor /10) + (patch / 100)  -- this feels like it's gonna break lol
       if crow_version ~= nil then print("Crow version " .. crow_version) end
@@ -229,7 +268,7 @@ function init()
   ------------------------------------
   -- save and restore pre-init state
   ------------------------------------
-  function capture_preinit()
+  local function capture_preinit()
     preinit_jf_mode = clock.run(
       function()
         clock.sleep(0.005) -- a small hold for usb round-trip -- not sure this is needed any more
@@ -244,11 +283,18 @@ function init()
 
   -- Reverts changes to crow and jf that might have been made by DS
   function cleanup()
+    clock.cancel(strum_clock)
+    seq_lattice:stop()
+    -- transport_midi:stop()
+    grid_redraw_metro:stop()
+    clock.link.stop()
+    countdown_timer:stop()
+
     seq_lattice:destroy()
     nb:stop_all()
     note_players = {} -- clears bundled crow/midi players for next script
-    clock.link.stop()
-    
+    -- clock.link.stop()
+    -- countdown_timer:stop()
     if preinit_jf_mode == 0 then
       crow.ii.jf.mode(preinit_jf_mode)
       print("Restoring jf.mode to " .. preinit_jf_mode)
@@ -271,9 +317,10 @@ function init()
   
   local events_lookup_names = {}
   local events_lookup_ids = {}
-  local event_categories = {}
+  local event_categories = {}    
+  local event_categories_unique = {}
   
-  function init_events()
+  local function init_events()
     events_lookup_names = {}  -- locals defined outside of function
     events_lookup_ids = {}
 
@@ -313,7 +360,6 @@ function init()
   --------------------
 
   -- functions and globals used by params
-  pattern_name = {"A","B","C","D"}
 
   -- show or hide midi channel param/menu
   local function set_channel_vis(id, channel_param)
@@ -346,6 +392,7 @@ function init()
   params:add_option("default_pset", "Default song", {"New", "Last PSET", "Template"}, 1)
   params:set_save("default_pset", false)
   -- param_option_to_index is used rather than set_param_string to handle any invalid/changed saved values
+
   params:set("default_pset", param_option_to_index("default_pset", prefs.default_pset) or 1)
   params:set_action("default_pset", function() save_prefs() end)
 
@@ -386,15 +433,14 @@ function init()
   init_dummy_funcs()
   xy.dash_x = 129 -- kinda silly but in case user has no dashboards, shift over the scrollbar
 
-  max_dashboards = 4
   for dash_no = 1, max_dashboards do -- limiting to 4 dashboards for now
-    params:add_option("dash_" .. dash_no, "Dash " .. dash_no, dash_name, 1)
+    params:add_option("dash_" .. dash_no, "Dash " .. dash_no, dashboards.names, 1)
     params:set_save("dash_" .. dash_no, false)
     params:set("dash_" .. dash_no, param_option_to_index("dash_" .. dash_no, prefs["dash_" .. dash_no] or defaults[dash_no]) or 1 )
     params:set_action("dash_" .. dash_no, 
       function(val)
         save_prefs()
-        dash_list[dash_no] = dash_functions[dash_ids[val]]
+        dash_list[dash_no] = dashboards.funcs[dashboards.ids[val]]
 
         -- redefine dash functions depending on selection
 
@@ -931,56 +977,6 @@ function init()
     end
   end
 
-  -- -- bank select MSB
-  -- for port = 1, 16 do
-  --   if midi.vports[port].connected then
-  --     for ch = 1, 16 do
-  --       -- generate param for each port/channel
-  --       local name = "midi_bank_msb_" .. port .. "_" .. ch
-  --       params:add_number(name, name, 1, 128, 0)
-  --       params:set_save(name, false)
-  --       params:hide(name)
-
-  --       -- using event action rather than param action since:
-  --       -- 1. we don't want this being sent at param bang and 
-  --       -- 2. we do want it to bang every time event fires, even if param index hasn't changed
-  --       table.insert(events_lookup, {
-  --         category = "MIDI port " .. port,
-  --         subcategory = "Channel " .. ch,
-  --         event_type = "param",
-  --         id = name,
-  --         name = "Bank select",
-  --         action = 'midi.vports[' .. port .. ']:cc(0, params:get("' .. name .. '"), ' .. ch .. ')'
-  --       })
-  --     end
-  --   end
-  -- end
-
-  --   -- bank select LSB
-  --   for port = 1, 16 do
-  --     if midi.vports[port].connected then
-  --       for ch = 1, 16 do
-  --         -- generate param for each port/channel
-  --         local name = "midi_bank_lsb_" .. port .. "_" .. ch
-  --         params:add_number(name, name, 1, 128, 0)
-  --         params:set_save(name, false)
-  --         params:hide(name)
-  
-  --         -- using event action rather than param action since:
-  --         -- 1. we don't want this being sent at param bang and 
-  --         -- 2. we do want it to bang every time event fires, even if param index hasn't changed
-  --         table.insert(events_lookup, {
-  --           category = "MIDI port " .. port,
-  --           subcategory = "Channel " .. ch,
-  --           event_type = "param",
-  --           id = name,
-  --           name = "Bank select (fine)",
-  --           action = 'midi.vports[' .. port .. ']:cc(32, params:get("' .. name .. '"), ' .. ch .. ')'
-  --         })
-  --       end
-  --     end
-  --   end
-
   -- due to crow_ds adding *all* shared params for Crow outs 1-4 in one player, break them up:
   local function subdivide_indices(string)
     local category
@@ -1215,7 +1211,7 @@ function init()
 
 
   -- ui
-  cycle_1_16 = 1
+  -- cycle_1_16 = 1
   -- led_pulse = 0
   screen_view_name = "Session"
   dash_y = 0
@@ -1478,8 +1474,6 @@ function init()
       table.insert(sources, "midi_voice")
 
       for i = 1, #sources do
-        -- local param_string = sources[i].."_voice"
-        -- local param_string = param_string == "seq_voice" and "seq_voice_1" or param_string
         local param_string = sources[i]
         local prev_param_name = voice[param_string] --params:string(param_string)
         local iterations = #params:lookup_param(param_string).options + 1
@@ -1487,6 +1481,7 @@ function init()
           for j = 1, iterations do
             if j == iterations then
               params:set(param_string, 1)
+              notification("MISSING " .. string.upper(prev_param_name), nil, 10)
               print("Unable to find NB voice " .. prev_param_name .. " for " .. param_string)
             elseif prev_param_name == params:lookup_param(param_string).options[j] then
               params:set(param_string, j)
@@ -1600,27 +1595,27 @@ function init()
   -------------
   function save_prefs()
     local filepath = norns.state.data
-    local prefs = {}
-    prefs.timestamp = os.date()
-    prefs.last_version = version
-    prefs.default_pset = params:string("default_pset")
-    prefs.sync_views = params:string("sync_views")
-    prefs.notifications = params:string("notifications")
-    prefs.preview_notes = params:string("preview_notes")
+    local p = {}
+    p.timestamp = os.date()
+    p.last_version = version
+    p.default_pset = params:string("default_pset")
+    p.sync_views = params:string("sync_views")
+    p.notifications = params:string("notifications")
+    p.preview_notes = params:string("preview_notes")
     for dash_no = 1, max_dashboards do
       local id = "dash_" .. dash_no
-      prefs[id] = params:string(id)
+      p[id] = params:string(id)
     end
-    prefs.crow_pullup = params:string("crow_pullup")
-    prefs.voice_instances = params:get("voice_instances")
-    prefs.config_enc_1 = params:get("config_enc_1")
-    prefs.config_enc_2 = params:get("config_enc_2")
-    prefs.config_enc_3 = params:get("config_enc_3")
+    p.crow_pullup = params:string("crow_pullup")
+    p.voice_instances = params:get("voice_instances")
+    p.config_enc_1 = params:get("config_enc_1")
+    p.config_enc_2 = params:get("config_enc_2")
+    p.config_enc_3 = params:get("config_enc_3")
     for i = 1, 16 do
       local id = "midi_continue_" .. i
-      prefs[id] = params:string(id)
+      p[id] = params:string(id)
     end 
-    tab.save(prefs, filepath .. "prefs.data")
+    tab.save(p, filepath .. "prefs.data")
     if countdown_timer ~= nil then --  trick to keep this from junking up repl on init bang (x2 if pset loads)
       print("table >> write: " .. filepath.."prefs.data")
     end
@@ -2174,10 +2169,7 @@ function init()
   else
     init_sprocket_cv_harm(division_names[params:get("crow_div_index")][1]/global_clock_div/4)
   end
-  
-  
-  -- todo: seeing some intermittent issues with grid freezing still. I thought this would fix it but maybe lower rate further.
-  -- libmonome: error in write: Input/output error
+    
   grid_redraw_metro = metro.init(grid_refresh, 1/30, -1)
   grid_dirty = true
   grid_redraw_metro:start()
@@ -2209,7 +2201,8 @@ end -- end of init
 -- end_tab is table indicating which grid or norns key release will end the message
 -- e.g. {g, x, y} or {k, 3}
 -- nil end_tab will result in long notification (enc)
-function notification(message, end_tab)
+-- duration is an optional override for popup duration
+function notification(message, end_tab, duration)
   local d = params:get("notifications")
   if d > 1 then -- index 1 == off
     if end_tab then
@@ -2217,15 +2210,13 @@ function notification(message, end_tab)
         clock.cancel(message_clock)
         popup_countdown = nil
       end
-      lvl = lvl_dimmed
-      update_dash_lvls()
+      set_lvl("dimmed")
       screen_message = message
       end_screen_message = end_tab
     else
-      lvl = lvl_dimmed
-      update_dash_lvls()
+      set_lvl("dimmed")
       screen_message = message
-      do_notification_timer_1(math.max(d, 3)) --  since no end_tab was supplied, do timer of some sort (unless notifs are off)
+      do_notification_timer_1(duration or math.max(d, 3)) --  since no end_tab was supplied, do timer of some sort (unless notifs are off)
     end
   end
 end
@@ -2346,8 +2337,7 @@ function do_notification_timer_1(pref)
 
   if pref < 3 then -- index 1 == off, 2 == momentary
     screen_message = nil
-    lvl = lvl_normal
-    update_dash_lvls()
+    set_lvl("normal")
   elseif pref > 2 then -- index 3 == brief, 4 == extended
     local time = (pref - 2) * 8
     if (popup_countdown or 0) == 0 then -- start timer
@@ -2358,8 +2348,7 @@ function do_notification_timer_1(pref)
             popup_countdown = popup_countdown - 1
             if popup_countdown == 0 then
               screen_message = nil
-              lvl = lvl_normal
-              update_dash_lvls()
+              set_lvl("normal")
               break
             end
             clock.sleep(.1)
@@ -2388,7 +2377,7 @@ function reset_norns_interaction(interaction)
     countdown = countdown - 1
     if countdown == 0 then
       norns_interaction = interaction or nil
-      lvl = lvl_normal
+      set_lvl("normal")
       break
     end
     clock.sleep(.1)
@@ -2451,6 +2440,115 @@ function update_lanes(lane)
 
     lane_path.countd = event_countd -- store distinct event count for update_lane_glyph()
 
+  end
+end
+
+
+--------------------------------------------
+-- PATTERN TRANSFORMATION FUNCTIONS --
+--------------------------------------------
+
+-- Rotate pattern, including custom chords
+-- set loop == true to rotate only the looped portion of the pattern
+local function rotate_pattern(view, offset, loop)
+  if view == "Chord" then
+    local length = loop and chord_pattern_length[active_chord_pattern] or max_chord_pattern_length
+    local temp_chord_pattern = {}
+    local temp_custom_chords = {}
+    local custom = theory.custom_chords
+    local scale_count = #dreamsequence.scales
+
+    for scale = 1, scale_count do
+      temp_custom_chords[scale] = {}
+      for x = 1, 14 do
+        temp_custom_chords[scale][x] = {} -- omit chord pattern in hierarchy
+      end
+    end
+
+    for y = 1, length do
+      temp_chord_pattern[y] = chord_pattern[active_chord_pattern][y] -- pattern
+      
+      for scale = 1, #dreamsequence.scales do -- shift custom chords across ALL scales
+        local c = custom[scale][active_chord_pattern]
+        for x = 1, 14 do
+          if c[x][y] then
+            temp_custom_chords[scale][x][y] = c[x][y]
+          end
+        end
+      end
+    end
+
+    for y = 1, length do
+      local offset_y = util.wrap(y - offset, 1, length)
+      chord_pattern[active_chord_pattern][y] = temp_chord_pattern[offset_y] -- pattern
+      
+      for scale = 1, scale_count do
+        for x = 1, 14 do
+          custom[scale][active_chord_pattern][x][y] = temp_custom_chords[scale][x][offset_y]
+        end
+      end
+    end
+
+  elseif view == "Seq" then
+    local pattern = seq_pattern[selected_seq_no]
+    local active = active_seq_pattern[selected_seq_no]
+    local length = loop and seq_pattern_length[selected_seq_no][active] or max_seq_pattern_length
+    local temp_seq_pattern = {}
+
+    for i = 1, length do
+      temp_seq_pattern[i] = pattern[active][i]
+    end
+    for i = 1, length do
+      pattern[active][i] = temp_seq_pattern[util.wrap(i - offset,1,length)]
+    end
+  
+  end
+end
+
+
+-- "Transposes" pattern by shifting left or right
+local function transpose_pattern(view, offset)
+  if view == "Chord" then
+    -- -- shift 1 degree:
+    -- for y = 1, max_chord_pattern_length do
+    --   if chord_pattern[active_chord_pattern][y] ~= 0 then
+    --     chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + offset, 1, 14)
+    --   end
+    -- end
+
+    -- shift 7 degrees/octave
+    offset = offset * 7
+    -- local offset_wrapped = util.wrap(chord_pattern[active_chord_pattern][y] + offset, 1, 14)
+    for y = 1, max_chord_pattern_length do
+      if chord_pattern[active_chord_pattern][y] ~= 0 then
+        chord_pattern[active_chord_pattern][y] = util.wrap(chord_pattern[active_chord_pattern][y] + offset, 1, 14)
+      end
+    end
+
+    -- shift custom_chords for all scales
+    for scale = 1, #dreamsequence.scales do
+      local custom = theory.custom_chords[scale] -- omit this bit for writing back to table: [active_chord_pattern]
+      custom[active_chord_pattern] = rotate_tab_values(custom[active_chord_pattern], offset)
+
+      -- adjust intervals
+      for x = 1, 14 do
+        local offset_semitones = util.wrap(x + offset, 1, 14) < x and 12 or -12
+        local c = custom[active_chord_pattern][x]
+        for y = 1, 16 do
+          if c[y] then
+            for i = 1, #c[y].intervals do
+              c[y]["intervals"][i] = c[y]["intervals"][i] + offset_semitones
+            end
+          end
+        end
+      end
+    end
+
+  elseif view == "Seq" then
+    local pattern = seq_pattern[selected_seq_no][active_seq_pattern[selected_seq_no]]
+    for y = 1, max_seq_pattern_length do
+      pattern[y] = rotate_tab_values(pattern[y], offset)
+    end
   end
 end
 
@@ -3198,8 +3296,11 @@ function countdown()
 
   cycle_1_16 = util.wrap(cycle_1_16 + 1, 1, 16)
   local led_pulse_tab = {0,0,0,1,2,3,2,1} -- 3x pause at top
-  led_pulse = led_pulse_tab[util.wrap(cycle_1_16, 1, 8)]
+
   blinky = blinky ~ 1
+  led_pulse = led_pulse_tab[util.wrap(cycle_1_16, 1, 8)]
+  dashboards.update_animations(blinky, led_pulse) -- send to dashboards
+
   led_high_blink = 15 - blinky * 4
   led_med_blink = 7 - blinky * 2
   led_low_blink = 3 - blinky
@@ -4279,26 +4380,26 @@ midi_event = function(data)
 end
 
 
---todo p2 check with Trent to see if there is a calc we can use rather than the regression
-function est_jf_time()
-  crow.ii.jf.get ("time") --populates jf_time global
+-- --todo p2 check with Trent to see if there is a calc we can use rather than the regression
+-- function est_jf_time()
+--   crow.ii.jf.get ("time") --populates jf_time global
   
-  jf_time_hold = clock.run(
-    function()
-      clock.sleep(0.005) -- a small hold for usb round-trip
-      local jf_time_s = math.exp(-0.694351 * jf_time + 3.0838) -- jf_time_v_to_s.
-      print("jf_time_s = " .. jf_time_s)
-      -- return(jf_time_s)
-      end
-  )
-end
+--   jf_time_hold = clock.run(
+--     function()
+--       clock.sleep(0.005) -- a small hold for usb round-trip
+--       local jf_time_s = math.exp(-0.694351 * jf_time + 3.0838) -- jf_time_v_to_s.
+--       print("jf_time_s = " .. jf_time_s)
+--       -- return(jf_time_s)
+--       end
+--   )
+-- end
 
 --#region local functions for grid_redraw
 
 -- function for drawing arranger patterns + playhead
 -- used by regular or shifted arranger (latter will pass modified x_offset depending on section)
 -- Q: It's not clear when a jump is occuring if said jump is off-screen. How to address this?
-local function draw_patterns_playheads(x, y, x_offset, arranger_led)
+local function draw_patterns_playheads(x, y, x_offset, arranger_led, led_pulse)
   local q = arranger_q
   if arranger_padded[q] then -- if arranger_q is valid, this takes priority for position pulsing
 
@@ -4393,15 +4494,6 @@ end
 
 
 function grid_redraw()
-  local blinky = blinky
-  local led_high = led_high
-  local led_med = led_med
-  local led_low = led_low
-  local led_high_blink = led_high_blink
-  local led_med_blink = led_med_blink
-  local led_low_blink = led_low_blink
-  local led_pulse = led_pulse
-  
   g:all(0) -- todo look into efficiency of this
   
   if screen_view_name == "mask_editor" then
@@ -4563,7 +4655,7 @@ function grid_redraw()
               for y = 1, 4 do -- patterns
                 arranger_led = get_patterns(x_offset, y)
                 local x_offset = x + arranger_grid_offset -- revert x_offset
-                draw_patterns_playheads(x, y, x_offset, arranger_led)
+                draw_patterns_playheads(x, y, x_offset, arranger_led, led_pulse)
               end
 
               draw_events(x, x_offset)
@@ -4572,7 +4664,7 @@ function grid_redraw()
               
               for y = 1, 4 do -- patterns
                 arranger_led = get_patterns(x_offset, y)
-                draw_patterns_playheads(x, y, x_offset, arranger_led)
+                draw_patterns_playheads(x, y, x_offset, arranger_led, led_pulse)
               end
               
               draw_events(x, x_offset)
@@ -4585,7 +4677,7 @@ function grid_redraw()
 
                 for y = 1, 4 do -- patterns
                   arranger_led = y == pattern_padded and 3 or nil
-                  draw_patterns_playheads(x, y, x_offset, arranger_led)
+                  draw_patterns_playheads(x, y, x_offset, arranger_led, led_pulse)
                 end
 
                 -- can't use draw_events here because we DO want to extend in_bounds area but DON'T want to offset populated segments
@@ -4613,7 +4705,7 @@ function grid_redraw()
             for y = 1, 4 do
               arranger_led = get_patterns(x_offset, y)
               local x_offset = x + arranger_grid_offset -- revert x_offset
-              draw_patterns_playheads(x, y, x_offset, arranger_led)
+              draw_patterns_playheads(x, y, x_offset, arranger_led, led_pulse)
             end
 
             draw_events(x, x_offset)
@@ -4630,7 +4722,7 @@ function grid_redraw()
             local arranger_led = nil
 
             arranger_led = y == arranger[x_offset] and 15 or (y == arranger_padded[x_offset] and 3) -- actual/padded segments
-            draw_patterns_playheads(x, y, x_offset, arranger_led)
+            draw_patterns_playheads(x, y, x_offset, arranger_led, led_pulse)
           end
 
           draw_events(x, x_offset)
@@ -4770,7 +4862,8 @@ end
 
 function reset_grid_led_phase()
   cycle_1_16 = 1 -- restart pulse cycle so upcoming pattern is immediately visible
-  led_pulse = 0
+  led_pulse = 0 -- local var for screen/grid
+  dashboards.update_animations(blinky, 0)
   grid_dirty = true
 end
 
@@ -5277,8 +5370,7 @@ function g.key(x, y, z)
           -- todo p0 need to do copy+paste and figure out complications there with simultaneous keypresses
           if not grid_interaction then -- first keypress which defines editing_chord
             grid_interaction = "chord_key_held"
-            lvl = lvl_dimmed
-            update_dash_lvls()
+            set_lvl("dimmed")
             editing_chord_scale = params:get("scale")
             editing_chord_pattern = active_chord_pattern
             editing_chord_x = x -- used for chord editor
@@ -5559,8 +5651,7 @@ function g.key(x, y, z)
         if chord_key_count == 0 then
           if grid_interaction == "chord_key_held" then
             grid_interaction = nil
-            lvl = lvl_normal
-            update_dash_lvls()
+            set_lvl("normal")
           end
         end
 
@@ -5705,7 +5796,7 @@ function key(n, z)
         -- if event_edit_active == false then -- maybe
         params:set("event_quick_actions", 1)
         norns_interaction = "event_actions"
-        lvl = lvl_dimmed
+        set_lvl("dimmed")
         -- end
       elseif not grid_interaction and not norns_interaction then
         -- notification("HOLD TO DEFER EDITS")--, {"k", 1}) --always show with timer rather than with a hold for this one 
@@ -5982,9 +6073,7 @@ function key(n, z)
         screen_view_name = "chord_editor"
         pending_chord_disable = {} -- cancel any help chord disables to be safe
 
-        lvl = lvl_normal
-        update_dash_lvls()
-
+        set_lvl("normal")
     
       elseif view_key_count > 0 and grid_view_name == "Seq" then -- Grid view key held down
 
@@ -6326,7 +6415,7 @@ function key(n, z)
           delete_events_in_segment() -- no arg so window will close after
         else -- if "Quick actions:" faux title, close window
           norns_interaction = nil
-          lvl = lvl_normal
+          set_lvl("normal")
         end
 
       end
@@ -7087,8 +7176,6 @@ end
 -------------------------
 -- todo p1: this can be improved quite a bit by just having these custom screens be generated at the key/g.key level. Should be a fun refactor.
 function redraw()
-  -- screen.font_face(tab.key(screen.font_face_names, "norns"))
-
   local dash_x = xy.dash_x   -- x origin of chord and arranger dashes
   local header_x = xy.header_x
   local header_y = xy.header_y

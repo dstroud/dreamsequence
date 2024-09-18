@@ -1,41 +1,43 @@
-dash_functions = {} -- storage for all dashboard functions
-dash_list = {} -- dynamic list of selected functions to draw, set by dash_n params
-dash_ids = {false}
-dash_name = {"Off"}
+local dashboards = {
+  funcs = {},
+  ids = {false},
+  names = {"Off"}
+}
+local lvl = {}
+local blinky
+local led_pulse
+
+local pattern_name = {"A","B","C","D"}
+
+function dashboards.update_animations(b, p) -- passes animation.blinky and animation.led_pulse
+  blinky = b -- from animation.blinky
+  led_pulse = p -- from animation.led_pulse
+end
+
+
+
 
 ------------------------------
 -- MODULAR DASHBOARD FUNCTIONS
 ------------------------------
-
--- x origin of chord and arranger dashes
-local dash_x = xy.dash_x
+local dash_x = 93
 local width = 35
 
-local lvl_pane = lvl.pane
-local lvl_pane_selected = lvl.pane_selected
-local lvl_pane_deselected = lvl.pane_deselected
-local lvl_chart_deselected = lvl.chart_deselected
-local lvl_menu_selected = lvl.menu_selected
+local lvl_pane
+local lvl_pane_selected
+local lvl_pane_deselected
+local lvl_chart_deselected
+local lvl_menu_selected
 
--- local lvl_pane_dark = lvl.pane_dark
--- local lvl_chart_area = lvl.chart_area
--- local lvl_menu_deselected = lvl.menu_deselected
--- local blinky = blinky -- can't be locally defined here or there's no updating of value
--- local led_pulse = led_pulse -- can't be locally defined here or there's no updating of value
-
-
--- function called by main script when we need to switch between normal and dim levels
-function update_dash_lvls()
-  -- lvl = lvl -- used by arranger dash
+-- function called from dreamsequence.lua when we need to switch between normal and dim levels
+function dashboards.update_dash_lvls(lvl_tab)
+  lvl = lvl_tab
 
   lvl_pane = lvl.pane
   lvl_pane_selected = lvl.pane_selected
   lvl_pane_deselected = lvl.pane_deselected
   lvl_chart_deselected = lvl.chart_deselected
   lvl_menu_selected = lvl.menu_selected
-
-  -- lvl_pane_dark = lvl.pane_dark
-  -- lvl_chart_area = lvl.chart_area
 end
 
 
@@ -44,11 +46,10 @@ end
 --------------------------------------------
 -- ARRANGER DASH
 --------------------------------------------
-table.insert(dash_ids, "arranger_chart")
-table.insert(dash_name,"Arranger chart")
+table.insert(dashboards.ids, "arranger_chart")
+table.insert(dashboards.names,"Arranger chart")
 
-function dash_functions.arranger_chart()
-  local lvl = lvl -- requires going to table for chart dimming :/
+function dashboards.funcs.arranger_chart()  
   local state = arranger_state
   local on = params:string("arranger") == "On"
   local final_seg = arranger_next == 0 -- arranger_position or 0 >= arranger_length
@@ -56,10 +57,8 @@ function dash_functions.arranger_chart()
 
   -- ARRANGER PANE
   screen.level(lvl_pane)
-  -- screen.level(on and lvl_pane or lvl_pane - 9)
   screen.rect(dash_x, dash_y, width, 22)
   screen.fill()
-
 
   -- ARRANGER POSITION READOUT
   -- dark = synced with arranger
@@ -185,10 +184,10 @@ end
 ---------------------
 -- CHORD READOUT: NAME
 ---------------------
-table.insert(dash_ids, "chord_active_name")
-table.insert(dash_name, "Chord name")
+table.insert(dashboards.ids, "chord_active_name")
+table.insert(dashboards.names, "Chord name")
 
-function dash_functions.chord_active_name()
+function dashboards.funcs.chord_active_name()
   -- pane
   screen.level(lvl_pane)
   screen.rect(dash_x, dash_y, width, 17)
@@ -213,10 +212,10 @@ end
 ---------------------
 -- CHORD READOUT: KEYBOARD VIZ
 ---------------------
-table.insert(dash_ids, "chord_active_kbd")
-table.insert(dash_name, "Chord kbd")
+table.insert(dashboards.ids, "chord_active_kbd")
+table.insert(dashboards.names, "Chord kbd")
 
-function dash_functions.chord_active_kbd()
+function dashboards.funcs.chord_active_kbd()
   local dark_g = lvl_pane_selected + 2
   local state_white = dash_keys_white
   local state_black = dash_keys_black
@@ -253,10 +252,10 @@ end
 ----------------------------------------------------
 -- CHORD PATTERN PROGRESS
 ----------------------------------------------------
-table.insert(dash_ids, "chord_progress")
-table.insert(dash_name, "Chord progress")
+table.insert(dashboards.ids, "chord_progress")
+table.insert(dashboards.names, "Chord progress")
 
-function dash_functions.chord_progress()
+function dashboards.funcs.chord_progress()
   -- pane
   screen.level(lvl_pane)
   screen.rect(dash_x, dash_y, width, 11)
@@ -292,10 +291,10 @@ end
 ----------------------------------------------------
 -- METRONOME, TIME REMAINING IN ARRANGEMENT
 ----------------------------------------------------
-table.insert(dash_ids, "metro_remaining")
-table.insert(dash_name, "Metro T-")
+table.insert(dashboards.ids, "metro_remaining")
+table.insert(dashboards.names, "Metro T-")
 
-function dash_functions.metro_remaining()
+function dashboards.funcs.metro_remaining()
   -- pane
   screen.level(lvl_pane)
   screen.rect(dash_x, dash_y, width, 11)
@@ -333,10 +332,10 @@ end
 ----------------------------------------------------
 -- METRONOME, TIME ELAPSED
 ----------------------------------------------------
-table.insert(dash_ids, "metro_elapsed")
-table.insert(dash_name, "Metro T+")
+table.insert(dashboards.ids, "metro_elapsed")
+table.insert(dashboards.names, "Metro T+")
 
-function dash_functions.metro_elapsed()
+function dashboards.funcs.metro_elapsed()
   -- pane
   screen.level(lvl_pane)
   screen.rect(dash_x, dash_y, width, 11)
@@ -367,3 +366,5 @@ function dash_functions.metro_elapsed()
 
   dash_y = dash_y + 12 -- position for next dash
 end
+
+return dashboards
