@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240918 Dan Stroud
+-- 1.4 240919 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -24,6 +24,21 @@
 
 -- stuff needed by includes
 dreamsequence = {}
+
+
+-- WIP: `pset_lookup` globals that need to be converted to locals
+-- local arranger = {}
+-- local events = {}
+-- local event_lanes = {}
+-- local chord_pattern = {}
+-- local chord_pattern_length = {}
+-- local seq_pattern = {}
+-- local seq_pattern_length = {}
+local misc = {}
+local voice = {}
+-- local masks = {} -- now theory.masks
+-- local chord = {}
+
 
 -- environment tables that are passed to included/required .lua files
 -- layout and palette
@@ -128,18 +143,15 @@ set_lvl("normal")
 
 -- load global scale mask file if present
 local filepath = norns.state.data
-masks = {} -- has to be global because of pset write function. todo p2 fix
 
 if util.file_exists(filepath) then
   if util.file_exists(filepath.."masks.data") then
-    masks = tab.load(filepath.."masks.data")
+    theory.masks = tab.load(filepath.."masks.data")
     print("table >> read: " .. filepath.."masks.data")
   else
-    masks = gen_default_masks()
+    theory.masks = gen_default_masks()
   end
 end
-
-theory.masks = masks
 
 clock.link.stop() -- transport won't start if external link clock is already running
 
@@ -1385,7 +1397,8 @@ function init()
 
   --#region PSET callback functions
   -- prefs .data table names we want pset callbacks to act on
-  pset_lookup = {"arranger", "events", "event_lanes", "chord_pattern", "chord_pattern_length", "seq_pattern", "seq_pattern_length", "misc", "voice", "masks", "chord"}
+  -- as these reside in various locations, additions will require updating params.action_read/write
+  local pset_lookup = {"arranger", "events", "event_lanes", "chord_pattern", "chord_pattern_length", "seq_pattern", "seq_pattern_length", "misc", "voice", "masks", "chord"}
 
   function params.action_write(filename, name, number)
     local number = number or "00" -- template
@@ -1397,14 +1410,10 @@ function init()
     misc.timestamp = os.date()
     misc.version = version
     misc.clock_tempo = params:get("clock_tempo")
-    -- misc.clock_source = params:get("clock_source") -- defer to system
     
-    -- these have to be global which is dumb
-    masks = deepcopy(theory.masks)
-    chord = deepcopy(theory.custom_chords)
+    chord = deepcopy(theory.custom_chords) -- todo de-global
 
     -- need to save and restore nb voices which can change based on what mods are enabled
-    -- reworked for seq2 but haven't tested
     voice = {}
 
     local sources = {}
@@ -1416,20 +1425,39 @@ function init()
     table.insert(sources, "midi_voice")
 
     for i = 1, #sources do
-      -- local param_string = sources[i].."_voice"
-      -- local param_string = param_string == "seq_voice" and "seq_voice_1" or param_string
-      -- voice[param_string] = params:string(param_string)
-      
-      -- print("debug sources[i] " .. params:string(sources[i]))
       voice[sources[i]] = params:string(sources[i])
     end
 
-
+    -- wip, slowly converting these to locals so we can't use the _G[] approach
+    -- need to coordinate with params.action_read
     for i = 1, #pset_lookup do
       local tablename = pset_lookup[i]
-      tab.save(_G[tablename], filepath .. tablename .. ".data")
+      if tablename == "arranger" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      elseif tablename == "events" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      elseif tablename == "event_lanes" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      elseif tablename == "chord_pattern" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      elseif tablename == "chord_pattern_length" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      elseif tablename == "seq_pattern" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      elseif tablename == "seq_pattern_length" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      elseif tablename == "misc" then
+        tab.save(misc, filepath .. tablename .. ".data")
+      elseif tablename == "voice" then
+        tab.save(voice, filepath .. tablename .. ".data")
+      elseif tablename == "masks" then
+        tab.save(theory.masks, filepath .. tablename .. ".data")
+      elseif tablename == "chord" then
+        tab.save(_G[tablename], filepath .. tablename .. ".data")
+      end
       print("table >> write: " .. filepath..tablename .. ".data")
     end
+    
   end
 
 
@@ -1440,21 +1468,43 @@ function init()
     if util.file_exists(filepath) then
       -- Close the event editor if it's currently open so pending edits aren't made to the new arranger unintentionally
       screen_view_name = "Session"
-      misc = {}
-      voice = {}
-      masks = {}
+      
+      -- todo p1: might want to run something to init all the `pset_lookup` tables in case a file is missing?
+      -- could also just roll that into the following:
+
       for i = 1, #pset_lookup do
         local tablename = pset_lookup[i]
           if util.file_exists(filepath..tablename..".data") then
-          _G[tablename] = tab.load(filepath..tablename..".data")
+          -- _G[tablename] = tab.load(filepath..tablename..".data")
           print("table >> read: " .. filepath..tablename..".data")
+            
+            if tablename == "arranger" then
+              _G[tablename] = tab.load(filepath..tablename..".data")
+            elseif tablename == "events" then
+              _G[tablename] = tab.load(filepath..tablename..".data")
+            elseif tablename == "event_lanes" then
+              _G[tablename] = tab.load(filepath..tablename..".data")
+            elseif tablename == "chord_pattern" then
+              _G[tablename] = tab.load(filepath..tablename..".data")
+            elseif tablename == "chord_pattern_length" then
+              _G[tablename] = tab.load(filepath..tablename..".data")
+            elseif tablename == "seq_pattern" then
+              _G[tablename] = tab.load(filepath..tablename..".data")
+            elseif tablename == "seq_pattern_length" then
+              _G[tablename] = tab.load(filepath..tablename..".data")
+            elseif tablename == "misc" then
+              misc = tab.load(filepath..tablename..".data")
+            elseif tablename == "voice" then
+              voice = tab.load(filepath..tablename..".data")              
+            elseif tablename == "masks" then
+              theory.masks = tab.load(filepath..tablename..".data")
+            elseif tablename == "chord" then
+              _G[tablename] = tab.load(filepath..tablename..".data")                 
+            end
+
         else
           print("table >> missing: " .. filepath..tablename..".data")
         end
-      end
-
-      if masks and #masks > 0 then
-        theory.masks = deepcopy(masks)
       end
 
       if chord and #chord > 0 then
@@ -1475,7 +1525,7 @@ function init()
 
       for i = 1, #sources do
         local param_string = sources[i]
-        local prev_param_name = voice[param_string] --params:string(param_string)
+        local prev_param_name = voice[param_string]
         local iterations = #params:lookup_param(param_string).options + 1
         if prev_param_name ~= nil then -- skip if not found (old pset data)
           for j = 1, iterations do
@@ -2225,9 +2275,8 @@ end
 -- param action function that saves current scales to global folder location
 function write_global_scales()
   local filepath = norns.state.data  
-  local masks = deepcopy(theory.masks)
 
-  tab.save(masks, filepath .. "masks.data")
+  tab.save(theory.masks, filepath .. "masks.data")
   print("table >> write: " .. filepath .. "masks.data")
 end
 
