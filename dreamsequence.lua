@@ -1487,6 +1487,7 @@ function init()
           for j = 1, iterations do
             if j == iterations then
               params:set(param_string, 1)
+              notification("MISSING " .. string.upper(prev_param_name), nil, 10)
               print("Unable to find NB voice " .. prev_param_name .. " for " .. param_string)
             elseif prev_param_name == params:lookup_param(param_string).options[j] then
               params:set(param_string, j)
@@ -2209,7 +2210,8 @@ end -- end of init
 -- end_tab is table indicating which grid or norns key release will end the message
 -- e.g. {g, x, y} or {k, 3}
 -- nil end_tab will result in long notification (enc)
-function notification(message, end_tab)
+-- duration is an optional override for popup duration
+function notification(message, end_tab, duration)
   local d = params:get("notifications")
   if d > 1 then -- index 1 == off
     if end_tab then
@@ -2225,7 +2227,7 @@ function notification(message, end_tab)
       lvl = lvl_dimmed
       update_dash_lvls()
       screen_message = message
-      do_notification_timer_1(math.max(d, 3)) --  since no end_tab was supplied, do timer of some sort (unless notifs are off)
+      do_notification_timer_1(duration or math.max(d, 3)) --  since no end_tab was supplied, do timer of some sort (unless notifs are off)
     end
   end
 end
