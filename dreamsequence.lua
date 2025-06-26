@@ -1,5 +1,5 @@
 -- Dreamsequence
--- 1.4 240918 Dan Stroud
+-- 1.4 250626 Dan Stroud
 -- llllllll.co/t/dreamsequence
 --
 -- Chord-based sequencer, 
@@ -5363,7 +5363,7 @@ function g.key(x, y, z)
 
           -- plays Chord when pressing on any Grid key (even turning chord off)
           if params:get("preview_notes") == 2 and (transport_state == "stopped" or transport_state == "paused") then
-            update_chord(x, y)
+            update_chord(x, y_offset)
             play_chord()
           end
 
